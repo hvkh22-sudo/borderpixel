@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Support — BorderPixel</title>
+<meta name="description" content="Help with BorderPixel purchases, photo checks, privacy, and exports.">
+<style>
+:root{
+  --bg:#ffffff; --surface:#f6f7fa; --border:#e2e6ee;
+  --text:#16203a; --muted:#5a6580; --brand:#1b3a6b; --accent:#2f6fd0;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0e1526; --surface:#161f36; --border:#26314c;
+    --text:#eef2fa; --muted:#a3aec6; --brand:#8fb4ea; --accent:#7aa9f0;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased}
+main{max-width:760px;margin:0 auto;padding:0 20px 64px}
+a{color:var(--accent)}
+header.nav{display:flex;align-items:center;justify-content:space-between;gap:16px;
+  flex-wrap:wrap;padding:22px 0;border-bottom:1px solid var(--border)}
+.brand{display:inline-flex;align-items:center;gap:9px;font-weight:700;
+  font-size:1.05rem;color:var(--text);text-decoration:none}
+.mark{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:8px;
+  background:var(--brand);color:#fff;font-size:.85rem}
+@media (prefers-color-scheme: dark){.mark{color:#0e1526}}
+nav a{margin-left:18px;text-decoration:none;font-weight:500;font-size:.95rem}
+nav a:hover{text-decoration:underline}
+.hero{padding:48px 0 30px}
+.label{font-size:.78rem;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--muted);font-weight:600;margin:0}
+h1{font-size:clamp(1.9rem,5.5vw,2.5rem);line-height:1.15;margin:.3em 0 .35em;letter-spacing:-.02em}
+h2{font-size:1.35rem;letter-spacing:-.01em;margin:0 0 .4em}
+.lede{font-size:1.1rem;color:var(--muted);max-width:62ch}
+.faq{border-top:1px solid var(--border)}
+details{border-bottom:1px solid var(--border);padding:4px 0}
+summary{cursor:pointer;font-weight:600;padding:15px 0;list-style:none;
+  display:flex;justify-content:space-between;gap:14px;align-items:center}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";color:var(--muted);font-weight:400;font-size:1.35rem;line-height:1}
+details[open] summary::after{content:"−"}
+details p{margin:0 0 16px;color:var(--muted);max-width:66ch}
+.contact{background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  padding:24px;margin-top:34px}
+.contact p:last-child{margin-bottom:0}
+.mail{font-weight:700;word-break:break-all}
+.warn{font-size:.92rem;color:var(--muted);border-left:3px solid var(--border);
+  padding-left:14px;margin-top:18px;max-width:64ch}
+footer{border-top:1px solid var(--border);margin-top:44px;padding:26px 0;
+  display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;
+  font-size:.92rem;color:var(--muted)}
+footer a{margin-right:16px}
+</style>
+</head>
+<body>
+<main>
+  <header class="nav">
+    <a class="brand" href="../"><span class="mark" aria-hidden="true">✓</span><span>BorderPixel</span></a>
+    <nav aria-label="Primary"><a href="./" aria-current="page">Support</a><a href="../privacy/">Privacy</a></nav>
+  </header>
+
+  <section class="hero">
+    <p class="label">Help center</p>
+    <h1>How can we help?</h1>
+    <p class="lede">For product or purchase help, email <span class="mail"><a href="mailto:hvkh22@gmail.com">hvkh22@gmail.com</a></span>. Include your iPhone model, iOS version, and what you were doing.</p>
+    <p class="warn">Never attach a passport photo or identity document to a support message.</p>
+  </section>
+
+  <section class="faq" aria-label="Frequently asked questions">
+    <details>
+      <summary>Will my photo definitely be accepted?</summary>
+      <p>No app can guarantee a government agency’s decision. BorderPixel checks visible requirements it can evaluate and clearly labels items you must confirm yourself.</p>
+    </details>
+    <details>
+      <summary>Does BorderPixel edit my face or background?</summary>
+      <p>No. It does not use generative AI, beauty filters, face retouching, or background replacement. It uses the photo you captured and applies crop, resize, and supported straightening.</p>
+    </details>
+    <details>
+      <summary>Where is my photo processed?</summary>
+      <p>The working photo is processed on your iPhone. BorderPixel does not operate a photo-processing server. A finished image leaves the app only when you choose an iOS Save or Share destination.</p>
+    </details>
+    <details>
+      <summary>Is this a subscription?</summary>
+      <p>No. The clean export is unlocked by one non-consumable App Store purchase. Use Restore Purchase on the Export screen if you previously bought it with the same Apple Account.</p>
+    </details>
+    <details>
+      <summary>Why is the purchase unavailable?</summary>
+      <p>Check your internet connection and try again. The purchase depends on Apple’s StoreKit service. If it remains unavailable, contact support with your iPhone model, iOS version, and the exact error message — do not send your photo.</p>
+    </details>
+    <details>
+      <summary>How do I request a refund?</summary>
+      <p>Apple handles App Store billing and refund decisions. Start at reportaproblem.apple.com or Apple Support. We can help identify the purchase, but we cannot issue the refund ourselves.</p>
+    </details>
+    <details>
+      <summary>The app cannot detect a face. What should I try?</summary>
+      <p>Use even front lighting, keep the full head and shoulders in frame, face the camera directly, and choose a plain real background. Retake the photo rather than editing facial features or replacing the background.</p>
+    </details>
+    <details>
+      <summary>Which documents are supported?</summary>
+      <p>The first release is designed for US passport photos. Always compare the final image with the current instructions for the exact application you are submitting.</p>
+    </details>
+  </section>
+
+  <section class="contact">
+    <p class="label">Contact</p>
+    <h2>Still stuck?</h2>
+    <p>Email <span class="mail"><a href="mailto:hvkh22@gmail.com">hvkh22@gmail.com</a></span>. Support correspondence is handled according to our <a href="../privacy/">Privacy Policy</a>.</p>
+  </section>
+
+  <footer>
+    <div><strong>BorderPixel</strong> — Independent, on-device passport photo guidance</div>
+    <div><a href="../">Home</a><a href="../privacy/">Privacy</a></div>
+  </footer>
+</main>
+</body>
+</html>
