@@ -15,7 +15,9 @@ import { config } from '../../services/config';
 import { getRepositories } from '../../services/db';
 import { deleteRecordingFile } from '../../services/files';
 import { useSettings } from '../../state/settings';
-import { backupFileName, collectBackup, serializeBackup } from '../../storage/backup';
+import { BackupError, backupFileName, collectBackup, importBackup, serializeBackup } from '../../storage/backup';
+import { pickBackupText } from '../../services/backupImport';
+import { randomUUID } from 'expo-crypto';
 
 export default function Privacy() {
   const analyticsEnabled = useSettings((s) => s.analyticsEnabled);
@@ -37,6 +39,17 @@ export default function Privacy() {
       Alert.alert(t('privacy.exportFailed'));
     } finally {
       exporting.current = false;
+    }
+  };
+
+  const importScripts = async () => {
+    try {
+      const text = await pickBackupText();
+      if (text == null) return;
+      const r = await importBackup(await getRepositories(), text, randomUUID);
+      Alert.alert(r.scriptsAdded + r.foldersAdded === 0 ? t('privacy.importNothing') : t('privacy.importDone', { scripts: r.scriptsAdded, folders: r.foldersAdded }));
+    } catch (e) {
+      Alert.alert(e instanceof BackupError ? t('privacy.importInvalid') : t('errors.generic'));
     }
   };
 
@@ -86,6 +99,7 @@ export default function Privacy() {
       </Section>
       <Section>
         <ListRow title={t('privacy.exportScripts')} subtitle={t('privacy.exportHint')} icon="share-outline" onPress={() => void exportScripts()} />
+        <ListRow title={t('privacy.importScripts')} subtitle={t('privacy.importHint')} icon="download-outline" onPress={() => void importScripts()} />
       </Section>
       <Button label={t('privacy.deleteAll')} variant="danger" icon="trash-outline" onPress={deleteAll} />
     </Screen>

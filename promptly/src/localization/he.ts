@@ -390,6 +390,11 @@ export const he: Strings = {
     exportFailed: 'לא הצלחנו לייצא את התסריטים. נסו שוב.',
     exportDialogTitle: 'גיבוי התסריטים מ-Promptly',
     shareUnavailable: 'שיתוף לא זמין במכשיר הזה.',
+    importScripts: 'ייבוא תסריטים',
+    importHint: 'הוספת תסריטים מקובץ גיבוי של Promptly. שום דבר לא נמחק או נדרס.',
+    importDone: 'יובאו {scripts} תסריטים ו-{folders} תיקיות.',
+    importNothing: 'כל מה שבקובץ כבר קיים ב-Promptly.',
+    importInvalid: 'הקובץ הזה אינו גיבוי תסריטים של Promptly.',
   },
   help: {
     title: 'עזרה ותמיכה',

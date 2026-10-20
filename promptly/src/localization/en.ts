@@ -383,6 +383,11 @@ export const en = {
     exportFailed: 'Couldn’t export your scripts. Please try again.',
     exportDialogTitle: 'Promptly scripts backup',
     shareUnavailable: 'Sharing isn’t available on this device.',
+    importScripts: 'Import scripts',
+    importHint: 'Add scripts from a Promptly backup file. Nothing is overwritten.',
+    importDone: 'Imported {scripts} scripts and {folders} folders.',
+    importNothing: 'Everything in this file is already in Promptly.',
+    importInvalid: 'This file isn’t a Promptly scripts backup.',
   },
   help: {
     title: 'Help & support',
