@@ -17,6 +17,7 @@ import { track } from '../services/analytics';
 import { getRepositories } from '../services/db';
 import { useSession } from '../state/session';
 import { useSettings } from '../state/settings';
+import { useDurationWpm } from '../state/speakingRate';
 import { useTheme } from '../theme/ThemeProvider';
 import { radius, spacing } from '../theme/tokens';
 
@@ -24,6 +25,7 @@ export default function Home() {
   const { colors } = useTheme();
   const onboardingDone = useSettings((s) => s.onboardingDone);
   const recoveredTakes = useSession((s) => s.recoveredTakes);
+  const paceWpm = useDurationWpm();
   const { data } = useFocusData(async () => {
     const repos = await getRepositories();
     const [scripts, takes] = await Promise.all([repos.scripts.list({ sort: 'recent' }), repos.recordings.list()]);
@@ -118,7 +120,7 @@ export default function Home() {
                   {s.body}
                 </Text>
                 <Text variant="caption" muted>
-                  ~{formatDuration(estimateSpeakingSeconds(s.body))}
+                  ~{formatDuration(estimateSpeakingSeconds(s.body, paceWpm))}
                 </Text>
               </Card>
             ))}

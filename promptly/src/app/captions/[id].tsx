@@ -56,7 +56,7 @@ export default function CaptionsEditor() {
   const [errorKey, setErrorKey] = useState<string | null>(null);
   const [notes, setNotes] = useState<string[]>([]);
   const [styleId, setStyleId] = useState<CaptionStyleId>('clean');
-  const [position, setPosition] = useState<CaptionPosition>('lower');
+  const [position, setPosition] = useState<CaptionPosition>(() => useSettings.getState().captionPosition);
   const [useScript, setUseScript] = useState(true);
   const [frameWidth, setFrameWidth] = useState(200);
   const abortRef = useRef<AbortController | null>(null);

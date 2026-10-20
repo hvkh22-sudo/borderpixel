@@ -16,7 +16,7 @@ import { formatDuration, t } from '../../localization/i18n';
 import { contentDirectionStyle, flipInRtl } from '../../localization/layoutDirection';
 import { getRepositories } from '../../services/db';
 import { deriveTitle, type Folder } from '../../storage/repositories';
-import { useSettings } from '../../state/settings';
+import { useDurationWpm } from '../../state/speakingRate';
 import { useTheme } from '../../theme/ThemeProvider';
 import { spacing, typography } from '../../theme/tokens';
 
@@ -26,7 +26,8 @@ const UNDO_SNAPSHOT_MS = 1200;
 export default function Editor() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors } = useTheme();
-  const wpm = useSettings((s) => s.prompter.wpm);
+  // Personal pace when learned, else the default (not the Timed scroll speed).
+  const wpm = useDurationWpm();
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [loaded, setLoaded] = useState(false);

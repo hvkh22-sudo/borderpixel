@@ -18,6 +18,7 @@ import { useSettings } from '../../state/settings';
 import { BackupError, backupFileName, collectBackup, importBackup, serializeBackup } from '../../storage/backup';
 import { pickBackupText } from '../../services/backupImport';
 import { randomUUID } from 'expo-crypto';
+import { useSpeakingRate } from '../../state/speakingRate';
 
 export default function Privacy() {
   const analyticsEnabled = useSettings((s) => s.analyticsEnabled);
@@ -70,6 +71,7 @@ export default function Privacy() {
           await repos.folders.clearAll();
           await repos.kv.clearAll();
           useSettings.getState().reset();
+          useSpeakingRate.getState().reset();
           Alert.alert(t('privacy.deleted'));
           router.replace('/');
         },

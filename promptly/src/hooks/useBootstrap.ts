@@ -17,6 +17,7 @@ import { fetchCustomerInfo, subscribeCustomerInfo } from '../services/purchases'
 import { useAccess } from '../state/access';
 import { useSession } from '../state/session';
 import { persistableSettings, useSettings, type SettingsState } from '../state/settings';
+import { SPEAKING_RATE_KEY, useSpeakingRate } from '../state/speakingRate';
 
 const SETTINGS_KEY = 'settings.v1';
 export const USAGE_VF_KEY = 'usage.voiceFollowSessions';
@@ -42,6 +43,7 @@ export function useBootstrap(): { ready: boolean; recovered: number } {
         });
         setAnalyticsEnabled(useSettings.getState().analyticsEnabled);
         useAccess.getState().setUsage({ voiceFollowSessionsUsed: await repos.kv.get(USAGE_VF_KEY, 0) });
+        useSpeakingRate.getState().hydrate(await repos.kv.get<unknown>(SPEAKING_RATE_KEY, null));
 
         // Persist settings on change (debounced).
         let timer: ReturnType<typeof setTimeout> | null = null;

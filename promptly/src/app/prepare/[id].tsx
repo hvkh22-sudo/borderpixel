@@ -1,6 +1,7 @@
+import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Button } from '../../components/Button';
 import { ListRow } from '../../components/ListRow';
@@ -11,6 +12,8 @@ import { Segmented } from '../../components/Segmented';
 import { Stepper } from '../../components/Stepper';
 import { Text } from '../../components/Text';
 import { checkFeature } from '../../features/monetization/entitlements';
+import { activePreset, applyPreset, getPreset, RECORDING_PRESETS, type PresetId } from '../../features/recording/presets';
+import { suggestedTimedWpm } from '../../features/teleprompter/speakingRate';
 import { MAX_WPM, MIN_WPM, WPM_STEP } from '../../features/teleprompter/scrollModel';
 import { Teleprompter } from '../../features/teleprompter/Teleprompter';
 import { estimateSpeakingSeconds } from '../../features/voice-follow/text';
@@ -19,14 +22,20 @@ import { getRepositories } from '../../services/db';
 import { support } from '../../services/deviceSupport';
 import { useAccess } from '../../state/access';
 import { useSettings, type ScrollMode } from '../../state/settings';
+import { useLearnedWpm, useSpeakingRate } from '../../state/speakingRate';
 import type { Script } from '../../storage/repositories';
-import { radius, spacing } from '../../theme/tokens';
+import { useTheme } from '../../theme/ThemeProvider';
+import { radius, spacing, touchTarget } from '../../theme/tokens';
 
 export default function Prepare() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [script, setScript] = useState<Script | null>(null);
   const prompter = useSettings((s) => s.prompter);
   const camera = useSettings((s) => s.camera);
+  const captionPosition = useSettings((s) => s.captionPosition);
+  const learnedWpm = useLearnedWpm();
+  const paceWpm = useSpeakingRate((s) => suggestedTimedWpm(s.history));
+  const { colors } = useTheme();
   const { setPrompter, setCamera } = useSettings.getState();
   const access = useAccess((s) => s.access);
   const usage = useAccess((s) => s.usage);
@@ -46,6 +55,12 @@ export default function Prepare() {
     }
     setPrompter({ mode });
   };
+  const preset = activePreset({ camera, prompter, captionPosition });
+  const choosePreset = (presetId: PresetId) => {
+    const s = useSettings.getState();
+    useSettings.setState(applyPreset({ camera: s.camera, prompter: s.prompter, captionPosition: s.captionPosition }, presetId));
+  };
+
   const mode: ScrollMode = prompter.mode === 'voice' && (!voiceSupported || !voiceGate.allowed) ? 'timed' : prompter.mode;
 
   const modeHint =
@@ -60,6 +75,40 @@ export default function Prepare() {
           <Teleprompter script={script.body} settings={{ ...prompter, mode }} mode="manual" playing={false} followCharOffset={null} />
         ) : null}
       </View>
+
+      <Section
+        title={t('presets.title')}
+        right={
+          <Text variant="caption" muted>
+            {preset ? t(getPreset(preset).nameKey) : t('presets.custom')}
+          </Text>
+        }
+      >
+        <View accessibilityRole="radiogroup" accessibilityLabel={t('presets.title')}>
+          {RECORDING_PRESETS.map((p) => {
+            const selected = p.id === preset;
+            return (
+              <Pressable
+                key={p.id}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+                accessibilityLabel={t(p.nameKey)}
+                accessibilityHint={t(p.detailKey)}
+                onPress={() => choosePreset(p.id)}
+                style={({ pressed }) => [styles.presetRow, pressed && { opacity: 0.7 }]}
+              >
+                <View style={styles.presetText}>
+                  <Text variant="callout">{t(p.nameKey)}</Text>
+                  <Text variant="caption" muted>
+                    {t(p.detailKey)}
+                  </Text>
+                </View>
+                <Ionicons name={selected ? 'checkmark-circle' : 'ellipse-outline'} size={22} color={selected ? colors.primary : colors.textMuted} />
+              </Pressable>
+            );
+          })}
+        </View>
+      </Section>
 
       <Section title={t('prepare.mode')}>
         <View style={styles.pad}>
@@ -97,6 +146,14 @@ export default function Prepare() {
             onChange={(wpm) => setPrompter({ wpm })}
             hint={script ? t('prepare.estimate', { duration: formatDuration(estimateSpeakingSeconds(script.body, prompter.wpm)) }) : undefined}
           />
+        ) : null}
+        {mode === 'timed' && learnedWpm != null && paceWpm != null ? (
+          <View style={styles.paceRow}>
+            <Text variant="caption" muted style={styles.flex}>
+              {paceWpm === prompter.wpm ? t('prepare.paceInUse', { n: learnedWpm }) : t('prepare.yourPace', { n: learnedWpm })}
+            </Text>
+            {paceWpm !== prompter.wpm ? <Button label={t('prepare.usePace')} variant="ghost" onPress={() => setPrompter({ wpm: paceWpm })} /> : null}
+          </View>
         ) : null}
       </Section>
 
@@ -143,6 +200,16 @@ export default function Prepare() {
               { value: 'back', label: t('prepare.back') },
             ]}
           />
+          <Text variant="callout">{t('prepare.orientation')}</Text>
+          <Segmented
+            accessibilityLabel={t('prepare.orientation')}
+            value={camera.orientation}
+            onChange={(orientation) => setCamera({ orientation })}
+            options={[
+              { value: 'portrait', label: t('prepare.portrait') },
+              { value: 'landscape', label: t('prepare.landscape') },
+            ]}
+          />
           <Text variant="callout">{t('prepare.quality')}</Text>
           <Segmented
             accessibilityLabel={t('prepare.quality')}
@@ -152,6 +219,13 @@ export default function Prepare() {
               { value: '1080p', label: '1080p' },
               { value: '720p', label: '720p' },
             ]}
+          />
+          <Text variant="callout">{t('prepare.frameRate')}</Text>
+          <Segmented
+            accessibilityLabel={t('prepare.frameRate')}
+            value={camera.fps}
+            onChange={(fps) => setCamera({ fps })}
+            options={[30, 60].map((n) => ({ value: n as 30 | 60, label: t('prepare.fps', { n }) }))}
           />
           <Text variant="callout">{t('prepare.countdown')}</Text>
           <Segmented
@@ -177,5 +251,9 @@ export default function Prepare() {
 const styles = StyleSheet.create({
   preview: { height: 220, borderRadius: radius.lg, overflow: 'hidden', backgroundColor: '#111' },
   pad: { gap: spacing.sm, paddingVertical: spacing.md },
+  presetRow: { minHeight: touchTarget + 8, flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
+  presetText: { flex: 1, gap: 2 },
+  paceRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingBottom: spacing.sm },
+  flex: { flex: 1 },
   proRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, justifyContent: 'center' },
 });

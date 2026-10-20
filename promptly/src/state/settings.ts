@@ -4,6 +4,8 @@
  */
 import { create } from 'zustand';
 
+import type { CaptionPosition } from '../features/captions/captionStyles';
+
 export type ScrollMode = 'manual' | 'timed' | 'voice';
 export type Appearance = 'system' | 'light' | 'dark';
 export type TextAlign = 'left' | 'center';
@@ -30,6 +32,8 @@ export interface PrompterSettings {
 
 export interface CameraSettings {
   position: 'front' | 'back';
+  /** Intended video frame. The file follows the screen orientation; this sets the target size and hints. */
+  orientation: 'portrait' | 'landscape';
   resolution: '1080p' | '720p';
   fps: 30 | 60;
 }
@@ -44,6 +48,8 @@ export interface SettingsState {
   speechLocale: string;
   prompter: PrompterSettings;
   camera: CameraSettings;
+  /** Default caption position for new captions (set by recording presets). */
+  captionPosition: CaptionPosition;
 }
 
 export const DEFAULT_PROMPTER: PrompterSettings = {
@@ -71,7 +77,8 @@ export const DEFAULT_SETTINGS: SettingsState = {
   aiConsent: false,
   speechLocale: 'en-US',
   prompter: DEFAULT_PROMPTER,
-  camera: { position: 'front', resolution: '1080p', fps: 30 },
+  camera: { position: 'front', orientation: 'portrait', resolution: '1080p', fps: 30 },
+  captionPosition: 'lower',
 };
 
 interface SettingsActions {

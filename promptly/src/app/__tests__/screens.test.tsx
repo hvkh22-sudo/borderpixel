@@ -5,6 +5,7 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 
 import { useSettings } from '../../state/settings';
+import { SPEAKING_RATE_KEY, useSpeakingRate } from '../../state/speakingRate';
 import { createRepos, renderScreen } from './testUtils';
 
 let mockRepos: Awaited<ReturnType<typeof createRepos>>;
@@ -31,6 +32,7 @@ beforeEach(async () => {
   mockPush.mockClear();
   for (const k of Object.keys(mockParams)) delete mockParams[k];
   useSettings.getState().hydrate({ onboardingDone: true });
+  useSpeakingRate.getState().reset();
 });
 
 describe('Home', () => {
@@ -123,6 +125,73 @@ describe('Prepare', () => {
     expect(screen.getByText('3 free Voice Follow takes left')).toBeTruthy();
     await fireEvent.press(screen.getByLabelText('Open camera'));
     expect(mockPush).toHaveBeenCalledWith(`/record/${s.id}?mode=voice`);
+  });
+});
+
+describe('Prepare presets', () => {
+  it('applies a preset, shows it as active, and turns Custom after a manual change', async () => {
+    const s = await mockRepos.scripts.create({ title: 'T', body: 'Hello world' });
+    mockParams.id = s.id;
+    const Prepare = require('../prepare/[id]').default;
+    await renderScreen(<Prepare />);
+    expect(await screen.findByText('Custom settings')).toBeTruthy();
+
+    await fireEvent.press(screen.getByLabelText('YouTube'));
+    expect(useSettings.getState().camera).toMatchObject({ orientation: 'landscape', resolution: '1080p', fps: 30 });
+    expect(screen.getByLabelText('YouTube').props.accessibilityState).toMatchObject({ selected: true });
+    expect(screen.queryByText('Custom settings')).toBeNull();
+
+    await fireEvent.press(screen.getByLabelText('TikTok / Reels / Shorts'));
+    expect(useSettings.getState().camera).toMatchObject({ orientation: 'portrait', fps: 30 });
+    expect(useSettings.getState().prompter.readingLine).toBe(0.18);
+    expect(useSettings.getState().captionPosition).toBe('lower');
+
+    await fireEvent.press(screen.getByLabelText('Talking head 60 fps'));
+    expect(useSettings.getState().camera.fps).toBe(60);
+
+    // A custom change still works and the setup becomes Custom.
+    await fireEvent.press(screen.getByLabelText('720p'));
+    expect(useSettings.getState().camera.resolution).toBe('720p');
+    expect(screen.getByText('Custom settings')).toBeTruthy();
+    expect(screen.getByLabelText('Talking head 60 fps').props.accessibilityState).toMatchObject({ selected: false });
+  });
+});
+
+describe('Learned speaking rate', () => {
+  it('suggests the creator’s pace in Timed mode with one-tap “Use my pace”', async () => {
+    await useSpeakingRate.getState().record({ wpm: 168, at: 1, source: 'voice' });
+    await useSpeakingRate.getState().record({ wpm: 172, at: 2, source: 'timed' });
+    expect((await mockRepos.kv.get<{ samples: unknown[] }>(SPEAKING_RATE_KEY, { samples: [] })).samples).toHaveLength(2);
+    const s = await mockRepos.scripts.create({ title: 'T', body: 'One two three four five six seven eight nine ten.' });
+    mockParams.id = s.id;
+    useSettings.getState().setPrompter({ mode: 'timed', wpm: 150 });
+    const Prepare = require('../prepare/[id]').default;
+    await renderScreen(<Prepare />);
+    expect(await screen.findByText(/Your pace: \d+ wpm$/)).toBeTruthy();
+    await fireEvent.press(screen.getByLabelText('Use my pace'));
+    expect(useSettings.getState().prompter.wpm).toBe(170);
+    expect(screen.getByText(/Your pace: \d+ wpm · in use/)).toBeTruthy();
+    expect(screen.queryByLabelText('Use my pace')).toBeNull();
+  });
+
+  it('shows nothing before enough takes, and duration estimates use the learned pace', async () => {
+    const s = await mockRepos.scripts.create({ title: 'T', body: Array.from({ length: 200 }, () => 'word').join(' ') });
+    mockParams.id = s.id;
+    useSettings.getState().setPrompter({ mode: 'timed', wpm: 150 });
+    const Prepare = require('../prepare/[id]').default;
+    const r = await renderScreen(<Prepare />);
+    await screen.findByText('150 words/min');
+    expect(screen.queryByLabelText('Use my pace')).toBeNull();
+    await r.unmount();
+
+    const Editor = require('../scripts/[id]').default;
+    const e = await renderScreen(<Editor />);
+    expect(await screen.findByText(/200 words · ~1m 20s/)).toBeTruthy(); // default 150 wpm
+    await e.unmount();
+    await useSpeakingRate.getState().record({ wpm: 200, at: 1, source: 'voice' });
+    await useSpeakingRate.getState().record({ wpm: 200, at: 2, source: 'voice' });
+    await renderScreen(<Editor />);
+    expect(await screen.findByText(/200 words · ~1m 0s/)).toBeTruthy();
   });
 });
 

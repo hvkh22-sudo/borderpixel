@@ -15,10 +15,14 @@
 | REC-07 | Rotation / orientation metadata | Portrait + landscape takes display correctly |
 | REC-08 | Front-camera mirroring | Document whether saved file is mirrored; confirm product choice |
 | REC-09 | Mic route change | Plug/unplug wired + Bluetooth mic mid-take: no crash; audio continues |
+| REC-10 | YouTube preset (landscape) | Rotation lock off, phone sideways: camera controls in trailing column, prompter readable; saved file is 16:9 landscape ~1920×1080 and plays upright in Photos/Gallery (iOS + Android). With rotation lock on, the “Turn your phone sideways” hint shows and the file stays portrait |
+| REC-11 | TikTok / Reels / Shorts preset | Saved file is 9:16 portrait ~1080×1920 at ~30 fps; tilting the phone mid-take does not flip the file orientation; reading line sits near the lens; new captions default to the lower safe position |
+| REC-12 | Talking head 60 fps preset | Device with 60 fps format records ~60 fps (check metadata); device without it falls back to 30 fps with no error. Android: confirm CameraX picks a 16:9 size for the landscape target (sensor-coordinate handling of `targetResolution`) |
 | VF-01 | VF + recording coexist (iOS) | Recording has full-quality audio AND prompter follows speech |
 | VF-02 | VF + recording (Android 13/14/15/16) | Video-only + persisted WAV muxed; audio continuous across recognizer restarts |
 | VF-03 | Latency | Word spoken → line moves: median measured and recorded (target to set from baseline) |
 | VF-04 | Behaviors | Pause holds; repeat no back-jump; skip paragraph recovers; tap-to-resync works |
+| VF-05 | Learned speaking rate | After 2+ Voice Follow takes ≥ 10 s, “Your pace” in setup is within ±10 % of words read ÷ time (stopwatch); tap-to-resync jumps do not inflate it; “Use my pace” sets Timed speed; app restart keeps it; Delete all data clears it |
 | CAP-01 | Transcribe 60 s take | Captions produced on-device, ≤ 1× real time on recent devices |
 | CAP-02 | No speech take | "We didn't hear any speech" shown; no fabricated text |
 | CAP-03 | Burn-in | Captioned MP4 matches preview style/position; original unchanged |

@@ -15,6 +15,7 @@ import { estimateSpeakingSeconds } from '../../features/voice-follow/text';
 import { useFocusData } from '../../hooks/useAsyncData';
 import { formatDuration, t } from '../../localization/i18n';
 import { getRepositories } from '../../services/db';
+import { useDurationWpm } from '../../state/speakingRate';
 import type { FolderWithCount, Script, ScriptSort } from '../../storage/repositories';
 import { useTheme } from '../../theme/ThemeProvider';
 import { radius, spacing } from '../../theme/tokens';
@@ -42,6 +43,7 @@ export default function Library() {
   const [sort, setSort] = useState<ScriptSort>('updated');
   const [undoId, setUndoId] = useState<string | null>(null);
   const [sheet, setSheet] = useState<SheetState | null>(null);
+  const paceWpm = useDurationWpm();
 
   const { data, reload } = useFocusData(async () => {
     const repos = await getRepositories();
@@ -256,7 +258,7 @@ export default function Library() {
                 {item.body || ' '}
               </Text>
               <Text variant="caption" muted numberOfLines={1}>
-                ~{formatDuration(estimateSpeakingSeconds(item.body))} · {new Date(item.updatedAt).toLocaleDateString()}
+                ~{formatDuration(estimateSpeakingSeconds(item.body, paceWpm))} · {new Date(item.updatedAt).toLocaleDateString()}
                 {activeFilter.kind !== 'folder' && item.folderId && folderName.has(item.folderId) ? ` · ${folderName.get(item.folderId)}` : ''}
               </Text>
             </View>
