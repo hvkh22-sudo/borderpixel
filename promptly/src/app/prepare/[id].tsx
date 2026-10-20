@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { decorative } from '../../components/a11y';
 import { Button } from '../../components/Button';
 import { ListRow } from '../../components/ListRow';
 import { ProBadge } from '../../components/ProBadge';
@@ -115,7 +116,7 @@ export default function Prepare() {
                     {t(p.detailKey)}
                   </Text>
                 </View>
-                <Ionicons name={selected ? 'checkmark-circle' : 'ellipse-outline'} size={22} color={selected ? colors.primary : colors.textMuted} />
+                <Ionicons {...decorative} name={selected ? 'checkmark-circle' : 'ellipse-outline'} size={22} color={selected ? colors.primary : colors.textMuted} />
               </Pressable>
             );
           })}

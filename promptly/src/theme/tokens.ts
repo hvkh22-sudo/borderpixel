@@ -19,9 +19,13 @@ export const palette = {
   violet300: '#A99FFF',
   violet100: '#ECE9FF',
   rec500: '#FF4D5A',
-  rec600: '#E63946',
+  /** Record button fill: white label passes 4.5:1 (rec500 is 3.25:1). */
+  rec600: '#D92C3A',
+  rec700: '#C62F3B',
   green500: '#2FBF71',
+  green700: '#1C8049',
   amber500: '#F5A524',
+  amber700: '#9A5B00',
 } as const;
 
 export interface ColorTokens {
@@ -35,6 +39,8 @@ export interface ColorTokens {
   primary: string;
   primaryPressed: string;
   primarySoft: string;
+  /** Primary-hue text and small glyphs (ghost buttons, badges, links): ≥ 4.5:1 on every surface. */
+  primaryText: string;
   onPrimary: string;
   record: string;
   success: string;
@@ -54,11 +60,13 @@ export const lightColors: ColorTokens = {
   primary: palette.violet500,
   primaryPressed: palette.violet600,
   primarySoft: palette.violet100,
+  primaryText: palette.violet600,
   onPrimary: palette.white,
-  record: palette.rec500,
-  success: palette.green500,
-  warning: palette.amber500,
-  danger: palette.rec600,
+  record: palette.rec600,
+  // Darker variants on light surfaces: the 500s are 2.0–2.4:1 on white (WCAG text needs 4.5:1).
+  success: palette.green700,
+  warning: palette.amber700,
+  danger: palette.rec700,
   overlay: 'rgba(9,10,15,0.55)',
 };
 
@@ -73,8 +81,9 @@ export const darkColors: ColorTokens = {
   primary: palette.violet500,
   primaryPressed: palette.violet600,
   primarySoft: 'rgba(109,94,245,0.18)',
+  primaryText: palette.violet300,
   onPrimary: palette.white,
-  record: palette.rec500,
+  record: palette.rec600,
   success: palette.green500,
   warning: palette.amber500,
   danger: palette.rec500,

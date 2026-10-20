@@ -18,11 +18,13 @@ interface Props {
   size?: 'md' | 'lg';
   style?: StyleProp<ViewStyle>;
   accessibilityHint?: string;
+  /** For toggle-style buttons (e.g. Compare): exposed as the selected state. */
+  selected?: boolean;
   /** Stable id for end-to-end tests (Maestro `id:` selector). */
   testID?: string;
 }
 
-export function Button({ label, onPress, variant = 'primary', icon, loading, disabled, size = 'md', style, accessibilityHint, testID }: Props) {
+export function Button({ label, onPress, variant = 'primary', icon, loading, disabled, size = 'md', style, accessibilityHint, selected, testID }: Props) {
   const { colors } = useTheme();
   const bg: Record<Variant, string> = {
     primary: colors.primary,
@@ -34,7 +36,7 @@ export function Button({ label, onPress, variant = 'primary', icon, loading, dis
   const fg: Record<Variant, string> = {
     primary: colors.onPrimary,
     secondary: colors.text,
-    ghost: colors.primary,
+    ghost: colors.primaryText,
     danger: colors.danger,
     record: '#FFFFFF',
   };
@@ -45,7 +47,7 @@ export function Button({ label, onPress, variant = 'primary', icon, loading, dis
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityHint={accessibilityHint}
-      accessibilityState={{ disabled: !!inactive, busy: !!loading }}
+      accessibilityState={{ disabled: !!inactive, busy: !!loading, ...(selected === undefined ? null : { selected }) }}
       disabled={inactive}
       onPress={() => {
         void Haptics.selectionAsync().catch(() => {});
@@ -65,7 +67,7 @@ export function Button({ label, onPress, variant = 'primary', icon, loading, dis
         ) : icon ? (
           <Ionicons name={icon} size={size === 'lg' ? 22 : 18} color={fg[variant]} />
         ) : null}
-        <Text style={[size === 'lg' ? typography.headline : typography.callout, { color: fg[variant], fontWeight: '600' }]}>{label}</Text>
+        <Text style={[size === 'lg' ? typography.headline : typography.callout, styles.label, { color: fg[variant] }]}>{label}</Text>
       </View>
     </Pressable>
   );
@@ -80,5 +82,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   lg: { minHeight: 58, paddingHorizontal: spacing.xxl },
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, maxWidth: '100%' },
+  // Long labels wrap at large Dynamic Type sizes instead of overflowing the pill.
+  label: { fontWeight: '600', flexShrink: 1, textAlign: 'center' },
 });

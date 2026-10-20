@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { decorative } from '../components/a11y';
 import { Button } from '../components/Button';
 import { Text } from '../components/Text';
 import { t } from '../localization/i18n';
@@ -28,7 +29,7 @@ export default function Onboarding() {
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: colors.background }]}>
       <View style={styles.body}>
-        <View style={[styles.logo, { backgroundColor: colors.primary }]}>
+        <View {...decorative} style={[styles.logo, { backgroundColor: colors.primary }]}>
           <Ionicons name="reader-outline" size={34} color="#fff" />
         </View>
         <Text variant="display" accessibilityRole="header">
@@ -38,7 +39,7 @@ export default function Onboarding() {
         <View style={styles.points}>
           {POINTS.map((p) => (
             <View key={p.key} style={styles.point}>
-              <View style={[styles.pointIcon, { backgroundColor: colors.primarySoft }]}>
+              <View {...decorative} style={[styles.pointIcon, { backgroundColor: colors.primarySoft }]}>
                 <Ionicons name={p.icon} size={20} color={colors.primary} />
               </View>
               <Text variant="callout" style={styles.flex}>

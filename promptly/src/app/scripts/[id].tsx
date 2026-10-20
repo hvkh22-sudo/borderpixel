@@ -231,7 +231,8 @@ export default function Editor() {
           />
         </View>
       ) : null}
-      <Text testID="editor-stats" variant="caption" muted accessibilityLiveRegion="polite">
+      {/* Not a live region: it changes on every keystroke and would interrupt dictation/typing feedback. */}
+      <Text testID="editor-stats" variant="caption" muted>
         {t('editor.stats', { words, duration: formatDuration(estimateSpeakingSeconds(body, wpm)) })} · {saveState === 'saved' ? t('editor.saved') : t('editor.saving')}
       </Text>
       <TextInput

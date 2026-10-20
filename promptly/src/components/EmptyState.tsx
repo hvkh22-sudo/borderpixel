@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { useTheme } from '../theme/ThemeProvider';
 import { spacing } from '../theme/tokens';
+import { decorative } from './a11y';
 import { Text } from './Text';
 
 interface Props {
@@ -17,10 +18,10 @@ export function EmptyState({ icon, title, body, action }: Props) {
   const { colors } = useTheme();
   return (
     <View style={styles.wrap}>
-      <View style={[styles.badge, { backgroundColor: colors.primarySoft }]}>
+      <View {...decorative} style={[styles.badge, { backgroundColor: colors.primarySoft }]}>
         <Ionicons name={icon} size={30} color={colors.primary} />
       </View>
-      <Text variant="headline" center>
+      <Text variant="headline" center accessibilityRole="header">
         {title}
       </Text>
       {body ? (

@@ -3,9 +3,11 @@ import { RecordingPresets, useAudioRecorder, type RecordingInput, type Recording
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Linking, StyleSheet, View } from 'react-native';
 
+import { decorative } from '../../components/a11y';
 import { Button } from '../../components/Button';
 import { Sheet } from '../../components/Sheet';
 import { Text } from '../../components/Text';
+import { useAnnounce } from '../../hooks/useAnnounce';
 import { t } from '../../localization/i18n';
 import { beginMicSession, deleteMicCheckFile, ensureMicPermission, releaseMicSession } from '../../services/micCheck';
 import { useTheme } from '../../theme/ThemeProvider';
@@ -165,12 +167,24 @@ function MicCheckPanel({ onClose, onResult }: { onClose: () => void; onResult?: 
   const verdictColor = verdict === 'good' ? colors.success : verdict === 'silent' ? colors.danger : colors.warning;
   const verdictIcon = verdict === 'good' ? 'checkmark-circle' : verdict === 'silent' ? 'mic-off' : 'alert-circle';
   const meterColor = level >= 0.98 ? colors.danger : colors.success;
+  const statusText =
+    phase === 'preparing'
+      ? t('micCheck.preparing')
+      : phase === 'listening'
+        ? t('micCheck.listening')
+        : phase === 'denied' || phase === 'blocked'
+          ? t('micCheck.permissionDenied')
+          : phase === 'error'
+            ? t('micCheck.failed')
+            : t('micCheck.intro');
+  // VoiceOver has no live regions: announce phase changes and the verdict (idle intro is read on focus).
+  useAnnounce(phase === 'done' && verdict ? `${t(VERDICT_TITLE[verdict])}. ${t(VERDICT_DETAIL[verdict])}` : phase === 'idle' ? null : statusText);
 
   return (
     <View style={styles.body}>
       {phase === 'done' && verdict ? (
         <View style={styles.verdict} accessibilityLiveRegion="polite">
-          <Ionicons name={verdictIcon} size={28} color={verdictColor} />
+          <Ionicons {...decorative} name={verdictIcon} size={28} color={verdictColor} />
           <View style={styles.flex}>
             <Text variant="headline">{t(VERDICT_TITLE[verdict])}</Text>
             <Text variant="caption" muted>
@@ -179,16 +193,8 @@ function MicCheckPanel({ onClose, onResult }: { onClose: () => void; onResult?: 
           </View>
         </View>
       ) : (
-        <Text variant="callout" muted>
-          {phase === 'preparing'
-            ? t('micCheck.preparing')
-            : phase === 'listening'
-              ? t('micCheck.listening')
-              : phase === 'denied' || phase === 'blocked'
-                ? t('micCheck.permissionDenied')
-                : phase === 'error'
-                  ? t('micCheck.failed')
-                  : t('micCheck.intro')}
+        <Text variant="callout" muted accessibilityLiveRegion={phase === 'idle' ? 'none' : 'polite'}>
+          {statusText}
         </Text>
       )}
 

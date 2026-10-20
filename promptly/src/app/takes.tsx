@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { memo, useCallback } from 'react';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 
+import { decorative } from '../components/a11y';
 import { EmptyState } from '../components/EmptyState';
 import { Text } from '../components/Text';
 import { useFocusData } from '../hooks/useAsyncData';
@@ -24,11 +25,11 @@ const TakeRow = memo(function TakeRow({ item, colors }: { item: Recording; color
     <Pressable
       testID="takes-item"
       accessibilityRole="button"
-      accessibilityLabel={`${when}, ${formatClock(item.durationMs)}`}
+      accessibilityLabel={[when, formatClock(item.durationMs), item.cues ? t('takes.captioned') : null].filter(Boolean).join(', ')}
       onPress={() => openTake(item.id)}
       style={({ pressed }) => [styles.row, { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.85 : 1 }]}
     >
-      <View style={[styles.thumb, { backgroundColor: colors.surfaceRaised }]}>
+      <View {...decorative} style={[styles.thumb, { backgroundColor: colors.surfaceRaised }]}>
         <Ionicons name="play" size={18} color={colors.text} />
       </View>
       <View style={styles.flex}>
@@ -38,7 +39,7 @@ const TakeRow = memo(function TakeRow({ item, colors }: { item: Recording; color
           {item.cues ? ` · ${t('takes.captioned')}` : ''}
         </Text>
       </View>
-      <Ionicons name="chevron-forward" size={18} color={colors.textMuted} style={flipInRtl()} />
+      <Ionicons {...decorative} name="chevron-forward" size={18} color={colors.textMuted} style={flipInRtl()} />
     </Pressable>
   );
 });

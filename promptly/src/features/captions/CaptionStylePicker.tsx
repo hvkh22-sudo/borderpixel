@@ -51,7 +51,7 @@ export function CaptionStylePicker({ value, onChange, showProBadge }: Props) {
               {label}
             </Text>
             {badge ? (
-              <Text variant="overline" color={colors.primary}>
+              <Text variant="overline" color={colors.primaryText}>
                 {badge}
               </Text>
             ) : null}

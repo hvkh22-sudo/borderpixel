@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
+import { decorative } from '../components/a11y';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { Screen } from '../components/Screen';
@@ -19,6 +20,7 @@ import {
   type StudioTool,
   type Tone,
 } from '../features/ai-script-studio/studio';
+import { useAnnounce } from '../hooks/useAnnounce';
 import { t, type TKey } from '../localization/i18n';
 import { AiError, aiAvailable, runStudio } from '../services/ai';
 import { track } from '../services/analytics';
@@ -27,7 +29,7 @@ import { getRepositories } from '../services/db';
 import { useSettings } from '../state/settings';
 import { deriveTitle, type Script, type ScriptVersionRow } from '../storage/repositories';
 import { useTheme } from '../theme/ThemeProvider';
-import { radius, spacing, typography } from '../theme/tokens';
+import { radius, spacing, touchTarget, typography } from '../theme/tokens';
 
 const EDIT_TOOLS: StudioTool[] = ['improve', 'shorten', 'conversational', 'hook', 'tone', 'platform'];
 const DURATIONS = [30, 60, 90, 180] as const;
@@ -51,6 +53,9 @@ export default function Studio() {
   const abortRef = useRef<AbortController | null>(null);
   const aiConsent = useSettings((st) => st.aiConsent);
   const [reported, setReported] = useState(false);
+  // AI results: errors are live regions on Android; VoiceOver gets announcements for both outcomes.
+  useAnnounce(result ? t('a11y.draftReady') : null, 'all');
+  useAnnounce(error);
 
   useEffect(() => {
     if (!params.scriptId) return;
@@ -114,7 +119,7 @@ export default function Studio() {
     return (
       <Screen>
         <Card>
-          <Ionicons name="sparkles-outline" size={28} color={colors.primary} />
+          <Ionicons {...decorative} name="sparkles-outline" size={28} color={colors.primary} />
           <Text variant="headline">{t('studio.title')}</Text>
           <Text muted>{t('studio.errors.not_configured')}</Text>
         </Card>
@@ -127,8 +132,8 @@ export default function Studio() {
     return (
       <Screen>
         <Card>
-          <Ionicons name="shield-checkmark-outline" size={28} color={colors.primary} />
-          <Text variant="headline">{t('studio.consentTitle')}</Text>
+          <Ionicons {...decorative} name="shield-checkmark-outline" size={28} color={colors.primary} />
+          <Text variant="headline" accessibilityRole="header">{t('studio.consentTitle')}</Text>
           <Text>{t('studio.disclosure')}</Text>
           <Button label={t('studio.consentAllow')} onPress={() => useSettings.getState().set({ aiConsent: true })} />
           <Button label={t('studio.consentNotNow')} variant="ghost" onPress={() => router.back()} />
@@ -168,7 +173,9 @@ export default function Studio() {
         </View>
       ) : (
         <View style={styles.form}>
-          <Text variant="title">{t(`studio.tools.${tool}` as TKey)}</Text>
+          <Text variant="title" accessibilityRole="header">
+            {t(`studio.tools.${tool}` as TKey)}
+          </Text>
           {tool === 'generate' ? (
             <>
               <TextInput value={topic} onChangeText={setTopic} placeholder={t('studio.topic')} placeholderTextColor={colors.textMuted} style={inputStyle} accessibilityLabel={t('studio.topic')} maxLength={300} />
@@ -178,7 +185,7 @@ export default function Studio() {
           ) : null}
           {tool === 'generate' || tool === 'platform' || tool === 'hook' ? (
             <>
-              <Text variant="overline" muted>
+              <Text variant="overline" muted accessibilityRole="header" accessibilityLabel={t('studio.platformLabel')}>
                 {t('studio.platformLabel').toUpperCase()}
               </Text>
               <Segmented accessibilityLabel={t('studio.platformLabel')} value={platform} onChange={setPlatform} options={PLATFORMS.map((p) => ({ value: p, label: t(`platform.${p}` as TKey) }))} />
@@ -186,15 +193,16 @@ export default function Studio() {
           ) : null}
           {tool === 'generate' || tool === 'tone' ? (
             <>
-              <Text variant="overline" muted>
+              <Text variant="overline" muted accessibilityRole="header" accessibilityLabel={t('studio.toneLabel')}>
                 {t('studio.toneLabel').toUpperCase()}
               </Text>
-              <View style={styles.chips}>
+              <View style={styles.chips} accessibilityRole="radiogroup" accessibilityLabel={t('studio.toneLabel')}>
                 {TONES.map((x) => (
                   <Pressable
                     key={x}
                     accessibilityRole="radio"
                     accessibilityState={{ selected: tone === x }}
+                    accessibilityLabel={t(`tone.${x}` as TKey)}
                     onPress={() => setTone(x)}
                     style={[styles.chip, { borderColor: tone === x ? colors.primary : colors.border, backgroundColor: tone === x ? colors.primarySoft : colors.surface }]}
                   >
@@ -206,14 +214,14 @@ export default function Studio() {
           ) : null}
           {tool === 'generate' || tool === 'shorten' ? (
             <>
-              <Text variant="overline" muted>
+              <Text variant="overline" muted accessibilityRole="header" accessibilityLabel={t('studio.duration')}>
                 {t('studio.duration').toUpperCase()}
               </Text>
               <Segmented accessibilityLabel={t('studio.duration')} value={duration} onChange={setDuration} options={DURATIONS.map((d) => ({ value: d, label: t('common.seconds', { n: d }) }))} />
             </>
           ) : null}
           <Button label={busy ? t('studio.running') : t('studio.run')} icon="sparkles" onPress={run} loading={busy} disabled={tool === 'generate' && !topic.trim()} />
-          {busy ? <ActivityIndicator color={colors.primary} /> : null}
+          {busy ? <ActivityIndicator color={colors.primary} {...decorative} /> : null}
           {error ? (
             <Text center color={colors.danger} accessibilityLiveRegion="assertive">
               {error}
@@ -225,8 +233,10 @@ export default function Studio() {
       {result ? (
         <View style={styles.form}>
           <View style={styles.resultHeader}>
-            <Text variant="headline">{t('studio.result')}</Text>
-            {script && tool !== 'hook' ? <Button label={t('studio.compare')} variant="ghost" onPress={() => setCompare((c) => !c)} /> : null}
+            <Text variant="headline" accessibilityRole="header">
+              {t('studio.result')}
+            </Text>
+            {script && tool !== 'hook' ? <Button label={t('studio.compare')} variant="ghost" selected={compare} onPress={() => setCompare((c) => !c)} /> : null}
           </View>
           {tool === 'hook' && result.alternatives?.length ? (
             result.alternatives.map((h) => (
@@ -240,7 +250,7 @@ export default function Studio() {
               {compare && script ? (
                 <Text>
                   {diffWords(script.body, result.text).map((p, i) => (
-                    <Text key={i} style={p.kind === 'added' ? { color: colors.success } : p.kind === 'removed' ? { color: colors.danger, textDecorationLine: 'line-through' } : undefined}>
+                    <Text key={i} style={p.kind === 'added' ? { color: colors.success, textDecorationLine: 'underline' } : p.kind === 'removed' ? { color: colors.danger, textDecorationLine: 'line-through' } : undefined}>
                       {p.text}
                     </Text>
                   ))}
@@ -271,7 +281,9 @@ export default function Studio() {
 function VersionList({ versions, onRestore }: { versions: ScriptVersionRow[]; onRestore: (v: ScriptVersionRow) => void }) {
   return (
     <View style={styles.form}>
-      <Text variant="headline">{t('studio.history')}</Text>
+      <Text variant="headline" accessibilityRole="header">
+        {t('studio.history')}
+      </Text>
       {versions.slice(0, 10).map((v) => (
         <Card key={v.id}>
           <Text variant="caption" muted>
@@ -291,6 +303,6 @@ const styles = StyleSheet.create({
   input: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.md, padding: spacing.md, minHeight: 48 },
   multi: { minHeight: 96, textAlignVertical: 'top' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  chip: { paddingHorizontal: spacing.md, minHeight: 40, justifyContent: 'center', borderRadius: radius.pill, borderWidth: 1 },
+  chip: { paddingHorizontal: spacing.md, minHeight: touchTarget, justifyContent: 'center', borderRadius: radius.pill, borderWidth: 1 },
   resultHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
 });

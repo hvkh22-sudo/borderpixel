@@ -53,8 +53,9 @@ export function Stepper({ label, value, display, min, max, step, onChange, hint 
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, minHeight: 56 },
-  text: { flex: 1 },
+  // Wraps the +/- control under the label at large Dynamic Type sizes.
+  row: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.md, minHeight: 56, paddingVertical: spacing.xs },
+  text: { flexGrow: 1, flexShrink: 1, flexBasis: 140 },
   controls: { flexDirection: 'row', alignItems: 'center', borderRadius: 999, borderWidth: StyleSheet.hairlineWidth },
   value: { minWidth: 64, textAlign: 'center', fontVariant: ['tabular-nums'], fontWeight: '600' },
 });

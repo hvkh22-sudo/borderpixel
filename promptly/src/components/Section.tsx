@@ -11,7 +11,7 @@ export function Section({ title, children, right }: { title?: string; children: 
     <View style={styles.wrap}>
       {title ? (
         <View style={styles.header}>
-          <Text variant="overline" muted accessibilityRole="header">
+          <Text variant="overline" muted accessibilityRole="header" accessibilityLabel={title}>
             {title.toUpperCase()}
           </Text>
           {right}

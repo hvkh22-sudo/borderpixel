@@ -40,7 +40,7 @@ Legend: ✅ verified · 🟡 implemented, not verified on device · ⬜ not star
 | AI Script Studio | 🟡 | proxy ✅ tested with mock LLM; no live API call made (no key, approval needed) |
 | Paywall / purchases / restore / lifetime | 🟡 | entitlement logic ✅ tested; no store products |
 | Recording recovery (orphan files) | 🟡 | duration restored via native module when available; Home shows a recovered-takes notice. Recorder now writes into documents, so a take survives an app kill; single-flight dedupe ✅ unit-tested. Partial-file playability **not tested on a device** |
-| Accessibility (labels, roles, adjustable steppers, live regions, reduced motion) | 🟡 | VoiceOver/TalkBack pass not done |
+| Accessibility (labels, roles, adjustable steppers, live regions, reduced motion) | 🟡 | Code audit + fixes in `docs/design/accessibility-audit.md`; token contrast ✅ unit-tested (WCAG AA, light + dark); roles/labels/states/custom actions ✅ tested in Node (`src/app/__tests__/accessibility.test.tsx`). VoiceOver/TalkBack pass on a device **not done** |
 | Localization framework (en) + RTL flag | 🟡 | English + Hebrew (folder and export strings included); Hebrew pending native-speaker review on device |
 | Remote control: Bluetooth page-turner / keyboard on the record screen (arrows, PageUp/Down, Space; opt-in Enter = start/stop; Settings › Remote control) | 🟡 | key mapping + JS bridge ✅ unit-tested; iOS first-responder view + Android ReactActivityHandler **never compiled**, not tested on a device (RC-01); volume-button remotes deliberately unsupported (docs/architecture/remote-control.md) |
 

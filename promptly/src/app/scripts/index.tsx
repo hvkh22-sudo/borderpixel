@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, Stack } from 'expo-router';
-import { memo, useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
+import { decorative } from '../../components/a11y';
 import { Button } from '../../components/Button';
 import { EmptyState } from '../../components/EmptyState';
 import { folderChoiceActions, FolderChips, type LibraryFilter } from '../../components/FolderChips';
@@ -16,6 +17,7 @@ import { useFocusData } from '../../hooks/useAsyncData';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { formatDuration, t } from '../../localization/i18n';
 import { getRepositories } from '../../services/db';
+import { useAnnounce } from '../../hooks/useAnnounce';
 import { useDurationWpm } from '../../state/speakingRate';
 import type { FolderWithCount, Script, ScriptSort } from '../../storage/repositories';
 import { useTheme } from '../../theme/ThemeProvider';
@@ -46,27 +48,37 @@ interface ScriptRowProps {
   colors: Colors;
   onOpen: (s: Script) => void;
   onActions: (s: Script) => void;
+  onA11yAction: (s: Script, action: string) => void;
 }
 
 /** Memoized: typing in search or opening a sheet does not re-render (or re-tokenize) every row. */
-const ScriptRow = memo(function ScriptRow({ item, folderLabel, paceWpm, colors, onOpen, onActions }: ScriptRowProps) {
+const ScriptRow = memo(function ScriptRow({ item, folderLabel, paceWpm, colors, onOpen, onActions, onA11yAction }: ScriptRowProps) {
   // Tokenizes the whole body: only redo it when the body or pace changes.
   const seconds = useMemo(() => estimateSpeakingSeconds(item.body, paceWpm), [item.body, paceWpm]);
+  const label = [item.title, item.favorite ? t('a11y.favorited') : null, `~${formatDuration(seconds)}`, new Date(item.updatedAt).toLocaleDateString(), folderLabel]
+    .filter(Boolean)
+    .join(', ');
   return (
     <Pressable
       testID="library-script-item"
       accessibilityRole="button"
-      accessibilityLabel={item.title}
-      accessibilityHint={t('common.edit')}
-      accessibilityActions={[{ name: 'longpress', label: t('library.moreActions') }]}
-      onAccessibilityAction={() => onActions(item)}
+      accessibilityLabel={label}
+      accessibilityHint={t('a11y.openScriptHint')}
+      accessibilityActions={[
+        { name: 'favorite', label: item.favorite ? t('library.unfavorite') : t('library.favorite') },
+        { name: 'move', label: t('library.moveToFolder') },
+        { name: 'duplicate', label: t('common.duplicate') },
+        { name: 'delete', label: t('common.delete') },
+        { name: 'longpress', label: t('library.moreActions') },
+      ]}
+      onAccessibilityAction={(e) => onA11yAction(item, e.nativeEvent.actionName)}
       onPress={() => onOpen(item)}
       onLongPress={() => onActions(item)}
       style={({ pressed }) => [styles.item, { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.85 : 1 }]}
     >
       <View style={styles.flex}>
         <View style={styles.titleRow}>
-          {item.favorite ? <Ionicons name="star" size={14} color={colors.warning} /> : null}
+          {item.favorite ? <Ionicons {...decorative} name="star" size={14} color={colors.warning} /> : null}
           <Text variant="headline" numberOfLines={1} style={styles.flex}>
             {item.title}
           </Text>
@@ -144,6 +156,28 @@ export default function Library() {
 
   const showActions = useCallback((s: Script) => setSheet({ kind: 'script', script: s }), []);
   const closeSheet = () => setSheet(null);
+  const toggleFavorite = (s: Script) => act((r) => r.scripts.update(s.id, { favorite: !s.favorite }));
+  const deleteScript = (s: Script) =>
+    act(async (r) => {
+      await r.scripts.remove(s.id);
+      setUndoId(s.id);
+    });
+  useAnnounce(undoId ? t('library.deleted') : null);
+
+  /** One screen-reader element per row; the row menu is also offered as custom actions. */
+  const onRowAction = (s: Script, action: string) => {
+    if (action === 'favorite') void toggleFavorite(s);
+    else if (action === 'move') setSheet({ kind: 'move', script: s });
+    else if (action === 'duplicate') void act((r) => r.scripts.duplicate(s.id, t('common.copySuffix')));
+    else if (action === 'delete') void deleteScript(s);
+    else showActions(s);
+  };
+  // Stable identity for memoized rows; always calls the latest handler.
+  const rowActionRef = useRef(onRowAction);
+  useEffect(() => {
+    rowActionRef.current = onRowAction;
+  });
+  const handleRowAction = useCallback((sc: Script, action: string) => rowActionRef.current(sc, action), []);
 
   const renderSheet = () => {
     if (!sheet) return null;
@@ -157,7 +191,7 @@ export default function Library() {
               testID: 'script-action-favorite',
               label: s.favorite ? t('library.unfavorite') : t('library.favorite'),
               icon: s.favorite ? 'star' : 'star-outline',
-              onPress: () => act((r) => r.scripts.update(s.id, { favorite: !s.favorite })),
+              onPress: () => toggleFavorite(s),
             },
             { testID: 'script-action-move', label: t('library.moveToFolder'), icon: 'folder-open-outline', onPress: () => setSheet({ kind: 'move', script: s }) },
             { testID: 'script-action-duplicate', label: t('common.duplicate'), icon: 'copy-outline', onPress: () => act((r) => r.scripts.duplicate(s.id, t('common.copySuffix'))) },
@@ -166,11 +200,7 @@ export default function Library() {
               label: t('common.delete'),
               icon: 'trash-outline',
               destructive: true,
-              onPress: () =>
-                act(async (r) => {
-                  await r.scripts.remove(s.id);
-                  setUndoId(s.id);
-                }),
+              onPress: () => deleteScript(s),
             },
           ]}
         />
@@ -236,9 +266,10 @@ export default function Library() {
         colors={colors}
         onOpen={openScript}
         onActions={showActions}
+        onA11yAction={handleRowAction}
       />
     ),
-    [showFolderLabel, folderName, paceWpm, colors, showActions],
+    [showFolderLabel, folderName, paceWpm, colors, showActions, handleRowAction],
   );
 
   const empty = searchQuery ? (
@@ -272,7 +303,7 @@ export default function Library() {
       />
       <View style={styles.controls}>
         <View style={[styles.search, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Ionicons name="search" size={18} color={colors.textMuted} />
+          <Ionicons {...decorative} name="search" size={18} color={colors.textMuted} />
           <TextInput
             testID="library-search"
             value={query}
@@ -295,7 +326,7 @@ export default function Library() {
       />
       <View style={styles.controls}>
         <Segmented
-          accessibilityLabel={t('library.sortUpdated')}
+          accessibilityLabel={t('a11y.sortBy')}
           value={sort}
           onChange={setSort}
           options={[
