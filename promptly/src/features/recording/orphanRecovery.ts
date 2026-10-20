@@ -41,6 +41,38 @@ export interface OrphanRecoveryDeps {
   }): Promise<unknown>;
 }
 
+/**
+ * Takes currently being recorded or finalized in this process, by file stem
+ * (`take_X` covers `take_X.mp4`, `take_X_av.mp4`, `take_X_audio_0.wav`). Recovery
+ * runs after first paint and may overlap a live take; those files are not orphans.
+ */
+const activeStems = new Map<string, number>();
+
+const stemOf = (pathOrName: string) => (pathOrName.split('/').pop() ?? pathOrName).replace(/\.[^.]+$/, '');
+
+/** Marks a take's file as in progress; call the returned function once it is registered or abandoned. */
+export function markRecordingActive(pathOrName: string): () => void {
+  const stem = stemOf(pathOrName);
+  activeStems.set(stem, (activeStems.get(stem) ?? 0) + 1);
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    const n = (activeStems.get(stem) ?? 1) - 1;
+    if (n > 0) activeStems.set(stem, n);
+    else activeStems.delete(stem);
+  };
+}
+
+const belongsTo = (name: string, stems: Iterable<string>) => {
+  for (const stem of stems) if (name === stem || name.startsWith(`${stem}.`) || name.startsWith(`${stem}_`)) return true;
+  return false;
+};
+
+export function isRecordingActive(name: string): boolean {
+  return belongsTo(name, activeStems.keys());
+}
+
 let inFlight: Promise<number> | null = null;
 
 export function recoverOrphanRecordings(deps: OrphanRecoveryDeps): Promise<number> {
@@ -53,16 +85,20 @@ export function recoverOrphanRecordings(deps: OrphanRecoveryDeps): Promise<numbe
 }
 
 async function run(deps: OrphanRecoveryDeps): Promise<number> {
+  // Taken before the DB read: a take that is registered and released while the names
+  // are being read is still skipped.
+  const activeBefore = [...activeStems.keys()];
   const known = new Set(await deps.knownFileNames());
   const orphans = deps.findOrphans(known);
   const names = new Set(orphans.map((o) => o.name));
   let recovered = 0;
   for (const f of orphans) {
-    if (known.has(f.name)) continue;
+    if (known.has(f.name) || belongsTo(f.name, activeBefore) || isRecordingActive(f.name)) continue;
     const muxed = f.name.replace(/\.(mov|mp4)$/i, '_av.mp4');
     if (muxed !== f.name && (names.has(muxed) || known.has(muxed))) continue;
     // Register even unreadable files so the user decides what to do with them.
     const info = await deps.videoInfo(f.uri).catch(() => null);
+    if (isRecordingActive(f.name)) continue;
     await deps.add({
       scriptId: null,
       fileName: f.name,

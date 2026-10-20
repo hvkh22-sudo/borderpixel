@@ -72,6 +72,22 @@ describe('Editor after Studio', () => {
   });
 });
 
+describe('Editor autosave', () => {
+  it('keeps an edit whose save failed dirty and saves it on the next flush', async () => {
+    const s = await mockRepos.scripts.create({ title: 'Draft', body: 'Original text' });
+    mockParams.id = s.id;
+    const realUpdate = mockRepos.scripts.update.bind(mockRepos.scripts);
+    const update = jest.spyOn(mockRepos.scripts, 'update').mockRejectedValueOnce(new Error('disk full')).mockImplementation(realUpdate);
+    const Editor = require('../scripts/[id]').default;
+    const view = await renderScreen(<Editor />);
+    await fireEvent.changeText(await screen.findByDisplayValue('Original text'), 'Edited once');
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(1), { timeout: 2000 });
+    // Leaving the screen flushes again: the failed edit is retried, not lost.
+    view.unmount();
+    await waitFor(async () => expect((await mockRepos.scripts.get(s.id))?.body).toBe('Edited once'), { timeout: 2000 });
+  });
+});
+
 describe('Editor auto title', () => {
   it('keeps deriving the title from the first line until the user edits the title', async () => {
     const s = await mockRepos.scripts.create({ title: 'Untitled script', body: '' });

@@ -91,11 +91,18 @@ export default function Editor() {
 
   const flush = useCallback(async () => {
     if (!latest.current.dirty) return;
-    latest.current.dirty = false;
+    const pending = latest.current;
+    pending.dirty = false;
     setSaveState('saving');
-    const repos = await getRepositories();
-    await repos.scripts.update(id, { title: latest.current.title, body: latest.current.body });
-    setSaveState('saved');
+    try {
+      const repos = await getRepositories();
+      await repos.scripts.update(id, { title: pending.title, body: pending.body });
+      if (!latest.current.dirty) setSaveState('saved');
+    } catch (e) {
+      // Not saved: stay dirty so the next change, background or leaving the screen retries.
+      if (latest.current === pending) pending.dirty = true;
+      if (__DEV__) console.warn('script save failed', e);
+    }
   }, [id]);
 
   // Save immediately when the app backgrounds or the screen unmounts.

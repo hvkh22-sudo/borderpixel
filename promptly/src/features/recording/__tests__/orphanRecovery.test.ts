@@ -1,4 +1,4 @@
-import { recoverOrphanRecordings, type OrphanFile, type OrphanRecoveryDeps } from '../orphanRecovery';
+import { isRecordingActive, markRecordingActive, recoverOrphanRecordings, type OrphanFile, type OrphanRecoveryDeps } from '../orphanRecovery';
 
 function fakeDeps(files: string[], known: string[] = []) {
   const registered: string[] = [...known];
@@ -35,5 +35,31 @@ describe('recoverOrphanRecordings', () => {
     const { deps, registered } = fakeDeps(['take_1.mp4', 'take_1_av.mp4']);
     expect(await recoverOrphanRecordings(deps)).toBe(1);
     expect(registered).toEqual(['take_1_av.mp4']);
+  });
+
+  it('never registers the files of a take that is still being recorded or finalized', async () => {
+    const release = markRecordingActive('/docs/recordings/take_live.mp4');
+    expect(isRecordingActive('take_live.mp4')).toBe(true);
+    expect(isRecordingActive('take_live_av.mp4')).toBe(true);
+    expect(isRecordingActive('take_other.mp4')).toBe(false);
+    const { deps, registered } = fakeDeps(['take_live.mp4', 'take_live_av.mp4', 'old.mp4']);
+    expect(await recoverOrphanRecordings(deps)).toBe(1);
+    expect(registered).toEqual(['old.mp4']);
+    release();
+    expect(isRecordingActive('take_live.mp4')).toBe(false);
+  });
+
+  it('skips a take that finished (and was registered) while the known names were being read', async () => {
+    const release = markRecordingActive('file:///docs/recordings/take_fast.mp4');
+    const { deps, registered } = fakeDeps(['take_fast.mp4']);
+    const read = deps.knownFileNames;
+    // The take is finalized and released after the DB snapshot was taken.
+    deps.knownFileNames = async () => {
+      const k = await read();
+      release();
+      return k;
+    };
+    expect(await recoverOrphanRecordings(deps)).toBe(0);
+    expect(registered).toEqual([]);
   });
 });

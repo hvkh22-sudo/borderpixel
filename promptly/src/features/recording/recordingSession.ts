@@ -17,6 +17,7 @@
  *   finalized, but no UI callback fires.
  */
 import type { FinalizeInput, FinalizeResult } from './finalizeTake';
+import { markRecordingActive } from './orphanRecovery';
 import {
   INITIAL_RECORDING_STATE,
   MIN_FREE_BYTES_TO_RECORD,
@@ -100,6 +101,8 @@ type Phase = 'starting' | 'recording' | 'stopping' | 'settled';
 interface Take {
   opts: TakeOptions;
   plannedPath: string;
+  /** Hides the take's files from orphan recovery until it is registered or abandoned. */
+  release: () => void;
   recorder: RecorderLike | null;
   requestedAt: number;
   startedAt: number | null;
@@ -202,9 +205,11 @@ export class RecordingSession {
       this.deps.onFailure?.('low_storage');
       return;
     }
+    const plannedPath = this.deps.newRecordingPath();
     const take: Take = {
       opts,
-      plannedPath: this.deps.newRecordingPath(),
+      plannedPath,
+      release: markRecordingActive(plannedPath),
       recorder: null,
       requestedAt: this.deps.now(),
       startedAt: null,
@@ -429,6 +434,7 @@ export class RecordingSession {
   }
 
   private endTake(take: Take): void {
+    take.release();
     take.phase = 'settled';
     if (take.watchdog) clearTimeout(take.watchdog);
     take.watchdog = null;

@@ -18,7 +18,9 @@ final class RemoteKeyResponderView: UIView {
 
   override init(frame: CGRect) {
     super.init(frame: frame)
-    isUserInteractionEnabled = false
+    // Must stay true: UIKit drops press (and keyboard) events for views with user interaction
+    // disabled, so pressesBegan would never fire. Zero frame means it never wins a touch hit-test.
+    isUserInteractionEnabled = true
     isAccessibilityElement = false
     accessibilityElementsHidden = true
     backgroundColor = .clear

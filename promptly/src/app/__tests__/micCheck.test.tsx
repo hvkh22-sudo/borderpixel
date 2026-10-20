@@ -15,6 +15,8 @@ const mockAudio = {
   granted: true,
   metering: [] as number[],
   input: { name: 'iPhone Microphone', type: 'MicrophoneBuiltIn', uid: 'built-in' },
+  /** When set, prepareToRecordAsync waits for it. */
+  prepareGate: null as Promise<void> | null,
 };
 
 jest.mock('../../services/db', () => ({ getRepositories: () => Promise.resolve(mockRepos) }));
@@ -48,6 +50,7 @@ jest.mock('expo-audio', () => {
     isRecording: false,
     prepareToRecordAsync: async () => {
       mockCalls.push('prepare');
+      if (mockAudio.prepareGate) await mockAudio.prepareGate;
       recorder.uri = 'file:///cache/mic-check.m4a';
     },
     record: () => {
@@ -76,10 +79,10 @@ async function openMicCheck() {
   const s = await mockRepos.scripts.create({ title: 'T', body: 'Hello world' });
   mockParams.id = s.id;
   const Prepare = require('../prepare/[id]').default;
-  await renderScreen(<Prepare />);
+  const view = await renderScreen(<Prepare />);
   await fireEvent.press(await screen.findByLabelText('Mic check'));
   await fireEvent.press(screen.getByLabelText('Start mic check'));
-  return s.id;
+  return Object.assign(s.id, { view }) as string & { view: typeof view };
 }
 
 beforeEach(async () => {
@@ -87,6 +90,7 @@ beforeEach(async () => {
   mockPush.mockClear();
   mockCalls.length = 0;
   mockAudio.granted = true;
+  mockAudio.prepareGate = null;
   mockAudio.input = { name: 'iPhone Microphone', type: 'MicrophoneBuiltIn', uid: 'built-in' };
   useSettings.getState().hydrate({ onboardingDone: true });
 });
@@ -138,5 +142,18 @@ describe('Mic check', () => {
     await openMicCheck();
     expect(await screen.findByText('Microphone access is off. Allow it to run a mic check.')).toBeTruthy();
     expect(mockCalls).toEqual([]);
+  });
+
+  it('never starts recording when the sheet closes while the recorder is preparing', async () => {
+    let open!: () => void;
+    mockAudio.prepareGate = new Promise<void>((r) => (open = r));
+    const { view } = await openMicCheck();
+    await waitFor(() => expect(mockCalls).toContain('prepare'));
+    view.unmount();
+    open();
+    await waitFor(() => expect(mockCalls.at(-1)).toBe('active:false'));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(mockCalls).not.toContain('record');
+    expect(mockCalls.at(-1)).toBe('active:false');
   });
 });

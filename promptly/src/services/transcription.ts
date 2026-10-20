@@ -144,14 +144,39 @@ function safeDelete(f: File) {
   }
 }
 
+/**
+ * Longest wait for a settled session's own "end" before the next one starts.
+ * On Android, "error" (and abort) are sent at once but "end" only later from a
+ * main-thread runnable (ExpoSpeechService.teardownAndEnd); without waiting, that
+ * stale "end" would end the next session as "no speech".
+ */
+const SESSION_END_WAIT_MS = 2_000;
+let previousSessionEnd: Promise<void> | null = null;
+
+function awaitSessionEnd(): Promise<void> {
+  const p = new Promise<void>((resolve) => {
+    const done = () => {
+      sub.remove();
+      clearTimeout(timer);
+      if (previousSessionEnd === p) previousSessionEnd = null;
+      resolve();
+    };
+    const sub = ExpoSpeechRecognitionModule.addListener('end', done);
+    const timer = setTimeout(done, SESSION_END_WAIT_MS);
+  });
+  return p;
+}
+
 /** One recognizer session over one audio source. */
-function recognize(audioSource: AudioSourceOptions, locale: string, signal?: AbortSignal): Promise<TranscriptionResult> {
-  if (signal?.aborted) return Promise.reject(new TranscriptionError('cancelled'));
+async function recognize(audioSource: AudioSourceOptions, locale: string, signal?: AbortSignal): Promise<TranscriptionResult> {
+  if (previousSessionEnd) await previousSessionEnd;
+  if (signal?.aborted) throw new TranscriptionError('cancelled');
 
   return new Promise<TranscriptionResult>((resolve, reject) => {
     const segments: RecognizedSegment[] = [];
     const transcripts: string[] = [];
     let settled = false;
+    let ended = false;
     // Segment timestamps are relative to each final result's session on some
     // engines; we offset by the end of the previous final result when needed.
     let offsetMs = 0;
@@ -160,6 +185,8 @@ function recognize(audioSource: AudioSourceOptions, locale: string, signal?: Abo
       if (settled) return;
       settled = true;
       subs.forEach((s) => s.remove());
+      // Settled before this session's own "end" arrived: hold the next session until it does.
+      if (!ended) previousSessionEnd = awaitSessionEnd();
       signal?.removeEventListener('abort', onAbort);
       fn();
     };
@@ -200,6 +227,7 @@ function recognize(audioSource: AudioSourceOptions, locale: string, signal?: Abo
         finish(() => reject(new TranscriptionError(code, e.message)));
       }),
       ExpoSpeechRecognitionModule.addListener('end', () => {
+        ended = true;
         finish(() =>
           segments.length || transcripts.length
             ? resolve({ segments, transcript: transcripts.join(' ') })
