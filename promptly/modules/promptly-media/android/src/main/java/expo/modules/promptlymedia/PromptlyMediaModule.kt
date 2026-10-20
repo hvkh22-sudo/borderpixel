@@ -464,7 +464,7 @@ private class CaptionOverlay(
     if (hl != null && highlightWord >= 0) {
       // Fill pass with the active word coloured; the stroke pass above stays plain.
       // Same text and paint, so this layout's metrics match the stroke layout.
-      val starts = text.split(" ").runningFold(0) { acc, w -> acc + w.length + 1 }
+      val starts = text.split(" ").runningFold(0) { acc, token -> acc + token.length + 1 }
       val spanned = SpannableString(text)
       if (highlightWord < starts.size - 1) {
         val end = min(text.length, starts[highlightWord + 1] - 1)

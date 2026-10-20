@@ -116,13 +116,19 @@ export function parseWavHeader(bytes: Uint8Array, fileSize = bytes.length): WavF
     const id = ascii(bytes, pos);
     const size = view.getUint32(pos + 4, true);
     if (id === 'fmt ') {
+      if (size < 16 || pos + 24 > bytes.length) throw new Error('WAV fmt chunk truncated');
       fmt = { channels: view.getUint16(pos + 10, true), sampleRate: view.getUint32(pos + 12, true), bitsPerSample: view.getUint16(pos + 22, true) };
+      if (fmt.channels < 1 || fmt.sampleRate < 1 || fmt.bitsPerSample < 8 || fmt.bitsPerSample % 8 !== 0) throw new Error('Unsupported WAV format');
     } else if (id === 'data') {
       if (!fmt) throw new Error('WAV data before fmt');
       const dataOffset = pos + 8;
       // Streamed writers may leave size 0 / 0xFFFFFFFF; trust the file size then.
-      const available = Math.max(0, fileSize - dataOffset);
-      return { ...fmt, dataOffset, dataBytes: size === 0 || size > available ? available : size };
+      // fileSize <= 0 means unknown (e.g. a file handle without a size): trust the header.
+      const available = fileSize > 0 ? Math.max(0, fileSize - dataOffset) : Number.POSITIVE_INFINITY;
+      const raw = size === 0 || size > available ? (Number.isFinite(available) ? available : size) : size;
+      // Keep whole sample frames so chunk ranges stay aligned.
+      const frame = (fmt.channels * fmt.bitsPerSample) / 8;
+      return { ...fmt, dataOffset, dataBytes: raw - (raw % frame) };
     }
     pos += 8 + size + (size % 2);
   }
