@@ -25,6 +25,7 @@ import { targetResolution } from '../../features/recording/presets';
 import { isBusy, remainingRecordSeconds } from '../../features/recording/recordingMachine';
 import type { SavedTake, TakeOptions } from '../../features/recording/recordingSession';
 import { useRecordingSession } from '../../features/recording/useRecordingSession';
+import { acceptRecordToggle, mapRemoteKey } from '../../features/teleprompter/remoteKeys';
 import { clampWpm } from '../../features/teleprompter/scrollModel';
 import { breakPaceSegment, createPaceTracker, timedSample, trackCursor, voiceSample } from '../../features/teleprompter/speakingRate';
 import { Teleprompter, type TeleprompterHandle } from '../../features/teleprompter/Teleprompter';
@@ -35,6 +36,7 @@ import { formatClock, t } from '../../localization/i18n';
 import { track } from '../../services/analytics';
 import { getRepositories } from '../../services/db';
 import { availableBytes } from '../../services/files';
+import { PromptlyMedia } from '../../services/nativeMedia';
 import { useAccess } from '../../state/access';
 import { useSettings, type ScrollMode } from '../../state/settings';
 import { useSpeakingRate } from '../../state/speakingRate';
@@ -46,6 +48,8 @@ export default function RecordScreen() {
   const prompter = useSettings((s) => s.prompter);
   const cameraSettings = useSettings((s) => s.camera);
   const speechLocale = useSettings((s) => s.speechLocale);
+  const remoteEnabled = useSettings((s) => s.remoteEnabled);
+  const remoteRecordToggle = useSettings((s) => s.remoteRecordToggle);
   const access = useAccess((s) => s.access);
   const usage = useAccess((s) => s.usage);
 
@@ -235,6 +239,31 @@ export default function RecordScreen() {
     }
   };
 
+  // Bluetooth page-turner / keyboard (docs/architecture/remote-control.md). The handler ref
+  // is refreshed after every render, so the native subscription only changes with the setting.
+  const remoteHandlerRef = useRef<(key: string, repeat: boolean) => void>(() => {});
+  const lastRemoteToggleRef = useRef<number | null>(null);
+  useEffect(() => {
+    remoteHandlerRef.current = (key, repeat) => {
+      const action = mapRemoteKey({ key, repeat }, { mode, recordToggle: remoteRecordToggle });
+      if (action.type === 'nudge') {
+        markManualJump();
+        prompterRef.current?.nudgeLines(action.lines);
+      } else if (action.type === 'togglePlay') {
+        setPlaying((p) => !p);
+      } else if (action.type === 'toggleRecord') {
+        const now = Date.now();
+        if (!acceptRecordToggle(lastRemoteToggleRef.current, now)) return;
+        lastRemoteToggleRef.current = now;
+        onRecordPress();
+      }
+    };
+  });
+  useEffect(() => {
+    if (!remoteEnabled || !appActive) return;
+    return PromptlyMedia.listenRemoteKeys((e) => remoteHandlerRef.current(e.key, e.repeat));
+  }, [remoteEnabled, appActive]);
+
   const close = () => {
     if (isBusy(state.status)) {
       Alert.alert(t('record.discardTitle'), undefined, [
@@ -375,7 +404,6 @@ export default function RecordScreen() {
                   prompterRef.current?.jumpToChar(c);
                 }}
                 onUserScroll={() => {
-                  if (isRecording) manualScrollRef.current = true;
                 }}
                 onEnd={() => {
                   if (isRecording && timedEndMsRef.current == null) timedEndMsRef.current = playedNow();

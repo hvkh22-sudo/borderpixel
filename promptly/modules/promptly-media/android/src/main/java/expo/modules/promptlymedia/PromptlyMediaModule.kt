@@ -97,7 +97,20 @@ class PromptlyMediaModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("PromptlyMedia")
 
-    Events("onProgress")
+    Events("onProgress", "onRemoteKey")
+
+    // Hardware remote keys (PromptlyMediaPackage.kt). While enabled, forwarded keys are consumed.
+    AsyncFunction("setRemoteKeysEnabled") { enabled: Boolean ->
+      RemoteKeys.emitter = if (enabled) {
+        { key: String, repeat: Boolean -> sendEvent("onRemoteKey", bundleOf("key" to key, "repeat" to repeat)) }
+      } else {
+        null
+      }
+    }.runOnQueue(Queues.MAIN)
+
+    OnDestroy {
+      RemoteKeys.emitter = null
+    }
 
     AsyncFunction("getVideoInfo") { uri: String ->
       val r = MediaMetadataRetriever()

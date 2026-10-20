@@ -425,6 +425,13 @@ export const en = {
     about: 'About',
     version: 'Version {v}',
     resetPrompter: 'Reset teleprompter settings',
+    remote: 'Remote control',
+    remoteEnabled: 'Use a Bluetooth remote or keyboard',
+    remoteEnabledHint: 'On the recording screen: arrow keys, Page Up/Down and Space move the script a few lines. In Timed mode, Space plays and pauses.',
+    remoteRecord: 'Remote can start/stop recording',
+    remoteRecordHint: 'The Enter key starts and stops a take. Off by default so a stray press can’t end your take.',
+    remoteSupported: 'Works with page-turner remotes and keyboards that send arrow, Page Up/Down, Space or Enter keys. Volume buttons and camera-shutter remotes are not supported.',
+    remoteUnavailable: 'Remote control isn’t included in this build yet.',
   },
   privacy: {
     title: 'Privacy & data',

@@ -42,6 +42,7 @@ Legend: ✅ verified · 🟡 implemented, not verified on device · ⬜ not star
 | Recording recovery (orphan files) | 🟡 | duration restored via native module when available; Home shows a recovered-takes notice. Recorder now writes into documents, so a take survives an app kill; single-flight dedupe ✅ unit-tested. Partial-file playability **not tested on a device** |
 | Accessibility (labels, roles, adjustable steppers, live regions, reduced motion) | 🟡 | VoiceOver/TalkBack pass not done |
 | Localization framework (en) + RTL flag | 🟡 | English + Hebrew (folder and export strings included); Hebrew pending native-speaker review on device |
+| Remote control: Bluetooth page-turner / keyboard on the record screen (arrows, PageUp/Down, Space; opt-in Enter = start/stop; Settings › Remote control) | 🟡 | key mapping + JS bridge ✅ unit-tested; iOS first-responder view + Android ReactActivityHandler **never compiled**, not tested on a device (RC-01); volume-button remotes deliberately unsupported (docs/architecture/remote-control.md) |
 
 ## Known issues / risks
 - iOS audio-session coexistence (camera audio + recognizer) unproven — fallback designed (DECISIONS D4).

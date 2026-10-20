@@ -11,6 +11,7 @@ import type {
   NativeCue,
   ProgressEvent,
   PromptlyMediaNativeModule,
+  RemoteKeyNativeEvent,
   VideoInfo,
   WavResult,
 } from '../../modules/promptly-media';
@@ -41,6 +42,32 @@ function job<T>(run: (id: string) => Promise<T>, onProgress?: (p: number) => voi
 
 export const PromptlyMedia = {
   isAvailable: () => native != null,
+
+  /** True when this build's native module can forward hardware remote keys. */
+  remoteKeysAvailable: () => typeof native?.setRemoteKeysEnabled === 'function',
+
+  /**
+   * Forward hardware remote / keyboard keys to `onKey` until the returned
+   * function is called. No-op (returns a no-op) when the build lacks support.
+   */
+  listenRemoteKeys(onKey: (e: RemoteKeyNativeEvent) => void): () => void {
+    const m = native;
+    if (!m || typeof m.setRemoteKeysEnabled !== 'function') return () => {};
+    // iOS returns void, Android a promise; a failure only means the remote stays inactive.
+    const setEnabled = (on: boolean) => {
+      try {
+        void Promise.resolve(m.setRemoteKeysEnabled?.(on)).catch(() => {});
+      } catch {
+        // Remote control is best effort.
+      }
+    };
+    const sub = m.addListener('onRemoteKey', onKey);
+    setEnabled(true);
+    return () => {
+      setEnabled(false);
+      sub.remove();
+    };
+  },
 
   getVideoInfo: (uri: string): Promise<VideoInfo> => mod().getVideoInfo(uri),
 

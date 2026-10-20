@@ -57,6 +57,17 @@ export interface ProgressEvent {
   progress: number;
 }
 
+/**
+ * A hardware key from a Bluetooth page-turner or keyboard (record screen only).
+ * `key` is a W3C-style name: ArrowUp/Down/Left/Right, PageUp, PageDown, Space,
+ * Enter, and on Android also MediaPlayPause, MediaTrackNext, MediaTrackPrevious.
+ */
+export interface RemoteKeyNativeEvent {
+  key: string;
+  /** Auto-repeat while held (Android `repeatCount > 0`; always false on iOS). */
+  repeat: boolean;
+}
+
 export interface PromptlyMediaNativeModule {
   getVideoInfo(uri: string): Promise<VideoInfo>;
   /** Renders captions onto a copy of the video. Never modifies the input. */
@@ -70,5 +81,12 @@ export interface PromptlyMediaNativeModule {
    */
   muxAudio(jobId: string, videoUri: string, segments: AudioSegment[], outputUri: string): Promise<string>;
   cancel(jobId: string): void;
+  /**
+   * Start/stop forwarding hardware keys as `onRemoteKey`. While enabled the
+   * forwarded keys are consumed (iOS: a hidden first responder; Android: the
+   * Activity's unhandled-key callbacks). Absent in builds older than this API.
+   */
+  setRemoteKeysEnabled?(enabled: boolean): Promise<void> | void;
   addListener(event: 'onProgress', cb: (e: ProgressEvent) => void): { remove(): void };
+  addListener(event: 'onRemoteKey', cb: (e: RemoteKeyNativeEvent) => void): { remove(): void };
 }

@@ -35,10 +35,11 @@
 | AI-01 | Studio happy path | Each tool returns a draft; version history keeps original |
 | AI-02 | Quota / offline / provider error | Correct messages; quota not charged on failure |
 | A11Y-01 | VoiceOver + TalkBack | Full core journey operable |
+| RC-01 | Bluetooth page-turner + keyboard (docs/architecture/remote-control.md) | iOS + Android, with (a) a page-turner sending arrows, (b) one sending PageUp/PageDown, (c) a Bluetooth keyboard: on the record screen ↓/→/PageDown/Space move the script forward ~3 lines and ↑/←/PageUp back, in Manual, Timed and Voice Follow, before and during a take; in Timed, Space plays/pauses; Enter does nothing by default and with “Remote can start/stop recording” on starts and stops a take (no double toggle on one press); no software keyboard appears (iOS); keys still work after an alert (Close during a take) and after background → foreground; with the setting off, keys do nothing. Android: after an arrow press, check whether a button gets focus and whether Space/Enter then activate it (known risk); media keys on a remote that has them. Note which remote models work. Volume-key remotes are expected not to work |
 
 ## 2. Unit coverage map
 aligner (15), voiceFollowController (3), scrollModel (6), captions (27), longTake (14), burnIn (2), transcription service (4), entitlements (11),
-recordingMachine (7), studio (6), repositories (7), i18n (3); server handler/prompts/validation/
+recordingMachine (7), studio (6), remoteKeys (14 + bridge 2), repositories (7), i18n (3); server handler/prompts/validation/
 entitlements (16).
 
 ## 3. Voice Follow measurement protocol
