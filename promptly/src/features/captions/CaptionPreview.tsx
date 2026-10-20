@@ -10,11 +10,18 @@ interface Props {
   position: CaptionPosition;
   /** Width of the rendered video frame, used to scale font size like the export. */
   frameWidth: number;
+  /**
+   * Index of the spoken word to highlight (from activeWordIndex), or -1.
+   * Ignored when the style has no highlight colour.
+   */
+  activeWord?: number;
 }
 
-export function CaptionPreview({ text, styleId, position, frameWidth }: Props) {
+export function CaptionPreview({ text, styleId, position, frameWidth, activeWord = -1 }: Props) {
   if (!text) return null;
   const s = CAPTION_STYLES[styleId];
+  const shown = s.uppercase ? text.toUpperCase() : text;
+  const highlight = s.highlightColor && activeWord >= 0 ? s.highlightColor : null;
   const fontSize = Math.max(10, frameWidth * s.fontSizeRatio);
   return (
     <View pointerEvents="none" style={[styles.wrap, { top: `${CAPTION_POSITION_Y[position] * 100}%` }]}>
@@ -32,7 +39,13 @@ export function CaptionPreview({ text, styleId, position, frameWidth }: Props) {
             textShadowRadius: s.strokeColor ? frameWidth * s.strokeWidthRatio * 2 : 0,
           }}
         >
-          {s.uppercase ? text.toUpperCase() : text}
+          {highlight
+            ? shown.split(' ').map((w, i, all) => (
+                <Text key={i} testID={i === activeWord ? 'caption-active-word' : undefined} style={i === activeWord ? { color: highlight } : null}>
+                  {i < all.length - 1 ? `${w} ` : w}
+                </Text>
+              ))
+            : shown}
         </Text>
       </View>
     </View>

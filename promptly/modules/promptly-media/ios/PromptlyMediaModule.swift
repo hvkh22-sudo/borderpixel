@@ -6,10 +6,17 @@ import UIKit
 // NOTE: Written against AVFoundation APIs available on iOS 16.4+ (Expo SDK 58 minimum).
 // Not yet compiled in CI — see QUALITY_CHECKLIST.md "Native module verification".
 
+struct WordTimingRecord: Record {
+  @Field var startMs: Double = 0
+  @Field var endMs: Double = 0
+}
+
 struct CueRecord: Record {
   @Field var startMs: Double = 0
   @Field var endMs: Double = 0
   @Field var text: String = ""
+  /// One entry per space-separated token of `text`; optional.
+  @Field var words: [WordTimingRecord]? = nil
 }
 
 struct CaptionStyleRecord: Record {
@@ -20,6 +27,7 @@ struct CaptionStyleRecord: Record {
   @Field var strokeColor: String? = nil
   @Field var strokeWidthRatio: Double = 0
   @Field var uppercase: Bool = false
+  @Field var highlightColor: String? = nil
   @Field var positionY: Double = 0.7
 }
 
@@ -211,22 +219,55 @@ public final class PromptlyMediaModule: Module {
     textLayer.frame = CGRect(x: padH, y: padV, width: bounds.width, height: bounds.height)
     container.addSublayer(textLayer)
 
-    // Visible only between cue start and end.
-    container.opacity = 0
-    let show = CAKeyframeAnimation(keyPath: "opacity")
     let total = max(duration, cue.endMs / 1000)
-    let start = cue.startMs / 1000 / total
-    let end = cue.endMs / 1000 / total
+    // Word highlight: one overlay per word, same string and frame as the base
+    // layer, with every glyph clear except that word. Identical layout keeps
+    // the coloured word exactly on top of the base word.
+    let tokens = text.components(separatedBy: " ")
+    if let hex = style.highlightColor, let highlight = UIColor(hex: hex), let words = cue.words, words.count == tokens.count {
+      var location = 0
+      for (i, token) in tokens.enumerated() {
+        let range = NSRange(location: location, length: (token as NSString).length)
+        location += range.length + 1
+        let marked = NSMutableAttributedString(attributedString: attributed)
+        let whole = NSRange(location: 0, length: marked.length)
+        marked.addAttribute(.foregroundColor, value: UIColor.clear, range: whole)
+        if attributes[.strokeColor] != nil { marked.addAttribute(.strokeColor, value: UIColor.clear, range: whole) }
+        marked.addAttribute(.foregroundColor, value: highlight, range: range)
+        if let stroke = attributes[.strokeColor] { marked.addAttribute(.strokeColor, value: stroke, range: range) }
+        let wordLayer = CATextLayer()
+        wordLayer.string = marked
+        wordLayer.isWrapped = true
+        wordLayer.alignmentMode = .center
+        wordLayer.contentsScale = 2
+        wordLayer.frame = textLayer.frame
+        // Lit from this word's start until the next word starts (no flicker in pauses).
+        let from = min(max(words[i].startMs, cue.startMs), cue.endMs)
+        let to = i + 1 < words.count ? min(max(words[i + 1].startMs, from), cue.endMs) : cue.endMs
+        if to > from {
+          Self.showOnly(wordLayer, fromMs: from, toMs: to, total: total)
+          container.addSublayer(wordLayer)
+        }
+      }
+    }
+
+    // Visible only between cue start and end.
+    Self.showOnly(container, fromMs: cue.startMs, toMs: cue.endMs, total: total)
+    return container
+  }
+
+  private static func showOnly(_ layer: CALayer, fromMs: Double, toMs: Double, total: Double) {
+    layer.opacity = 0
+    let show = CAKeyframeAnimation(keyPath: "opacity")
     // Discrete mode: keyTimes runs 0...1 with one more entry than values.
     show.values = [0, 1, 0]
-    show.keyTimes = [0, NSNumber(value: start), NSNumber(value: end), 1]
+    show.keyTimes = [0, NSNumber(value: fromMs / 1000 / total), NSNumber(value: toMs / 1000 / total), 1]
     show.calculationMode = .discrete
     show.duration = total
     show.beginTime = AVCoreAnimationBeginTimeAtZero
     show.isRemovedOnCompletion = false
     show.fillMode = .both
-    container.add(show, forKey: "visibility")
-    return container
+    layer.add(show, forKey: "visibility")
   }
 }
 

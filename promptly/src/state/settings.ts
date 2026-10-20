@@ -50,6 +50,8 @@ export interface SettingsState {
   camera: CameraSettings;
   /** Default caption position for new captions (set by recording presets). */
   captionPosition: CaptionPosition;
+  /** Word-by-word caption highlight (Pro; needs measured word timing). */
+  captionWordHighlight: boolean;
 }
 
 export const DEFAULT_PROMPTER: PrompterSettings = {
@@ -79,6 +81,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
   prompter: DEFAULT_PROMPTER,
   camera: { position: 'front', orientation: 'portrait', resolution: '1080p', fps: 30 },
   captionPosition: 'lower',
+  captionWordHighlight: false,
 };
 
 interface SettingsActions {

@@ -279,7 +279,9 @@ export const en = {
     style: {
       label: 'Style',
       clean: 'Clean',
+      softBox: 'Soft Box',
       bold: 'Creator Bold',
+      pop: 'Pop',
       contrast: 'High Contrast',
     },
     position: 'Position',
@@ -293,6 +295,12 @@ export const en = {
     useScript: 'Match spelling to my script',
     lowConfidence: 'Some words were hard to hear. Please review highlighted captions.',
     estimatedTiming: 'Timing is approximate on this device. Word highlighting is unavailable.',
+    part: 'Part {n} of {total}',
+    wordHighlight: 'Highlight the spoken word',
+    wordHighlightHint: 'Choose Soft Box, Creator Bold or Pop to see the highlight.',
+    wordHighlightEdited: 'Edited captions are shown without word highlight.',
+    partialEnd: 'Captions stop at {at}. The recognizer may have stopped early, so the rest of the take has no captions. Review before exporting.',
+    gap: 'Part of the take couldn’t be transcribed ({from}–{to}). Captions are missing there.',
     errors: {
       unsupported_device: 'Automatic captions aren’t available on this device yet.',
       language_not_supported: 'This language isn’t supported for on-device captions.',
@@ -357,6 +365,7 @@ export const en = {
     trigger: {
       voiceFollow: 'You’ve used your free Voice Follow takes.',
       captionStyle: 'This caption style is part of Pro.',
+      captionWordHighlight: 'Word-by-word highlight is part of Pro.',
       general: '',
     },
   },

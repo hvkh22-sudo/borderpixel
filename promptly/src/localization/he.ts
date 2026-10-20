@@ -286,7 +286,9 @@ export const he: Strings = {
     style: {
       label: 'סגנון',
       clean: 'נקי',
+      softBox: 'תיבה רכה',
       bold: 'Creator Bold',
+      pop: 'פופ',
       contrast: 'ניגודיות גבוהה',
     },
     position: 'מיקום',
@@ -300,6 +302,12 @@ export const he: Strings = {
     useScript: 'התאמת האיות לתסריט שלי',
     lowConfidence: 'חלק מהמילים לא נשמעו בבירור. עברו על הכתוביות המסומנות.',
     estimatedTiming: 'התזמון במכשיר הזה משוער. הדגשת מילים לא זמינה.',
+    part: 'חלק {n} מתוך {total}',
+    wordHighlight: 'הדגשת המילה הנאמרת',
+    wordHighlightHint: 'בחרו תיבה רכה, Creator Bold או פופ כדי לראות את ההדגשה.',
+    wordHighlightEdited: 'כתוביות שנערכו מוצגות בלי הדגשת מילים.',
+    partialEnd: 'הכתוביות נעצרות ב-{at}. ייתכן שזיהוי הדיבור הפסיק מוקדם, ולכן לשאר הטייק אין כתוביות. בדקו לפני הייצוא.',
+    gap: 'לא הצלחנו לתמלל חלק מהטייק ({from}–{to}). שם חסרות כתוביות.',
     errors: {
       unsupported_device: 'כתוביות אוטומטיות עדיין לא זמינות במכשיר הזה.',
       language_not_supported: 'השפה הזו לא נתמכת בכתוביות במכשיר.',
@@ -364,6 +372,7 @@ export const he: Strings = {
     trigger: {
       voiceFollow: 'ניצלתם את הטייקים החינמיים עם מעקב קולי.',
       captionStyle: 'סגנון הכתוביות הזה הוא חלק מ-Pro.',
+      captionWordHighlight: 'הדגשת מילה אחר מילה היא חלק מ-Pro.',
       general: '',
     },
   },
