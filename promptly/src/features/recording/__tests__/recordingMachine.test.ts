@@ -2,6 +2,8 @@ import {
   INITIAL_RECORDING_STATE,
   RecordingEvent,
   RecordingState,
+  isBusy,
+  recorderMaxFileSize,
   recordingReducer,
   remainingRecordSeconds,
 } from '../recordingMachine';
@@ -65,7 +67,31 @@ describe('recordingReducer', () => {
   });
 });
 
+describe('starting phase', () => {
+  const ready = run([{ type: 'PREPARE' }, { type: 'CAMERA_READY' }]);
+
+  it('is busy, blocks a second start and can be aborted back to ready', () => {
+    const starting = recordingReducer(ready, { type: 'START_REQUESTED' });
+    expect(starting.status).toBe('starting');
+    expect(isBusy('starting')).toBe(true);
+    expect(recordingReducer(starting, { type: 'START_REQUESTED' })).toBe(starting);
+    expect(recordingReducer(starting, { type: 'START_ABORTED' }).status).toBe('ready');
+  });
+
+  it('accepts a finish that arrives before the start promise resolved', () => {
+    const s = run([{ type: 'START_REQUESTED' }, { type: 'RECORDING_FINISHED', filePath: '/c.mp4', at: 10 }], ready);
+    expect(s.status).toBe('finalizing');
+  });
+});
+
 describe('storage estimates', () => {
+  it('derives a finite recorder size limit with headroom', () => {
+    expect(recorderMaxFileSize(Number.POSITIVE_INFINITY)).toBeUndefined();
+    expect(recorderMaxFileSize(Number.NaN)).toBeUndefined();
+    expect(recorderMaxFileSize(100 * 1024 * 1024)).toBe(50 * 1024 * 1024);
+    expect(recorderMaxFileSize(1024 ** 3)).toBe(1024 ** 3 - 150 * 1024 * 1024);
+  });
+
   it('estimates remaining seconds conservatively', () => {
     expect(remainingRecordSeconds(50 * 1024 * 1024)).toBe(0);
     expect(remainingRecordSeconds(1024 * 1024 * 1024)).toBeGreaterThan(400);

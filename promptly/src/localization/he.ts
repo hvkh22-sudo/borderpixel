@@ -263,6 +263,8 @@ export const he: Strings = {
     failed: 'ההקלטה נעצרה באופן לא צפוי.',
     failedRecovered: 'ההקלטה נעצרה, אבל הטייק נשמר.',
     interrupted: 'ההקלטה הופסקה.',
+    savedInterrupted: 'ההקלטה הופסקה. כל מה שצולם עד אז נשמר.',
+    savedStorageFull: 'ההקלטה נעצרה כי האחסון במכשיר כמעט מלא. הטייק נשמר.',
     discardTitle: 'למחוק את הטייק הזה?',
     overlayNote: 'רק אתם רואים את התסריט — הוא לא מוקלט.',
   },

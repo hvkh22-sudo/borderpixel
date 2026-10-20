@@ -7,6 +7,7 @@ import { getLocales } from 'expo-localization';
 import { useEffect, useState } from 'react';
 
 import { deriveAccess } from '../features/monetization/entitlements';
+import { recoverOrphanRecordings } from '../features/recording/orphanRecovery';
 import { setLanguage } from '../localization/i18n';
 import { syncLayoutDirection } from '../localization/layoutDirection';
 import { setAnalyticsEnabled, track } from '../services/analytics';
@@ -27,6 +28,7 @@ export function useBootstrap(): { ready: boolean; recovered: number } {
   const [recovered, setRecovered] = useState(0);
 
   useEffect(() => {
+    let alive = true;
     let unsubscribePurchases = () => {};
     let unsubscribeSettings = () => {};
     (async () => {
@@ -52,40 +54,35 @@ export function useBootstrap(): { ready: boolean; recovered: number } {
           timer = setTimeout(() => void repos.kv.set(SETTINGS_KEY, persistableSettings(s)), 400);
         });
 
-        // Recordings written but never registered (app killed while finalizing).
-        const orphans = findOrphanRecordings(await repos.recordings.knownFileNames());
-        for (const f of orphans) {
-          // Best effort: a file cut off mid-write may not be readable; register it anyway
-          // so the user decides what to do with it.
-          const info = PromptlyMedia.isAvailable() ? await PromptlyMedia.getVideoInfo(f.uri).catch(() => null) : null;
-          await repos.recordings.add({
-            scriptId: null,
-            fileName: f.name,
-            durationMs: Math.round(info?.durationMs ?? 0),
-            width: info?.width ?? null,
-            height: info?.height ?? null,
-            status: 'recovered',
-          });
-        }
-        setRecovered(orphans.length);
-        useSession.getState().setRecoveredTakes(orphans.length);
+        // Recordings written but never registered (app killed while recording or finalizing).
+        // Single-flight + dedupe inside: StrictMode's double effect cannot register a file twice.
+        const recoveredCount = await recoverOrphanRecordings({
+          knownFileNames: () => repos.recordings.knownFileNames(),
+          findOrphans: (known) => findOrphanRecordings(known),
+          videoInfo: (uri) => (PromptlyMedia.isAvailable() ? PromptlyMedia.getVideoInfo(uri) : Promise.resolve(null)),
+          add: (rec) => repos.recordings.add(rec),
+        });
+        if (alive) setRecovered(recoveredCount);
+        if (recoveredCount > 0) useSession.getState().setRecoveredTakes(recoveredCount);
         cleanExports(24 * 60 * 60 * 1000);
       } catch (e) {
         if (__DEV__) console.warn('bootstrap storage failed', e);
         useSettings.getState().hydrate({});
       }
-      setReady(true);
+      if (alive) setReady(true);
       track({ name: 'app_open' });
 
       try {
         useAccess.getState().setAccess(deriveAccess(await fetchCustomerInfo()));
         unsubscribePurchases = subscribeCustomerInfo((info) => useAccess.getState().setAccess(deriveAccess(info)));
+        if (!alive) unsubscribePurchases(); // unmounted while fetching
       } catch (e) {
         // Offline / store unavailable: the SDK cache is used next time; stay on current state.
         if (__DEV__) console.warn('purchases unavailable', e);
       }
     })();
     return () => {
+      alive = false;
       unsubscribePurchases();
       unsubscribeSettings();
     };

@@ -13,6 +13,8 @@ export interface VoiceFollowApi {
   snapshot: VoiceFollowSnapshot;
   start(opts: { locale: string; persistAudio: boolean }): Promise<boolean>;
   stop(): Promise<PersistedAudio[]>;
+  /** Audio segments persisted so far (fallback when stop() does not settle). */
+  collectedAudio(): PersistedAudio[];
   resync(charOffset: number): void;
 }
 
@@ -24,8 +26,11 @@ export function useVoiceFollow(script: string): VoiceFollowApi {
   const [snapshot, setSnapshot] = useState<VoiceFollowSnapshot>(IDLE);
   const persisted = useRef<PersistedAudio[]>([]);
   const active = useRef(false);
+  // Bumped by stop() and unmount: a start() that resolves afterwards must release the mic.
+  const generation = useRef(0);
 
   useEffect(() => {
+    const gen = generation;
     // Only re-render when what the user sees changes.
     let last = '';
     const unsub = controller.subscribe((s) => {
@@ -49,13 +54,23 @@ export function useVoiceFollow(script: string): VoiceFollowApi {
       unsub();
       subs.forEach((u) => u());
       clearInterval(tick);
-      if (active.current) void engine.stop();
+      gen.current++;
+      if (active.current) void engine.stop().catch(() => {});
+      active.current = false;
     };
   }, [controller, engine]);
 
   const start = useCallback(
     async ({ locale, persistAudio }: { locale: string; persistAudio: boolean }) => {
-      if (!(await ensureSpeechPermission())) {
+      const gen = ++generation.current;
+      let granted = false;
+      try {
+        granted = await ensureSpeechPermission();
+      } catch {
+        granted = false;
+      }
+      if (gen !== generation.current) return false;
+      if (!granted) {
         controller.handleError('not-allowed');
         return false;
       }
@@ -68,28 +83,40 @@ export function useVoiceFollow(script: string): VoiceFollowApi {
           onDevice: getSpeechCapabilities().onDevice,
           persistAudio,
         });
-        active.current = true;
-        controller.markStarted(Date.now());
-        track({ name: 'voice_follow_started' });
-        return true;
       } catch {
         controller.handleError('unknown');
         return false;
       }
+      if (gen !== generation.current) {
+        // Stopped (or unmounted) while the recognizer was starting.
+        void engine.stop().catch(() => {});
+        return false;
+      }
+      active.current = true;
+      controller.markStarted(Date.now());
+      track({ name: 'voice_follow_started' });
+      return true;
     },
     [controller, engine, script],
   );
 
   const stop = useCallback(async () => {
+    generation.current++;
     active.current = false;
-    await engine.stop();
+    try {
+      await engine.stop();
+    } catch {
+      // The recognizer may already be gone; persisted audio is still collected below.
+    }
     controller.stop();
     // audioend for the last file arrives shortly after stop.
     await new Promise((r) => setTimeout(r, 400));
     return [...persisted.current];
   }, [controller, engine]);
 
+  const collectedAudio = useCallback(() => [...persisted.current], []);
+
   const resync = useCallback((charOffset: number) => controller.resyncToChar(charOffset, Date.now()), [controller]);
 
-  return { snapshot, start, stop, resync };
+  return { snapshot, start, stop, collectedAudio, resync };
 }

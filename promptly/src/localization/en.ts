@@ -256,6 +256,8 @@ export const en = {
     failed: 'Recording stopped unexpectedly.',
     failedRecovered: 'Recording stopped, but your take was saved.',
     interrupted: 'Recording was interrupted.',
+    savedInterrupted: 'Recording was interrupted. Everything up to that point was saved.',
+    savedStorageFull: 'Recording stopped because your device is almost out of storage. Your take was saved.',
     discardTitle: 'Discard this take?',
     overlayNote: 'The script is visible to you only — it is not recorded.',
   },
