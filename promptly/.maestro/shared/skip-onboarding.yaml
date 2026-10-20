@@ -1,0 +1,14 @@
+# If the onboarding screen is showing, finish it. Ends on Home.
+appId: app.promptly.placeholder
+---
+- runFlow:
+    when:
+      visible:
+        id: onboarding-start
+    commands:
+      - tapOn:
+          id: onboarding-start
+- extendedWaitUntil:
+    visible:
+      id: home-create
+    timeout: 15000

@@ -23,6 +23,7 @@ export default function Takes() {
       ListEmptyComponent={data ? <EmptyState icon="film-outline" title={t('takes.empty')} body={t('takes.emptyBody')} /> : undefined}
       renderItem={({ item }) => (
         <Pressable
+          testID="takes-item"
           accessibilityRole="button"
           accessibilityLabel={`${new Date(item.createdAt).toLocaleString()}, ${formatClock(item.durationMs)}`}
           onPress={() => router.push(`/take/${item.id}`)}

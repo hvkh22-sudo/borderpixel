@@ -18,9 +18,11 @@ interface Props {
   size?: 'md' | 'lg';
   style?: StyleProp<ViewStyle>;
   accessibilityHint?: string;
+  /** Stable id for end-to-end tests (Maestro `id:` selector). */
+  testID?: string;
 }
 
-export function Button({ label, onPress, variant = 'primary', icon, loading, disabled, size = 'md', style, accessibilityHint }: Props) {
+export function Button({ label, onPress, variant = 'primary', icon, loading, disabled, size = 'md', style, accessibilityHint, testID }: Props) {
   const { colors } = useTheme();
   const bg: Record<Variant, string> = {
     primary: colors.primary,
@@ -39,6 +41,7 @@ export function Button({ label, onPress, variant = 'primary', icon, loading, dis
   const inactive = disabled || loading;
   return (
     <Pressable
+      testID={testID}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityHint={accessibilityHint}

@@ -1,0 +1,52 @@
+# Paywall: open from Settings → Subscription, tap Restore, close.
+# Never taps Subscribe: no purchase is attempted.
+appId: app.promptly.placeholder
+tags:
+  - core
+---
+- runFlow: shared/launch.yaml
+- runFlow: shared/skip-onboarding.yaml
+
+- tapOn:
+    id: home-settings
+- takeScreenshot: screenshots/06-1-settings
+- tapOn:
+    id: settings-subscription
+- extendedWaitUntil:
+    visible:
+      id: subscription-upgrade
+    timeout: 10000
+- tapOn:
+    id: subscription-upgrade
+
+- extendedWaitUntil:
+    visible:
+      id: paywall-title
+    timeout: 10000
+# Prices load from the store; "unavailable" is acceptable in a dev build without store setup.
+- extendedWaitUntil:
+    visible:
+      id: "(paywall-subscribe|paywall-unavailable)"
+    timeout: 20000
+- takeScreenshot: screenshots/06-2-paywall
+
+- tapOn:
+    id: paywall-restore
+# Restore may show an OS sign-in prompt on a fresh phone; dismiss it, never sign in.
+- tapOn:
+    text: "(Cancel|Not Now)"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: paywall-message
+    timeout: 30000
+    optional: true
+- takeScreenshot: screenshots/06-3-after-restore
+
+- tapOn:
+    id: paywall-close
+- extendedWaitUntil:
+    visible:
+      id: subscription-upgrade
+    timeout: 10000
+- takeScreenshot: screenshots/06-4-closed

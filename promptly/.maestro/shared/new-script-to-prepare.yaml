@@ -1,0 +1,23 @@
+# From Home: create a blank script, type a short text, open the recording setup.
+# Ends on the Prepare (setup) screen.
+appId: app.promptly.placeholder
+---
+- tapOn:
+    id: home-create
+- tapOn:
+    id: create-blank
+- extendedWaitUntil:
+    visible:
+      id: editor-body
+    timeout: 10000
+- tapOn:
+    id: editor-body
+- inputText: "Hello, this is an automated Promptly test take. One, two, three, four, five."
+- hideKeyboard:
+    optional: true
+- tapOn:
+    id: editor-record
+- extendedWaitUntil:
+    visible:
+      id: prepare-start
+    timeout: 10000

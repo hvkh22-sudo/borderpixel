@@ -1,0 +1,59 @@
+# Export a fresh take: save to Photos/Gallery, then open the share sheet and dismiss it.
+# Afterwards a human checks the saved video in Photos/Gallery (overlay must be absent).
+appId: app.promptly.placeholder
+tags:
+  - core
+  - camera
+---
+- runFlow: shared/launch.yaml
+- runFlow: shared/skip-onboarding.yaml
+- runFlow: shared/new-script-to-prepare.yaml
+- runFlow:
+    file: shared/record-timed-take.yaml
+    env:
+      SHOT_PREFIX: "05"
+
+- tapOn:
+    id: take-export
+- extendedWaitUntil:
+    visible:
+      id: export-save-photos
+    timeout: 10000
+- takeScreenshot: screenshots/05-5-export-sheet
+
+# --- Save to Photos / Gallery ---
+- tapOn:
+    id: export-save-photos
+- runFlow: shared/allow-system-dialogs.yaml
+- extendedWaitUntil:
+    visible:
+      id: export-status
+    timeout: 60000
+- takeScreenshot: screenshots/05-6-saved-status
+
+# --- Share sheet: open, screenshot, dismiss ---
+- tapOn:
+    id: export-share-video
+- extendedWaitUntil:
+    visible:
+      id: maestro-wait-never-present
+    timeout: 3000
+    optional: true
+- takeScreenshot: screenshots/05-7-share-sheet
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - back
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          text: "Close"
+          optional: true
+- extendedWaitUntil:
+    visible:
+      id: export-share-video
+    timeout: 10000
+- takeScreenshot: screenshots/05-8-after-share

@@ -1,0 +1,20 @@
+# Maestro workspace config for Promptly.
+# Run from promptly/:  maestro test .maestro/
+# Only the top-level flows (01-…, 02-…) run; helpers in shared/ are called with runFlow.
+flows:
+  - "0*.yaml"
+
+# The Hebrew flow needs the phone switched to Hebrew first (see README), so it is
+# skipped in a full run. Run it on its own: maestro test .maestro/07-hebrew-rtl.yaml
+excludeTags:
+  - hebrew
+
+executionOrder:
+  continueOnFailure: true
+  flowsOrder:
+    - 01-first-run
+    - 02-script-crud
+    - 03-record-timed
+    - 04-captions
+    - 05-export
+    - 06-paywall

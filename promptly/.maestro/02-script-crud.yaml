@@ -1,0 +1,154 @@
+# Scripts: create by typing, rename via the title, search, folder create + move,
+# delete + undo, then clean up (script and folder removed).
+# English UI only (the confirm button of the folder-delete alert is matched by text).
+appId: app.promptly.placeholder
+tags:
+  - core
+---
+- runFlow: shared/launch.yaml
+- runFlow: shared/skip-onboarding.yaml
+
+# --- Create by typing (no clipboard needed) ---
+- tapOn:
+    id: home-create
+- takeScreenshot: screenshots/02-1-create-options
+- tapOn:
+    id: create-blank
+- extendedWaitUntil:
+    visible:
+      id: editor-body
+    timeout: 10000
+- tapOn:
+    id: editor-body
+- inputText: "Maestro body line. Testing the Promptly editor."
+- hideKeyboard:
+    optional: true
+
+# --- Rename via the title field ---
+- tapOn:
+    id: editor-title
+- eraseText:
+    charactersToErase: 80
+- inputText: "Maestro CRUD"
+- hideKeyboard:
+    optional: true
+- assertVisible:
+    text: "Maestro CRUD"
+# Autosave runs 0.6 s after the last keystroke.
+- extendedWaitUntil:
+    visible:
+      id: maestro-wait-never-present
+    timeout: 1500
+    optional: true
+- takeScreenshot: screenshots/02-2-editor
+- runFlow: shared/go-back.yaml
+
+# --- Library + search ---
+- extendedWaitUntil:
+    visible:
+      id: home-see-all-scripts
+    timeout: 10000
+- tapOn:
+    id: home-see-all-scripts
+- tapOn:
+    id: library-search
+- inputText: "Maestro CRUD"
+- hideKeyboard:
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: library-script-item
+    timeout: 5000
+- assertVisible:
+    id: library-script-item
+    text: "Maestro CRUD"
+- takeScreenshot: screenshots/02-3-search
+
+# --- Folder: create from the chip row ---
+- tapOn:
+    id: folder-chip-new
+- tapOn:
+    id: name-form-input
+- inputText: "Maestro Folder"
+- tapOn:
+    id: name-form-submit
+- extendedWaitUntil:
+    visible:
+      id: folder-chip
+    timeout: 5000
+- takeScreenshot: screenshots/02-4-folder-created
+- tapOn:
+    id: folder-chip-all
+
+# --- Move the script into the folder (search still filters to one script) ---
+# Long-press opens the script actions (the "…" button is nested and not reachable on iOS).
+- longPressOn:
+    id: library-script-item
+- tapOn:
+    id: script-action-move
+- tapOn:
+    id: folder-choice
+    text: "Maestro Folder"
+# Filter by the folder: the script must be listed there.
+- tapOn:
+    id: folder-chip
+    text: ".*Maestro Folder.*"
+- extendedWaitUntil:
+    visible:
+      id: library-script-item
+    timeout: 5000
+- assertVisible:
+    id: library-script-item
+    text: "Maestro CRUD"
+- takeScreenshot: screenshots/02-5-moved-into-folder
+- tapOn:
+    id: folder-chip-all
+
+# --- Delete + undo ---
+# Long-press opens the script actions (the "…" button is nested and not reachable on iOS).
+- longPressOn:
+    id: library-script-item
+- tapOn:
+    id: script-action-delete
+- extendedWaitUntil:
+    visible:
+      id: library-undo
+    timeout: 5000
+- takeScreenshot: screenshots/02-6-deleted-undo-bar
+- tapOn:
+    id: library-undo
+- extendedWaitUntil:
+    visible:
+      id: library-script-item
+    timeout: 5000
+- assertVisible:
+    id: library-script-item
+    text: "Maestro CRUD"
+- takeScreenshot: screenshots/02-7-restored
+
+# --- Clean up: delete the script for good, then the folder ---
+# Long-press opens the script actions (the "…" button is nested and not reachable on iOS).
+- longPressOn:
+    id: library-script-item
+- tapOn:
+    id: script-action-delete
+- tapOn:
+    id: library-undo-dismiss
+- tapOn:
+    id: library-search
+- eraseText:
+    charactersToErase: 40
+- hideKeyboard:
+    optional: true
+- longPressOn:
+    id: folder-chip
+    text: ".*Maestro Folder.*"
+- tapOn:
+    id: folder-action-delete
+- tapOn:
+    text: "Delete"
+- extendedWaitUntil:
+    notVisible:
+      text: ".*Maestro Folder.*"
+    timeout: 5000
+- takeScreenshot: screenshots/02-8-cleaned-up

@@ -1,0 +1,89 @@
+# Hebrew / right-to-left walk-through: screenshots of the main screens for a human to judge.
+#
+# Maestro cannot change the language from inside a flow. Before running this flow:
+#   - Physical Android phone: set the phone language to Hebrew (Settings → System → Languages),
+#     or on Android 13+ try the per-app language command in .maestro/README.md.
+#   - iOS Simulator / Android emulator: start it in Hebrew, e.g.
+#       maestro start-device --platform ios --device-locale he_IL
+#   - iPhone (manual only): Settings → Promptly → Language → עברית.
+# The flow clears app data so onboarding shows again, and checks Hebrew text is on screen.
+# Run on its own (excluded from a full run by the "hebrew" tag):
+#   maestro test .maestro/07-hebrew-rtl.yaml
+appId: app.promptly.placeholder
+tags:
+  - hebrew
+---
+- runFlow:
+    file: shared/launch.yaml
+    env:
+      CLEAR_STATE: "true"
+
+- extendedWaitUntil:
+    visible:
+      id: onboarding-start
+    timeout: 30000
+# Hebrew onboarding button text ("Let's start"). Fails if the app is still in English.
+- assertVisible:
+    text: "בואו נתחיל"
+- takeScreenshot: screenshots/07-1-onboarding-he
+- tapOn:
+    id: onboarding-start
+
+- extendedWaitUntil:
+    visible:
+      id: home-create
+    timeout: 15000
+- takeScreenshot: screenshots/07-2-home-he
+
+# Setup screen in Hebrew (from the sample script).
+- tapOn:
+    id: home-try-sample
+- extendedWaitUntil:
+    visible:
+      id: prepare-start
+    timeout: 15000
+- takeScreenshot: screenshots/07-3-setup-he
+- runFlow: shared/go-back.yaml
+
+- extendedWaitUntil:
+    visible:
+      id: home-create
+    timeout: 10000
+- tapOn:
+    id: home-create
+- takeScreenshot: screenshots/07-4-create-he
+- tapOn:
+    id: create-blank
+- extendedWaitUntil:
+    visible:
+      id: editor-body
+    timeout: 10000
+- tapOn:
+    id: editor-body
+# Typing Hebrew via inputText may not work on Android; optional.
+- inputText:
+    text: "שלום, זה טקסט בדיקה בעברית."
+    optional: true
+- hideKeyboard:
+    optional: true
+- takeScreenshot: screenshots/07-5-editor-he
+- runFlow: shared/go-back.yaml
+
+- extendedWaitUntil:
+    visible:
+      id: home-settings
+    timeout: 10000
+- tapOn:
+    id: home-settings
+- takeScreenshot: screenshots/07-6-settings-he
+- tapOn:
+    id: settings-subscription
+- tapOn:
+    id: subscription-upgrade
+- extendedWaitUntil:
+    visible:
+      id: paywall-title
+    timeout: 10000
+- takeScreenshot: screenshots/07-7-paywall-he
+- tapOn:
+    id: paywall-close

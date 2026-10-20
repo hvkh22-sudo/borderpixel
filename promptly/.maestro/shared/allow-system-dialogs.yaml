@@ -1,0 +1,28 @@
+# Accept OS permission dialogs if any appear (camera, microphone, speech, Photos).
+# launchApp already grants permissions, so normally nothing shows and every step is skipped.
+# Run it twice in a row to cover camera + microphone prompts.
+appId: app.promptly.placeholder
+---
+# Android 11+ permission controller buttons.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn:
+          id: "com.android.permissioncontroller:id/permission_allow_foreground_only_button"
+          optional: true
+      - tapOn:
+          id: "com.android.permissioncontroller:id/permission_allow_button"
+          optional: true
+      - tapOn:
+          text: "(While using the app|Allow|Allow all)"
+          optional: true
+
+# iOS alerts (camera, microphone, speech recognition, Photos add-only).
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          text: "(Allow|OK|Allow Full Access|Allow Access to All Photos)"
+          optional: true

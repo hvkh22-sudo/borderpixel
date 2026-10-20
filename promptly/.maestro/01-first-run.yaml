@@ -1,0 +1,46 @@
+# First run: fresh install state → onboarding → Home → sample script → recording setup.
+# WARNING: clears the app's data (scripts and takes inside Promptly) on this phone.
+appId: app.promptly.placeholder
+tags:
+  - core
+---
+- runFlow:
+    file: shared/launch.yaml
+    env:
+      CLEAR_STATE: "true"
+
+- extendedWaitUntil:
+    visible:
+      id: onboarding-start
+    timeout: 30000
+- takeScreenshot: screenshots/01-1-onboarding
+- tapOn:
+    id: onboarding-start
+
+- extendedWaitUntil:
+    visible:
+      id: home-create
+    timeout: 15000
+- assertVisible:
+    id: home-try-sample
+- takeScreenshot: screenshots/01-2-home-empty
+
+- tapOn:
+    id: home-try-sample
+- extendedWaitUntil:
+    visible:
+      id: prepare-start
+    timeout: 15000
+- assertVisible:
+    id: mode-timed
+- assertVisible:
+    id: mode-manual
+- takeScreenshot: screenshots/01-3-setup
+
+# Back on Home the sample now shows under recent scripts.
+- runFlow: shared/go-back.yaml
+- extendedWaitUntil:
+    visible:
+      id: home-script-item
+    timeout: 10000
+- takeScreenshot: screenshots/01-4-home-with-sample

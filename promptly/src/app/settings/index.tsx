@@ -26,22 +26,22 @@ export default function Settings() {
           value={appearance}
           onChange={(v) => set({ appearance: v })}
           options={[
-            { value: 'system', label: t('settings.system') },
-            { value: 'light', label: t('settings.light') },
-            { value: 'dark', label: t('settings.dark') },
+            { value: 'system', label: t('settings.system'), testID: 'appearance-system' },
+            { value: 'light', label: t('settings.light'), testID: 'appearance-light' },
+            { value: 'dark', label: t('settings.dark'), testID: 'appearance-dark' },
           ]}
         />
       </Section>
       <Section title={t('settings.speechLanguage')}>
         {SPEECH_LOCALES.map((l) => (
-          <ListRow key={l} title={l} value={l === speechLocale ? '✓' : undefined} onPress={() => set({ speechLocale: l })} />
+          <ListRow key={l} testID={`settings-speech-${l}`} title={l} value={l === speechLocale ? '✓' : undefined} onPress={() => set({ speechLocale: l })} />
         ))}
       </Section>
       <Section>
-        <ListRow icon="card-outline" title={t('settings.subscription')} value={access.isPro ? (access.source === 'lifetime' ? t('subscription.lifetime') : t('subscription.pro')) : t('subscription.free')} onPress={() => router.push('/settings/subscription')} />
-        <ListRow icon="shield-checkmark-outline" title={t('settings.privacy')} onPress={() => router.push('/settings/privacy')} />
-        <ListRow icon="help-circle-outline" title={t('settings.help')} onPress={() => router.push('/settings/help')} />
-        <ListRow icon="refresh-outline" title={t('settings.resetPrompter')} onPress={() => useSettings.getState().setPrompter(DEFAULT_PROMPTER)} />
+        <ListRow testID="settings-subscription" icon="card-outline" title={t('settings.subscription')} value={access.isPro ? (access.source === 'lifetime' ? t('subscription.lifetime') : t('subscription.pro')) : t('subscription.free')} onPress={() => router.push('/settings/subscription')} />
+        <ListRow testID="settings-privacy" icon="shield-checkmark-outline" title={t('settings.privacy')} onPress={() => router.push('/settings/privacy')} />
+        <ListRow testID="settings-help" icon="help-circle-outline" title={t('settings.help')} onPress={() => router.push('/settings/help')} />
+        <ListRow testID="settings-reset-prompter" icon="refresh-outline" title={t('settings.resetPrompter')} onPress={() => useSettings.getState().setPrompter(DEFAULT_PROMPTER)} />
       </Section>
       <Text variant="caption" muted center>
         {t('settings.version', { v: Constants.expoConfig?.version ?? '—' })}

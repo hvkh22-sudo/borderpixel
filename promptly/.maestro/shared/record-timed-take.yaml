@@ -1,0 +1,69 @@
+# From the Prepare screen: Timed mode, 3 s countdown, record about 8 s, stop.
+# Ends on the take preview. Env SHOT_PREFIX (required) names the screenshots.
+# Pauses use an optional wait on the id "maestro-wait-never-present", which never exists.
+appId: app.promptly.placeholder
+---
+- tapOn:
+    id: mode-timed
+- scrollUntilVisible:
+    element:
+      id: countdown-3
+    direction: DOWN
+    timeout: 10000
+- tapOn:
+    id: countdown-3
+- tapOn:
+    id: prepare-start
+
+# Permission dialogs (normally pre-granted by launchApp).
+- runFlow: allow-system-dialogs.yaml
+- runFlow:
+    when:
+      visible:
+        id: record-permission-allow
+    commands:
+      - tapOn:
+          id: record-permission-allow
+      - runFlow: allow-system-dialogs.yaml
+      - runFlow: allow-system-dialogs.yaml
+
+- extendedWaitUntil:
+    visible:
+      id: record-button
+    timeout: 20000
+# Give the camera a moment to start before pressing record.
+- extendedWaitUntil:
+    visible:
+      id: maestro-wait-never-present
+    timeout: 2000
+    optional: true
+- takeScreenshot: screenshots/${SHOT_PREFIX}-1-camera-ready
+
+- tapOn:
+    id: record-button
+- extendedWaitUntil:
+    visible:
+      id: record-countdown
+    timeout: 5000
+    optional: true
+- takeScreenshot: screenshots/${SHOT_PREFIX}-2-countdown
+- extendedWaitUntil:
+    visible:
+      id: record-timer
+    timeout: 15000
+- takeScreenshot: screenshots/${SHOT_PREFIX}-3-recording
+
+# Record about 8 seconds.
+- extendedWaitUntil:
+    visible:
+      id: maestro-wait-never-present
+    timeout: 8000
+    optional: true
+
+- tapOn:
+    id: record-button
+- extendedWaitUntil:
+    visible:
+      id: take-video
+    timeout: 60000
+- takeScreenshot: screenshots/${SHOT_PREFIX}-4-take-preview

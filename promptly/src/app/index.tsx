@@ -50,12 +50,13 @@ export default function Home() {
           Promptly
         </Text>
         <View style={styles.row}>
-          <IconButton icon="film-outline" label={t('home.takes')} onPress={() => router.push('/takes')} />
-          <IconButton icon="settings-outline" label={t('home.settings')} onPress={() => router.push('/settings')} />
+          <IconButton testID="home-takes" icon="film-outline" label={t('home.takes')} onPress={() => router.push('/takes')} />
+          <IconButton testID="home-settings" icon="settings-outline" label={t('home.settings')} onPress={() => router.push('/settings')} />
         </View>
       </View>
       <ScrollView contentContainerStyle={styles.content}>
         <Pressable
+          testID="home-create"
           accessibilityRole="button"
           accessibilityLabel={t('home.create')}
           accessibilityHint={t('home.createHint')}
@@ -99,7 +100,7 @@ export default function Home() {
             icon="sparkles-outline"
             title={t('home.emptyTitle')}
             body={t('home.emptyBody')}
-            action={<Button label={t('home.trySample')} variant="secondary" icon="play" onPress={trySample} />}
+            action={<Button testID="home-try-sample" label={t('home.trySample')} variant="secondary" icon="play" onPress={trySample} />}
           />
         ) : null}
 
@@ -109,10 +110,10 @@ export default function Home() {
               <Text variant="headline" accessibilityRole="header">
                 {t('home.recentScripts')}
               </Text>
-              <Button label={t('home.seeAll')} variant="ghost" onPress={() => router.push('/scripts')} />
+              <Button testID="home-see-all-scripts" label={t('home.seeAll')} variant="ghost" onPress={() => router.push('/scripts')} />
             </View>
             {data.scripts.map((s) => (
-              <Card key={s.id} onPress={() => router.push(`/scripts/${s.id}`)} accessibilityLabel={s.title}>
+              <Card key={s.id} testID="home-script-item" onPress={() => router.push(`/scripts/${s.id}`)} accessibilityLabel={s.title}>
                 <Text variant="headline" numberOfLines={1}>
                   {s.title}
                 </Text>
@@ -133,10 +134,10 @@ export default function Home() {
               <Text variant="headline" accessibilityRole="header">
                 {t('home.recentTakes')}
               </Text>
-              <Button label={t('home.seeAll')} variant="ghost" onPress={() => router.push('/takes')} />
+              <Button testID="home-see-all-takes" label={t('home.seeAll')} variant="ghost" onPress={() => router.push('/takes')} />
             </View>
             {data.takes.map((r) => (
-              <Card key={r.id} onPress={() => router.push(`/take/${r.id}`)} accessibilityLabel={new Date(r.createdAt).toLocaleString()}>
+              <Card key={r.id} testID="home-take-item" onPress={() => router.push(`/take/${r.id}`)} accessibilityLabel={new Date(r.createdAt).toLocaleString()}>
                 <View style={styles.takeRow}>
                   <View style={[styles.thumb, { backgroundColor: colors.surfaceRaised }]}>
                     <Ionicons name="play" size={18} color={colors.text} />

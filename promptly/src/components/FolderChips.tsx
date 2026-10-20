@@ -20,13 +20,16 @@ interface ChipProps {
   count?: number;
   onPress: () => void;
   onLongPress?: () => void;
+  /** Stable id for end-to-end tests. */
+  testID?: string;
 }
 
-export function Chip({ label, accessibilityLabel, accessibilityHint, selected, icon, count, onPress, onLongPress }: ChipProps) {
+export function Chip({ label, accessibilityLabel, accessibilityHint, selected, icon, count, onPress, onLongPress, testID }: ChipProps) {
   const { colors } = useTheme();
   const fg = selected ? colors.onPrimary : colors.text;
   return (
     <Pressable
+      testID={testID}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityHint={accessibilityHint}
@@ -71,11 +74,12 @@ export function FolderChips({ folders, value, onChange, onNewFolder, onManageFol
       accessibilityLabel={t('folders.row')}
       keyboardShouldPersistTaps="handled"
     >
-      <Chip label={t('library.all')} selected={value.kind === 'all'} onPress={() => onChange({ kind: 'all' })} />
-      <Chip label={t('library.favorites')} icon="star-outline" selected={value.kind === 'favorites'} onPress={() => onChange({ kind: 'favorites' })} />
+      <Chip testID="folder-chip-all" label={t('library.all')} selected={value.kind === 'all'} onPress={() => onChange({ kind: 'all' })} />
+      <Chip testID="folder-chip-favorites" label={t('library.favorites')} icon="star-outline" selected={value.kind === 'favorites'} onPress={() => onChange({ kind: 'favorites' })} />
       {folders.map((f) => (
         <Chip
           key={f.id}
+          testID="folder-chip"
           label={f.name}
           icon="folder-outline"
           count={f.scriptCount}
@@ -86,7 +90,7 @@ export function FolderChips({ folders, value, onChange, onNewFolder, onManageFol
           onLongPress={() => onManageFolder(f)}
         />
       ))}
-      <Chip label={t('folders.newFolder')} icon="add" onPress={onNewFolder} />
+      <Chip testID="folder-chip-new" label={t('folders.newFolder')} icon="add" onPress={onNewFolder} />
     </ScrollView>
   );
 }
@@ -94,9 +98,9 @@ export function FolderChips({ folders, value, onChange, onNewFolder, onManageFol
 /** Sheet rows for choosing a script's folder: No folder, each folder, then New folder. */
 export function folderChoiceActions(folders: Folder[], currentId: string | null, onSelect: (id: string | null) => void, onNew: () => void): SheetAction[] {
   return [
-    { label: t('folders.noFolder'), icon: 'file-tray-outline', selected: currentId === null, onPress: () => onSelect(null) },
-    ...folders.map((f): SheetAction => ({ label: f.name, icon: 'folder-outline', selected: currentId === f.id, onPress: () => onSelect(f.id) })),
-    { label: t('folders.newFolder'), icon: 'add', onPress: onNew },
+    { testID: 'folder-choice-none', label: t('folders.noFolder'), icon: 'file-tray-outline', selected: currentId === null, onPress: () => onSelect(null) },
+    ...folders.map((f): SheetAction => ({ testID: 'folder-choice', label: f.name, icon: 'folder-outline', selected: currentId === f.id, onPress: () => onSelect(f.id) })),
+    { testID: 'folder-choice-new', label: t('folders.newFolder'), icon: 'add', onPress: onNew },
   ];
 }
 

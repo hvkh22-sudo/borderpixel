@@ -49,7 +49,7 @@ export default function Onboarding() {
         </View>
       </View>
       <View style={styles.footer}>
-        <Button label={t('onboarding.start')} onPress={finish} size="lg" />
+        <Button testID="onboarding-start" label={t('onboarding.start')} onPress={finish} size="lg" />
         <Text variant="caption" muted center>
           {t('onboarding.privacy')}
         </Text>

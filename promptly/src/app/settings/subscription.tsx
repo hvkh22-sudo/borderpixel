@@ -24,8 +24,8 @@ export default function Subscription() {
         ) : null}
         {access.billingIssue ? <Text color={colors.warning}>{t('subscription.billingIssue')}</Text> : null}
       </Card>
-      {access.source === 'subscription' ? <Button label={t('subscription.manage')} variant="secondary" onPress={() => void openManageSubscriptions()} /> : null}
-      {access.source !== 'lifetime' ? <Button label={t('subscription.upgrade')} onPress={() => router.push('/paywall')} /> : null}
+      {access.source === 'subscription' ? <Button testID="subscription-manage" label={t('subscription.manage')} variant="secondary" onPress={() => void openManageSubscriptions()} /> : null}
+      {access.source !== 'lifetime' ? <Button testID="subscription-upgrade" label={t('subscription.upgrade')} onPress={() => router.push('/paywall')} /> : null}
     </Screen>
   );
 }

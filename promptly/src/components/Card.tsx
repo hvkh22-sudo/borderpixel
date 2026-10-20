@@ -10,14 +10,17 @@ interface Props {
   onLongPress?: () => void;
   accessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
+  /** Stable id for end-to-end tests. */
+  testID?: string;
 }
 
-export function Card({ children, onPress, onLongPress, accessibilityLabel, style }: Props) {
+export function Card({ children, onPress, onLongPress, accessibilityLabel, style, testID }: Props) {
   const { colors } = useTheme();
   const base = [styles.card, { backgroundColor: colors.surface, borderColor: colors.border }, style];
-  if (!onPress) return <View style={base}>{children}</View>;
+  if (!onPress) return <View testID={testID} style={base}>{children}</View>;
   return (
     <Pressable
+      testID={testID}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       onPress={onPress}

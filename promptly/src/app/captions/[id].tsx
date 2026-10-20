@@ -133,7 +133,7 @@ export default function CaptionsEditor() {
   if (!capSupport.ok) {
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
-        <Text center>{t('captions.errors.unsupported_device')}</Text>
+        <Text testID="captions-unsupported" center>{t('captions.errors.unsupported_device')}</Text>
         <Text center muted>
           {t(`support.${capSupport.reason}`)}
         </Text>
@@ -152,20 +152,20 @@ export default function CaptionsEditor() {
           {phase === 'working' ? (
             <>
               <ActivityIndicator color={colors.primary} />
-              <Text muted accessibilityLiveRegion="polite">
+              <Text testID="captions-working" muted accessibilityLiveRegion="polite">
                 {t('captions.generating')}
               </Text>
-              <Button label={t('common.cancel')} variant="ghost" onPress={() => abortRef.current?.abort()} />
+              <Button testID="captions-cancel" label={t('common.cancel')} variant="ghost" onPress={() => abortRef.current?.abort()} />
             </>
           ) : (
             <>
               {errorKey ? (
-                <Text center accessibilityLiveRegion="assertive">
+                <Text testID="captions-error" center accessibilityLiveRegion="assertive">
                   {t(errorKey as Parameters<typeof t>[0])}
                 </Text>
               ) : null}
-              {scriptBody ? <ListRow title={t('captions.useScript')} toggle={{ value: useScript, onChange: setUseScript }} /> : null}
-              <Button label={phase === 'error' ? t('common.retry') : t('captions.generate')} icon="text" onPress={generate} />
+              {scriptBody ? <ListRow testID="captions-use-script" title={t('captions.useScript')} toggle={{ value: useScript, onChange: setUseScript }} /> : null}
+              <Button testID="captions-generate" label={phase === 'error' ? t('common.retry') : t('captions.generate')} icon="text" onPress={generate} />
               <Text variant="caption" muted center>
                 {t('captions.onDevice')}
               </Text>
@@ -248,7 +248,7 @@ export default function CaptionsEditor() {
       />
       {phase === 'ready' ? (
         <View style={[styles.footer, { borderTopColor: colors.border }]}>
-          <Button label={t('captions.save')} onPress={save} />
+          <Button testID="captions-save" label={t('captions.save')} onPress={save} />
         </View>
       ) : null}
     </View>

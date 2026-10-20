@@ -34,9 +34,9 @@ export default function Create() {
   };
 
   const options = [
-    { icon: 'clipboard-outline', title: t('create.paste'), hint: t('create.pasteHint'), onPress: paste },
-    { icon: 'create-outline', title: t('create.blank'), hint: '', onPress: () => createAndOpen('', 'blank') },
-    { icon: 'sparkles-outline', title: t('create.ai'), hint: t('create.aiHint'), onPress: () => router.replace('/studio?tool=generate') },
+    { testID: 'create-paste', icon: 'clipboard-outline', title: t('create.paste'), hint: t('create.pasteHint'), onPress: paste },
+    { testID: 'create-blank', icon: 'create-outline', title: t('create.blank'), hint: '', onPress: () => createAndOpen('', 'blank') },
+    { testID: 'create-ai', icon: 'sparkles-outline', title: t('create.ai'), hint: t('create.aiHint'), onPress: () => router.replace('/studio?tool=generate') },
   ] as const;
 
   return (
@@ -44,6 +44,7 @@ export default function Create() {
       {options.map((o) => (
         <Pressable
           key={o.title}
+          testID={o.testID}
           accessibilityRole="button"
           accessibilityLabel={o.title}
           accessibilityHint={o.hint || undefined}

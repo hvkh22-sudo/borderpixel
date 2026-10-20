@@ -282,6 +282,7 @@ export default function RecordScreen() {
           {t('record.permissionBody')}
         </Text>
         <Button
+          testID="record-permission-allow"
           label={blocked ? t('record.permissionSettings') : t('record.permissionAllow')}
           onPress={async () => {
             if (blocked) return void Linking.openSettings();
@@ -289,7 +290,7 @@ export default function RecordScreen() {
             if (cam && !micPerm.hasPermission) await micPerm.requestPermission();
           }}
         />
-        <Button label={t('common.back')} variant="ghost" onPress={() => router.back()} />
+        <Button testID="record-permission-back" label={t('common.back')} variant="ghost" onPress={() => router.back()} />
       </SafeAreaView>
     );
   }
@@ -306,7 +307,7 @@ export default function RecordScreen() {
         : null;
   const footnote =
     state.status === 'finalizing' || state.status === 'stopping' ? (
-      <Text variant="caption" color="#fff" center accessibilityLiveRegion="polite">
+      <Text testID="record-finalizing" variant="caption" color="#fff" center accessibilityLiveRegion="polite">
         {t('record.finalizing')}
       </Text>
     ) : (
@@ -345,10 +346,10 @@ export default function RecordScreen() {
         <View style={styles.main}>
           {/* Top bar */}
           <View style={styles.topBar}>
-            <IconButton icon="close" label={t('record.close')} color="#fff" background="rgba(0,0,0,0.35)" onPress={close} />
+            <IconButton testID="record-close" icon="close" label={t('record.close')} color="#fff" background="rgba(0,0,0,0.35)" onPress={close} />
             <View style={styles.center}>
               {recording ? (
-                <View style={styles.recPill} accessibilityLiveRegion="polite" accessibilityLabel={`${t('record.recording')} ${formatClock(elapsed)}`}>
+                <View testID="record-timer" style={styles.recPill} accessibilityLiveRegion="polite" accessibilityLabel={`${t('record.recording')} ${formatClock(elapsed)}`}>
                   <View style={styles.recDot} />
                   <Text variant="callout" color="#fff" style={styles.tabular}>
                     {formatClock(elapsed)}
@@ -368,6 +369,7 @@ export default function RecordScreen() {
               ) : null}
             </View>
             <IconButton
+              testID="record-flip"
               icon="camera-reverse-outline"
               label={t('record.flip')}
               color="#fff"
@@ -405,7 +407,7 @@ export default function RecordScreen() {
           </View>
 
           {notice || state.status === 'recoverableFailure' || state.status === 'unrecoverableFailure' ? (
-            <View style={styles.notice} accessibilityLiveRegion="assertive">
+            <View testID="record-notice" style={styles.notice} accessibilityLiveRegion="assertive">
               <Text variant="callout" color="#fff" center>
                 {state.error === 'low_storage'
                   ? t('record.lowStorage')
@@ -438,6 +440,7 @@ export default function RecordScreen() {
           </View>
 
           <Pressable
+            testID="record-button"
             accessibilityRole="button"
             accessibilityLabel={recording ? t('record.stop') : t('record.start')}
             accessibilityState={{ disabled: !(state.status === 'ready' || recording || state.status === 'countdown') }}
@@ -468,7 +471,7 @@ export default function RecordScreen() {
       </SafeAreaView>
 
       {state.status === 'countdown' ? (
-        <Pressable style={styles.countdown} onPress={() => dispatch({ type: 'CANCEL_COUNTDOWN' })} accessibilityRole="button" accessibilityLabel={t('record.countdownCancel')}>
+        <Pressable testID="record-countdown" style={styles.countdown} onPress={() => dispatch({ type: 'CANCEL_COUNTDOWN' })} accessibilityRole="button" accessibilityLabel={t('record.countdownCancel')}>
           <Text variant="display" color="#fff" style={styles.countdownText} accessibilityLiveRegion="assertive">
             {countdown}
           </Text>
