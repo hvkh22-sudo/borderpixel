@@ -12,6 +12,8 @@ import { Segmented } from '../../components/Segmented';
 import { Stepper } from '../../components/Stepper';
 import { Text } from '../../components/Text';
 import { checkFeature } from '../../features/monetization/entitlements';
+import { MicCheckSheet, VERDICT_SHORT } from '../../features/recording/MicCheckSheet';
+import type { MicVerdict } from '../../features/recording/micCheck';
 import { activePreset, applyPreset, getPreset, RECORDING_PRESETS, type PresetId } from '../../features/recording/presets';
 import { suggestedTimedWpm } from '../../features/teleprompter/speakingRate';
 import { MAX_WPM, MIN_WPM, WPM_STEP } from '../../features/teleprompter/scrollModel';
@@ -20,6 +22,7 @@ import { estimateSpeakingSeconds } from '../../features/voice-follow/text';
 import { formatDuration, t } from '../../localization/i18n';
 import { getRepositories } from '../../services/db';
 import { support } from '../../services/deviceSupport';
+import { whenMicReleased } from '../../services/micCheck';
 import { useAccess } from '../../state/access';
 import { useSettings, type ScrollMode } from '../../state/settings';
 import { useLearnedWpm, useSpeakingRate } from '../../state/speakingRate';
@@ -40,6 +43,8 @@ export default function Prepare() {
   const access = useAccess((s) => s.access);
   const usage = useAccess((s) => s.usage);
   const vfSupport = support.voiceFollow();
+  const [micOpen, setMicOpen] = useState(false);
+  const [micVerdict, setMicVerdict] = useState<MicVerdict | null>(null);
 
   useEffect(() => {
     void getRepositories().then((r) => r.scripts.get(id).then(setScript));
@@ -63,12 +68,18 @@ export default function Prepare() {
 
   const mode: ScrollMode = prompter.mode === 'voice' && (!voiceSupported || !voiceGate.allowed) ? 'timed' : prompter.mode;
 
+  // The camera must own the audio session: wait until a mic check has fully released it.
+  const openCamera = async () => {
+    await whenMicReleased();
+    router.push(`/record/${id}?mode=${mode}`);
+  };
+
   const modeHint =
     mode === 'manual' ? t('prepare.modeManualHint') : mode === 'timed' ? t('prepare.modeTimedHint') : t('prepare.modeVoiceHint');
 
   return (
     <Screen
-      footer={<Button testID="prepare-start" label={t('prepare.start')} icon="videocam" variant="record" size="lg" onPress={() => router.push(`/record/${id}?mode=${mode}`)} />}
+      footer={<Button testID="prepare-start" label={t('prepare.start')} icon="videocam" variant="record" size="lg" onPress={() => void openCamera()} />}
     >
       <View style={styles.preview} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
         {script ? (
@@ -236,7 +247,15 @@ export default function Prepare() {
             options={[0, 3, 5, 10].map((n) => ({ value: n as 0 | 3 | 5 | 10, label: n === 0 ? t('common.off') : t('common.seconds', { n }), testID: `countdown-${n}` }))}
           />
         </View>
+        <ListRow
+          title={t('micCheck.row')}
+          subtitle={t('micCheck.rowHint')}
+          icon="mic-outline"
+          value={micVerdict ? t(VERDICT_SHORT[micVerdict]) : undefined}
+          onPress={() => setMicOpen(true)}
+        />
       </Section>
+      <MicCheckSheet visible={micOpen} onClose={() => setMicOpen(false)} onResult={setMicVerdict} />
       {!access.isPro ? (
         <View style={styles.proRow}>
           <ProBadge />

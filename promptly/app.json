@@ -133,6 +133,15 @@
         }
       ],
       [
+        "expo-audio",
+        {
+          "microphonePermission": "Promptly records your voice with your video and can follow your speech to scroll the script.",
+          "recordAudioAndroid": true,
+          "enableBackgroundRecording": false,
+          "enableBackgroundPlayback": false
+        }
+      ],
+      [
         "expo-localization",
         {
           "supportsRTL": true,

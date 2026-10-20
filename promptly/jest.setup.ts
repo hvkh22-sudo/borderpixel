@@ -32,3 +32,20 @@ jest.mock('react-native-worklets', () => ({
   ...jest.requireActual('react-native-worklets'),
   getUIRuntimeHolder: () => ({}),
 }));
+// expo-audio (mic check): inert recorder; src/app/__tests__/micCheck.test.tsx installs a scriptable one.
+jest.mock('expo-audio', () => ({
+  RecordingPresets: { LOW_QUALITY: {}, HIGH_QUALITY: {} },
+  useAudioRecorder: () => ({
+    id: 'rec',
+    uri: null,
+    isRecording: false,
+    prepareToRecordAsync: () => Promise.resolve(),
+    record: () => undefined,
+    stop: () => Promise.resolve(),
+    getStatus: () => ({}),
+    getCurrentInput: () => Promise.reject(new Error('no input')),
+  }),
+  requestRecordingPermissionsAsync: () => Promise.resolve({ granted: false, canAskAgain: true }),
+  setAudioModeAsync: () => Promise.resolve(),
+  setIsAudioActiveAsync: () => Promise.resolve(),
+}));
