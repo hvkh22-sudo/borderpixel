@@ -40,7 +40,7 @@ Legend: ✅ verified · 🟡 implemented, not verified on device · ⬜ not star
 - Android media library permission flow with READ_MEDIA_* blocked must be verified on API 33+.
 - Front camera mirroring of the saved file uses VisionCamera `mirrorMode: auto` default — verify
   creators get the expected (non-mirrored/mirrored) output.
-- Free-tier AI abuse: needs App Attest / Play Integrity before production.
+- Free-tier AI abuse: App Attest / Play Integrity verification implemented server + client, unit-tested (Apple's published attestation example, fake ES256 assertions, Play verdict fixtures) and run in local workerd; **not tested on devices or against the live Google API**. `INTEGRITY_MODE=report` (log only) until verified; switch to `enforce` before free-tier AI goes live.
 
 ## Store readiness
 ⬜ name · 🟡 original icon generated (`scripts/generate-icons.py`), not reviewed on a home screen · 🟡 listing drafts · 🟡 privacy policy draft ·

@@ -6,7 +6,9 @@ import { DurableObject } from 'cloudflare:workers';
 
 import { fetchEntitlement } from './entitlements';
 import { handle, type HandlerConfig } from './handler';
+import { INTEGRITY_DEFAULTS, parseIntegrityMode, type IntegrityDeps } from './integrity';
 import { AnthropicLlm } from './llm';
+import { decodeIntegrityToken, parseServiceAccount } from './playIntegrity';
 import type { QuotaStore } from './quota';
 
 export interface Env {
@@ -24,6 +26,18 @@ export interface Env {
   OUTPUT_USD_PER_MTOK: string;
   /** Kill switch: anything but "true" disables AI (no billable calls). */
   AI_ENABLED: string;
+  /** Device integrity enforcement: off | report (default) | enforce. */
+  INTEGRITY_MODE?: string;
+  APPLE_TEAM_ID?: string;
+  IOS_BUNDLE_ID?: string;
+  /** "true" accepts App Attest development-environment keys (dev builds). */
+  APP_ATTEST_ALLOW_DEVELOPMENT?: string;
+  ANDROID_PACKAGE?: string;
+  /** Comma-separated base64url SHA-256 digests of the Play app-signing certificate. */
+  ANDROID_CERT_SHA256?: string;
+  /** Secret: Google service-account JSON with access to the Play Integrity API. */
+  PLAY_INTEGRITY_SA_JSON?: string;
+  UNVERIFIED_PAID_PER_DAY?: string;
   COUNTERS: DurableObjectNamespace<Counters>;
 }
 
@@ -54,6 +68,16 @@ export class Counters extends DurableObject {
   async cachePut(key: string, value: unknown, expiresAt: number): Promise<void> {
     await this.ctx.storage.put(`cache:${key}`, { value, expiresAt });
   }
+  async cacheTake(key: string, now: number): Promise<unknown> {
+    const e = await this.ctx.storage.get<{ value: unknown; expiresAt: number }>(`cache:${key}`);
+    if (e) await this.ctx.storage.delete(`cache:${key}`);
+    return e && e.expiresAt > now ? e.value : null;
+  }
+  async advance(key: string, value: number): Promise<boolean> {
+    if (value <= ((await this.ctx.storage.get<number>(key)) ?? 0)) return false;
+    await this.ctx.storage.put(key, value);
+    return true;
+  }
 }
 
 class DurableQuotaStore implements QuotaStore {
@@ -79,12 +103,34 @@ class DurableQuotaStore implements QuotaStore {
   cachePut<T>(scope: string, key: string, value: T, expiresAt: number) {
     return this.stub(scope).cachePut(key, value, expiresAt);
   }
+  async cacheTake<T>(scope: string, key: string, now: number) {
+    return (await this.stub(scope).cacheTake(key, now)) as T | null;
+  }
+  advance(scope: string, key: string, value: number) {
+    return this.stub(scope).advance(key, value);
+  }
 }
 
 const num = (v: string | undefined, fallback: number) => {
   const n = Number(v);
   return Number.isFinite(n) && n >= 0 ? n : fallback;
 };
+
+function integrityDeps(env: Env): IntegrityDeps {
+  const sa = env.PLAY_INTEGRITY_SA_JSON ? parseServiceAccount(env.PLAY_INTEGRITY_SA_JSON) : null;
+  return {
+    config: {
+      mode: parseIntegrityMode(env.INTEGRITY_MODE),
+      appleAppId: env.APPLE_TEAM_ID && env.IOS_BUNDLE_ID ? `${env.APPLE_TEAM_ID}.${env.IOS_BUNDLE_ID}` : null,
+      allowDevelopmentKeys: env.APP_ATTEST_ALLOW_DEVELOPMENT === 'true',
+      androidPackage: env.ANDROID_PACKAGE || null,
+      androidCertDigests: (env.ANDROID_CERT_SHA256 ?? '').split(',').map((d) => d.trim()).filter(Boolean),
+      ...INTEGRITY_DEFAULTS,
+      unverifiedPaidPerDay: num(env.UNVERIFIED_PAID_PER_DAY, INTEGRITY_DEFAULTS.unverifiedPaidPerDay),
+    },
+    decodePlayToken: sa ? (token, pkg) => decodeIntegrityToken(token, pkg, sa, Date.now()) : undefined,
+  };
+}
 
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
@@ -108,6 +154,7 @@ export default {
       now: Date.now,
       config,
       log: (entry) => console.log(JSON.stringify(entry)),
+      integrity: integrityDeps(env),
     });
   },
 };

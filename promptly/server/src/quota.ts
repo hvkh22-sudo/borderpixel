@@ -13,6 +13,10 @@ export interface QuotaStore {
   /** Small JSON cache with TTL (entitlements). */
   cacheGet<T>(scope: string, key: string, now: number): Promise<T | null>;
   cachePut<T>(scope: string, key: string, value: T, expiresAt: number): Promise<void>;
+  /** Atomically reads and deletes a cache entry (single-use integrity challenges). */
+  cacheTake<T>(scope: string, key: string, now: number): Promise<T | null>;
+  /** Atomically sets counter `key` to `value` iff value > current; returns whether it advanced. */
+  advance(scope: string, key: string, value: number): Promise<boolean>;
 }
 
 export class MemoryQuotaStore implements QuotaStore {
@@ -46,5 +50,17 @@ export class MemoryQuotaStore implements QuotaStore {
   }
   async cachePut<T>(scope: string, key: string, value: T, expiresAt: number) {
     this.cache.set(this.k(scope, key), { value, expiresAt });
+  }
+  async cacheTake<T>(scope: string, key: string, now: number) {
+    const id = this.k(scope, key);
+    const e = this.cache.get(id);
+    this.cache.delete(id);
+    return e && e.expiresAt > now ? (e.value as T) : null;
+  }
+  async advance(scope: string, key: string, value: number) {
+    const id = this.k(scope, key);
+    if (value <= (this.counters.get(id) ?? 0)) return false;
+    this.counters.set(id, value);
+    return true;
   }
 }

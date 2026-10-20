@@ -1,8 +1,16 @@
 /**
  * Request handling, independent of the Workers runtime (fully unit-tested).
- * Order: validate → IP limit → global budget → entitlement → quota → LLM →
- * account spend. Script text is never logged.
+ * Order: validate → IP limit → global budget → entitlement → device integrity →
+ * quota → LLM → account spend. Script text is never logged.
  */
+import {
+  INTEGRITY_DEFAULTS,
+  decideIntegrity,
+  issueChallenge,
+  registerAppAttestKey,
+  verifyRequestIntegrity,
+  type IntegrityDeps,
+} from './integrity';
 import { LlmError } from './llm';
 import { SYSTEM_PROMPT, buildUserPrompt } from './prompts';
 import type { QuotaStore } from './quota';
@@ -27,7 +35,20 @@ export interface Deps {
   now: () => number;
   config: HandlerConfig;
   log: (entry: Record<string, string | number>) => void;
+  /** Device integrity (App Attest / Play Integrity). Omitted → mode "off". */
+  integrity?: IntegrityDeps;
 }
+
+const INTEGRITY_OFF: IntegrityDeps = {
+  config: {
+    mode: 'off',
+    appleAppId: null,
+    allowDevelopmentKeys: false,
+    androidPackage: null,
+    androidCertDigests: [],
+    ...INTEGRITY_DEFAULTS,
+  },
+};
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -69,6 +90,18 @@ async function remainingFor(store: QuotaStore, scope: string, q: ReturnType<type
   return Math.max(0, q.base.limit - baseUsed) + Math.max(0, q.credits.limit - creditsUsed);
 }
 
+async function readJson(req: Request): Promise<{ raw: string; body: unknown } | { error: Response }> {
+  const length = Number(req.headers.get('content-length') ?? '0');
+  if (length > LIMITS.maxBodyBytes) return { error: json(413, { error: 'too_large' }) };
+  const raw = await req.text();
+  if (raw.length > LIMITS.maxBodyBytes) return { error: json(413, { error: 'too_large' }) };
+  try {
+    return { raw, body: JSON.parse(raw) };
+  } catch {
+    return { error: json(400, { error: 'invalid_json' }) };
+  }
+}
+
 export async function handle(req: Request, deps: Deps): Promise<Response> {
   const url = new URL(req.url);
   const userId = req.headers.get('x-app-user-id') ?? '';
@@ -82,18 +115,34 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
     return json(200, { remaining, resetsAt: q.resets ? monthResetsAt : null, plan: e.plan });
   }
 
+  const integrity = deps.integrity ?? INTEGRITY_OFF;
+  const ctx = { store: deps.store, now: deps.now, integrity };
+
+  if (req.method === 'POST' && url.pathname.startsWith('/v1/integrity/')) {
+    if (integrity.config.mode === 'off') return json(404, { error: 'integrity_disabled' });
+    if (url.pathname === '/v1/integrity/challenge') {
+      const c = await issueChallenge(ctx, userId, day);
+      return c ? json(200, c) : json(429, { error: 'rate_limited' });
+    }
+    if (url.pathname === '/v1/integrity/attest') {
+      const read = await readJson(req);
+      if ('error' in read) return read.error;
+      const b = read.body as { keyId?: unknown; attestation?: unknown; challenge?: unknown } | null;
+      if (!b || typeof b.keyId !== 'string' || typeof b.attestation !== 'string' || typeof b.challenge !== 'string') {
+        return json(400, { error: 'invalid_request' });
+      }
+      const r = await registerAppAttestKey(ctx, userId, { keyId: b.keyId, attestation: b.attestation, challenge: b.challenge });
+      deps.log({ event: 'integrity_attest', platform: 'ios', status: r.ok ? 'verified' : 'failed', reason: r.ok ? '' : r.reason });
+      return r.ok ? json(200, { ok: true }) : json(400, { error: 'attestation_failed' });
+    }
+    return json(404, { error: 'not_found' });
+  }
+
   if (req.method !== 'POST' || url.pathname !== '/v1/studio') return json(404, { error: 'not_found' });
 
-  const length = Number(req.headers.get('content-length') ?? '0');
-  if (length > LIMITS.maxBodyBytes) return json(413, { error: 'too_large' });
-  const raw = await req.text();
-  if (raw.length > LIMITS.maxBodyBytes) return json(413, { error: 'too_large' });
-  let body: unknown;
-  try {
-    body = JSON.parse(raw);
-  } catch {
-    return json(400, { error: 'invalid_json' });
-  }
+  const read = await readJson(req);
+  if ('error' in read) return read.error;
+  const { raw, body } = read;
   const parsed = parseStudioRequest(body);
   if ('error' in parsed) return json(400, { error: parsed.error });
 
@@ -113,8 +162,28 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
   } catch {
     return json(503, { error: 'entitlement_unavailable' });
   }
-  const q = quotaFor(ent, deps.config, month);
   const scope = `user:${userId}`;
+
+  if (integrity.config.mode !== 'off') {
+    const outcome = await verifyRequestIntegrity(ctx, userId, req.headers, raw);
+    const decision = decideIntegrity(integrity.config.mode, outcome, ent);
+    deps.log({
+      event: 'integrity',
+      mode: integrity.config.mode,
+      status: outcome.status,
+      platform: outcome.status === 'missing' ? '' : outcome.platform,
+      reason: outcome.status === 'failed' ? outcome.reason : '',
+      plan: ent.plan,
+      decision,
+    });
+    if (decision === 'block') return json(403, { error: 'integrity_required' });
+    if (decision === 'limit') {
+      const cap = await deps.store.consume(scope, `unverified:${day}`, integrity.config.unverifiedPaidPerDay);
+      if (!cap.allowed) return json(429, { error: 'rate_limited' });
+    }
+  }
+
+  const q = quotaFor(ent, deps.config, month);
   let chargedKey = q.base.key;
   let quota = await deps.store.consume(scope, q.base.key, q.base.limit);
   if (!quota.allowed && q.credits.limit > 0) {

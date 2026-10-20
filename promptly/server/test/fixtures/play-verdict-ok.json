@@ -1,0 +1,19 @@
+{
+  "requestDetails": {
+    "requestPackageName": "app.promptly.test",
+    "requestHash": "REPLACED_IN_TEST",
+    "timestampMillis": "1792497600000"
+  },
+  "appIntegrity": {
+    "appRecognitionVerdict": "PLAY_RECOGNIZED",
+    "packageName": "app.promptly.test",
+    "certificateSha256Digest": ["6a6a1474b5cbbb2b1aa57e0bc3"],
+    "versionCode": "42"
+  },
+  "deviceIntegrity": {
+    "deviceRecognitionVerdict": ["MEETS_DEVICE_INTEGRITY"]
+  },
+  "accountDetails": {
+    "appLicensingVerdict": "LICENSED"
+  }
+}

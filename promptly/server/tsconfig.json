@@ -8,7 +8,8 @@
     "types": ["@cloudflare/workers-types"],
     "lib": ["es2022"],
     "skipLibCheck": true,
-    "noEmit": true
+    "noEmit": true,
+    "resolveJsonModule": true
   },
   "include": ["src", "test", "eval"]
 }

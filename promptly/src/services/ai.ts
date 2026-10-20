@@ -5,6 +5,7 @@
  */
 import { StudioRequest, StudioResponse, validateStudioRequest } from '../features/ai-script-studio/studio';
 import { config, flags } from './config';
+import { integrity, type IntegrityTransport } from './integrity';
 import { appUserId } from './purchases';
 
 export type AiErrorCode =
@@ -28,6 +29,33 @@ export class AiError extends Error {
 
 const TIMEOUT_MS = 45_000;
 
+function integrityTransport(userId: string): IntegrityTransport {
+  return {
+    async challenge() {
+      try {
+        const res = await fetch(`${config.aiBaseUrl}/v1/integrity/challenge`, { method: 'POST', headers: { 'x-app-user-id': userId } });
+        if (!res.ok) return null;
+        const body = (await res.json()) as { challenge?: unknown };
+        return typeof body.challenge === 'string' ? body.challenge : null;
+      } catch {
+        return null;
+      }
+    },
+    async attest(keyId, attestation, challenge) {
+      try {
+        const res = await fetch(`${config.aiBaseUrl}/v1/integrity/attest`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-app-user-id': userId },
+          body: JSON.stringify({ keyId, attestation, challenge }),
+        });
+        return res.ok;
+      } catch {
+        return false;
+      }
+    },
+  };
+}
+
 export function aiAvailable(): boolean {
   return flags.aiStudio && config.aiBaseUrl.length > 0;
 }
@@ -39,6 +67,10 @@ export async function runStudio(req: StudioRequest, signal?: AbortSignal): Promi
   const userId = await appUserId();
   if (!userId) throw new AiError('not_configured', 'purchases not configured');
 
+  // The exact body string is what the integrity assertion / request hash covers.
+  const body = JSON.stringify(req);
+  const integrityHeaders = await integrity.headersFor(body, integrityTransport(userId));
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   signal?.addEventListener('abort', () => controller.abort());
@@ -46,8 +78,8 @@ export async function runStudio(req: StudioRequest, signal?: AbortSignal): Promi
   try {
     res = await fetch(`${config.aiBaseUrl}/v1/studio`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-app-user-id': userId },
-      body: JSON.stringify(req),
+      headers: { 'content-type': 'application/json', 'x-app-user-id': userId, ...integrityHeaders },
+      body,
       signal: controller.signal,
     });
   } catch (e) {
@@ -57,19 +89,22 @@ export async function runStudio(req: StudioRequest, signal?: AbortSignal): Promi
   }
   clearTimeout(timer);
   if (res.ok) return (await res.json()) as StudioResponse;
-  const body = (await res.json().catch(() => ({}))) as { error?: string };
+  const err = (await res.json().catch(() => ({}))) as { error?: string };
   switch (res.status) {
     case 400:
-      throw new AiError('invalid_request', body.error);
-    case 401:
+      throw new AiError('invalid_request', err.error);
     case 403:
+      // Server could not verify this install: re-attest from scratch on the next attempt.
+      if (err.error === 'integrity_required') await integrity.reset();
+      throw new AiError('unauthorized');
+    case 401:
       throw new AiError('unauthorized');
     case 402:
       throw new AiError('quota_exceeded');
     case 429:
       throw new AiError('rate_limited');
     default:
-      throw new AiError('server_error', body.error);
+      throw new AiError('server_error', err.error);
   }
 }
 
