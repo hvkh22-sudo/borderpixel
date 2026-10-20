@@ -7,7 +7,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useKeepAwake } from 'expo-keep-awake';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, AppState, Linking, Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -15,16 +15,16 @@ import {
   useCameraPermission,
   useMicrophonePermission,
   useVideoOutput,
-  type Recorder,
 } from 'react-native-vision-camera';
 
 import { Button } from '../../components/Button';
 import { IconButton } from '../../components/IconButton';
 import { Text } from '../../components/Text';
 import { checkFeature } from '../../features/monetization/entitlements';
-import { finalizeTake } from '../../features/recording/finalizeTake';
 import { targetResolution } from '../../features/recording/presets';
-import { INITIAL_RECORDING_STATE, isBusy, recordingReducer, remainingRecordSeconds } from '../../features/recording/recordingMachine';
+import { isBusy, remainingRecordSeconds } from '../../features/recording/recordingMachine';
+import type { SavedTake, TakeOptions } from '../../features/recording/recordingSession';
+import { useRecordingSession } from '../../features/recording/useRecordingSession';
 import { clampWpm } from '../../features/teleprompter/scrollModel';
 import { breakPaceSegment, createPaceTracker, timedSample, trackCursor, voiceSample } from '../../features/teleprompter/speakingRate';
 import { Teleprompter, type TeleprompterHandle } from '../../features/teleprompter/Teleprompter';
@@ -34,7 +34,7 @@ import { USAGE_VF_KEY } from '../../hooks/useBootstrap';
 import { formatClock, t } from '../../localization/i18n';
 import { track } from '../../services/analytics';
 import { getRepositories } from '../../services/db';
-import { availableBytes, hasRoomToRecord } from '../../services/files';
+import { availableBytes } from '../../services/files';
 import { useAccess } from '../../state/access';
 import { useSettings, type ScrollMode } from '../../state/settings';
 import { useSpeakingRate } from '../../state/speakingRate';
@@ -50,7 +50,6 @@ export default function RecordScreen() {
   const usage = useAccess((s) => s.usage);
 
   const [script, setScript] = useState<string | null>(null);
-  const [state, dispatch] = useReducer(recordingReducer, INITIAL_RECORDING_STATE);
   const [position, setPosition] = useState(cameraSettings.position);
   const [playing, setPlaying] = useState(false);
   const [countdown, setCountdown] = useState(0);
@@ -80,12 +79,10 @@ export default function RecordScreen() {
   // 60 fps is a constraint: VisionCamera falls back to the closest supported rate.
   const constraints = useMemo(() => [{ fps: cameraSettings.fps }], [cameraSettings.fps]);
 
-  const recorderRef = useRef<Recorder | null>(null);
   const startedAtRef = useRef(0);
   const prompterRef = useRef<TeleprompterHandle>(null);
   const vf = useVoiceFollow(script ?? '');
   const scriptWords = useMemo(() => countWords(script ?? ''), [script]);
-  const isRecording = state.status === 'recording';
 
   // Speaking-rate measurement (refs only: nothing here re-renders the camera screen).
   const paceRef = useRef(createPaceTracker());
@@ -93,6 +90,31 @@ export default function RecordScreen() {
   const playSinceRef = useRef(0);
   const timedEndMsRef = useRef<number | null>(null);
   const manualScrollRef = useRef(false);
+
+  // Recording lifecycle (races, interruptions, salvage) lives in RecordingSession; the screen
+  // only maps UI and camera events onto it. UI callbacks never fire after unmount.
+  const { session, state } = useRecordingSession(videoOutput, {
+    onRecordingStarted: (at) => {
+      startedAtRef.current = at;
+      paceRef.current = createPaceTracker();
+      playedMsRef.current = 0;
+      timedEndMsRef.current = null;
+      manualScrollRef.current = false;
+      setElapsed(0);
+      track({ name: 'recording_started', mode });
+      if (mode === 'timed') setPlaying(true);
+    },
+    onVoiceFollowStarted: async () => {
+      if (access.isPro) return;
+      const repos = await getRepositories();
+      useAccess.getState().setUsage({ voiceFollowSessionsUsed: await repos.kv.increment(USAGE_VF_KEY) });
+    },
+    onTakeCompleted: (durationMs) => track({ name: 'recording_completed', mode, durationSec: Math.round(durationMs / 1000) }),
+    onFailure: (code) => track({ name: 'recording_failed', code }),
+    onTakeSaved: (take) => onTakeSaved(take),
+  });
+  const dispatch = session.dispatch;
+  const isRecording = state.status === 'recording';
   const playedNow = () => playedMsRef.current + (playSinceRef.current ? Date.now() - playSinceRef.current : 0);
   const markManualJump = () => {
     if (!isRecording) return;
@@ -117,12 +139,23 @@ export default function RecordScreen() {
   }, [playing, isRecording]);
 
   useEffect(() => {
-    void getRepositories().then(async (r) => setScript((await r.scripts.get(id))?.body ?? ''));
+    let alive = true;
+    void getRepositories()
+      .then(async (r) => {
+        const body = (await r.scripts.get(id))?.body ?? '';
+        if (alive) setScript(body);
+      })
+      .catch(() => {
+        if (alive) setScript('');
+      });
+    return () => {
+      alive = false;
+    };
   }, [id]);
 
   useEffect(() => {
-    if (camPerm.hasPermission && micPerm.hasPermission) dispatch({ type: 'PREPARE' });
-  }, [camPerm.hasPermission, micPerm.hasPermission]);
+    if (camPerm.hasPermission && micPerm.hasPermission) session.prepare();
+  }, [camPerm.hasPermission, micPerm.hasPermission, session]);
 
   // Recording timer (1 Hz is enough for the label; no per-frame renders).
   useEffect(() => {
@@ -131,92 +164,34 @@ export default function RecordScreen() {
     return () => clearInterval(iv);
   }, [state.status]);
 
-  const finishRecording = useCallback(
-    async (filePath: string) => {
-      dispatch({ type: 'RECORDING_FINISHED', filePath, at: Date.now() });
-      setPlaying(false);
-      const audio = voice ? await vf.stop() : [];
-      try {
-        const result = await finalizeTake({
-          filePath,
-          scriptId: id,
-          durationMs: Date.now() - startedAtRef.current,
-          recordingStartedAt: startedAtRef.current,
-          separateAudio: separateAudio ? audio : [],
-        });
-        dispatch({ type: 'FINALIZED' });
-        track({ name: 'recording_completed', mode, durationSec: Math.round((Date.now() - startedAtRef.current) / 1000) });
-        // Learn the creator's pace from completed takes only (best effort, after the take is safe).
-        const now = Date.now();
-        const sample = voice
-          ? voiceSample(paceRef.current, now)
-          : mode === 'timed'
-            ? timedSample(
-                { scriptWords, playedMs: timedEndMsRef.current ?? 0, reachedEnd: timedEndMsRef.current != null, manualScroll: manualScrollRef.current },
-                now,
-              )
-            : null;
-        if (sample) void useSpeakingRate.getState().record(sample);
-        router.replace(`/take/${result.recordingId}${result.audioMergeFailed ? '?audioIssue=1' : ''}`);
-      } catch {
-        // The raw file is still on disk; bootstrap recovery will register it.
-        dispatch({ type: 'FAILED', error: 'write_failed', partialFilePath: filePath });
-        track({ name: 'recording_failed', code: 'write_failed' });
-      }
-    },
-    [id, mode, scriptWords, separateAudio, vf, voice],
-  );
+  const onTakeSaved = (take: SavedTake) => {
+    setPlaying(false);
+    // Learn the creator's pace from completed takes only (best effort, after the take is safe).
+    if (!take.salvaged) {
+      const now = Date.now();
+      const sample = voice
+        ? voiceSample(paceRef.current, now)
+        : mode === 'timed'
+          ? timedSample(
+              { scriptWords, playedMs: timedEndMsRef.current ?? 0, reachedEnd: timedEndMsRef.current != null, manualScroll: manualScrollRef.current },
+              now,
+            )
+          : null;
+      if (sample) void useSpeakingRate.getState().record(sample);
+    }
+    const query = [take.audioMergeFailed ? 'audioIssue=1' : null, take.notice ? `notice=${take.notice}` : null].filter(Boolean).join('&');
+    router.replace(`/take/${take.recordingId}${query ? `?${query}` : ''}`);
+  };
 
-  const beginRecording = useCallback(async () => {
-    if (!hasRoomToRecord()) {
-      dispatch({ type: 'FAILED', error: 'low_storage' });
-      return;
-    }
-    try {
-      const recorder = await videoOutput.createRecorder({
-        maxFileSize: Math.max(50 * 1024 * 1024, availableBytes() - 150 * 1024 * 1024),
-      });
-      recorderRef.current = recorder;
-      await recorder.startRecording(
-        (path) => void finishRecording(path),
-        (error) => {
-          if (__DEV__) console.warn('recording error', error);
-          dispatch({ type: 'FAILED', error: 'unknown', partialFilePath: recorder.filePath || null });
-          track({ name: 'recording_failed', code: 'recorder_error' });
-          if (voice) void vf.stop();
-        },
-      );
-      startedAtRef.current = Date.now();
-      paceRef.current = createPaceTracker();
-      playedMsRef.current = 0;
-      timedEndMsRef.current = null;
-      manualScrollRef.current = false;
-      setElapsed(0);
-      dispatch({ type: 'RECORDING_STARTED', at: startedAtRef.current });
-      track({ name: 'recording_started', mode });
-      if (mode === 'timed') setPlaying(true);
-      if (voice) {
-        const ok = await vf.start({ locale: speechLocale, persistAudio: separateAudio });
-        if (ok && !access.isPro) {
-          const repos = await getRepositories();
-          useAccess.getState().setUsage({ voiceFollowSessionsUsed: await repos.kv.increment(USAGE_VF_KEY) });
-        }
-      }
-    } catch (e) {
-      if (__DEV__) console.warn('start failed', e);
-      dispatch({ type: 'FAILED', error: 'unknown' });
-    }
-  }, [access.isPro, finishRecording, mode, separateAudio, speechLocale, vf, videoOutput, voice]);
-
-  const stopRecording = useCallback(async () => {
-    if (state.status !== 'recording') return;
-    dispatch({ type: 'STOP' });
-    try {
-      await recorderRef.current?.stopRecording();
-    } catch {
-      dispatch({ type: 'FAILED', error: 'write_failed', partialFilePath: recorderRef.current?.filePath ?? null });
-    }
-  }, [state.status]);
+  const takeOptions = (): TakeOptions => ({
+    scriptId: id,
+    separateAudio,
+    voiceFollow: voice
+      ? { start: () => vf.start({ locale: speechLocale, persistAudio: separateAudio }), stop: vf.stop, collectedAudio: vf.collectedAudio }
+      : null,
+  });
+  const beginRecording = () => session.start(takeOptions());
+  const stopRecording = () => session.stop();
 
   // Countdown → start. Tap during countdown cancels.
   useEffect(() => {
@@ -230,20 +205,22 @@ export default function RecordScreen() {
       }
     }, 1000);
     return () => clearTimeout(tmo);
-  }, [state.status, countdown, beginRecording]);
+    // beginRecording reads the latest options when the timer fires.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.status, countdown]);
 
-  // Leaving the app stops the take cleanly so the file is finalized.
+  // Leaving the app stops the take cleanly so the file is finalized (and cancels a countdown).
   useEffect(() => {
     const sub = AppState.addEventListener('change', (s) => {
       // 'inactive' (Control Center, incoming-call banner) keeps recording; background stops cleanly.
       setAppActive(s !== 'background');
-      if (s === 'background') void stopRecording();
+      if (s === 'background') session.interrupt();
     });
     return () => sub.remove();
-  }, [stopRecording]);
+  }, [session]);
 
   const onRecordPress = () => {
-    if (state.status === 'recording') return void stopRecording();
+    if (state.status === 'recording' || state.status === 'starting') return void stopRecording();
     if (state.status === 'countdown') return dispatch({ type: 'CANCEL_COUNTDOWN' });
     if (state.status !== 'ready') return;
     if (voice && !checkFeature('voiceFollow', access, usage).allowed) {
@@ -327,14 +304,16 @@ export default function RecordScreen() {
         // Output orientation follows the UI (what the creator sees), not the raw sensor: with rotation
         // lock on, a vertical take stays vertical even if the phone tilts. Device test REC-07.
         orientationSource="interface"
-        onStarted={() => dispatch({ type: 'CAMERA_READY' })}
+        onStarted={() => session.cameraStarted()}
+        onStopped={() => session.cameraStopped()}
         onError={(e) => {
           if (__DEV__) console.warn('camera error', e);
-          dispatch({ type: 'FAILED', error: 'camera_unavailable' });
+          // During a take: stop and keep the file. Otherwise: camera unavailable.
+          session.cameraError();
         }}
         onInterruptionStarted={() => {
           setNotice(t('record.interrupted'));
-          void stopRecording();
+          session.interrupt();
         }}
         onInterruptionEnded={() => setNotice(null)}
       />
@@ -387,7 +366,7 @@ export default function RecordScreen() {
                 script={script}
                 settings={{ ...prompter, wpm }}
                 mode={mode}
-                playing={playing}
+                playing={playing && (state.status === 'recording' || !isBusy(state.status))}
                 followCharOffset={voice ? vf.snapshot.charOffset : null}
                 highlightCharOffset={voice ? vf.snapshot.charOffset : 0}
                 onTapChar={(c) => {
@@ -415,7 +394,7 @@ export default function RecordScreen() {
                     ? t('record.noCamera')
                     : notice ?? (state.partialFilePath ? t('record.failedRecovered') : t('record.failed'))}
               </Text>
-              {state.status === 'recoverableFailure' ? <Button label={t('common.retry')} variant="secondary" onPress={() => dispatch({ type: 'RETRY' })} /> : null}
+              {state.status === 'recoverableFailure' ? <Button label={t('common.retry')} variant="secondary" onPress={() => session.retry()} /> : null}
             </View>
           ) : !recording && lowStorageSec < 300 ? (
             <Text variant="caption" color={palette.amber500} center>

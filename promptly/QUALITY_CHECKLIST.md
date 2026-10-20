@@ -25,7 +25,7 @@ Legend: ✅ verified · 🟡 implemented, not verified on device · ⬜ not star
 | Export my scripts (Settings › Privacy & data → one versioned JSON: scripts + versions + folders, via share sheet) | 🟡 | serialize/parse/merge ✅ tested (format version check, malformed input rejected, round-trip without loss, re-import adds nothing, never overwrites); share sheet and file hand-off not tried on a device |
 | Import scripts from a backup file | ⬜ | merge logic implemented and tested (`importBackup` in `src/storage/backup.ts`), **no UI**: `expo-document-picker` is not installed (installing needs approval/network); add a picker + Settings row when it is |
 | Teleprompter manual / timed / display settings / mirror / reading line | 🟡 | geometry ✅ tested; 60 fps unmeasured |
-| Recording (VisionCamera v5), countdown, timer, flip, interruptions, low storage | 🟡 | state machine ✅ tested |
+| Recording (VisionCamera v5), countdown, timer, flip, interruptions, low storage | 🟡 | state machine ✅ tested; lifecycle races (stop while starting, double finish, recorder error salvage, stop watchdog, VF failure/timeout, unmount) ✅ unit-tested in `recordingSession.test.ts` — see docs/architecture/recording-reliability.md. Interruptions/background/size limit **not tested on a device** |
 | Learned speaking rate (P1) | 🟡 | `speakingRate.ts` ✅ unit-tested (weighted median, clamp 80–240, ≥ 10 s, manual jumps excluded); learns from Voice Follow cursor progress and Timed takes that reached the end untouched; used for editor/home/library estimates and “Your pace” in setup. Live measurement accuracy not checked on a device (VF-05) |
 | Recording presets + landscape (P1) | 🟡 | `presets.ts` ✅ unit-tested; setup screen ✅ screen-tested. Landscape camera layout, interface-driven output orientation, landscape target size and 60 fps fallback **not tested on a device** (REC-07, REC-10..12) |
 | Mic check on setup screen (P1 mic pre-flight) | 🟡 | `micCheck.ts` verdicts ✅ unit-tested; sheet ✅ screen-tested with expo-audio mocked (verdicts, input name, Bluetooth note, permission denied, stop → delete clip → release session before camera). Thresholds are initial estimates; real meter levels, input names and camera audio after the check **not tested on a device** (MIC-01) |
@@ -39,7 +39,7 @@ Legend: ✅ verified · 🟡 implemented, not verified on device · ⬜ not star
 | Caption burn-in | 🟡 | behind `EXPO_PUBLIC_FLAG_BURN_IN=on`; native code uncompiled |
 | AI Script Studio | 🟡 | proxy ✅ tested with mock LLM; no live API call made (no key, approval needed) |
 | Paywall / purchases / restore / lifetime | 🟡 | entitlement logic ✅ tested; no store products |
-| Recording recovery (orphan files) | 🟡 | duration restored via native module when available; Home shows a recovered-takes notice |
+| Recording recovery (orphan files) | 🟡 | duration restored via native module when available; Home shows a recovered-takes notice. Recorder now writes into documents, so a take survives an app kill; single-flight dedupe ✅ unit-tested. Partial-file playability **not tested on a device** |
 | Accessibility (labels, roles, adjustable steppers, live regions, reduced motion) | 🟡 | VoiceOver/TalkBack pass not done |
 | Localization framework (en) + RTL flag | 🟡 | English + Hebrew (folder and export strings included); Hebrew pending native-speaker review on device |
 

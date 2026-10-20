@@ -23,6 +23,45 @@ export function recordingFile(fileName: string): File {
   return new File(recordingsDir(), fileName);
 }
 
+/**
+ * Filesystem path for a new take. The recorder writes straight into the
+ * documents directory (not the OS temp dir) so a take survives the app being
+ * killed mid-recording and is picked up by orphan recovery on next launch.
+ */
+export function recordingPathFor(fileName: string): string {
+  return toFsPath(recordingFile(fileName).uri);
+}
+
+/** The file name when `path` is directly inside the recordings directory, else null. */
+export function recordingNameIfInside(path: string): string | null {
+  const dir = toFsPath(recordingsDir().uri).replace(/\/+$/, '');
+  const p = toFsPath(path);
+  if (!p.startsWith(`${dir}/`)) return null;
+  const name = p.slice(dir.length + 1);
+  return name && !name.includes('/') ? name : null;
+}
+
+/** Size in bytes of a file, 0 when it does not exist or cannot be read. */
+export function fileSizeAt(path: string): number {
+  try {
+    const f = new File(toFileUri(path));
+    return f.exists ? (f.info().size ?? 0) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Scratch location for derived files (the Android audio mux). Kept out of the
+ * recordings directory so a half-written output is never mistaken for a take
+ * by orphan recovery; moved into place only once complete.
+ */
+export function scratchFile(fileName: string): File {
+  const dir = new Directory(Paths.cache, 'scratch');
+  if (!dir.exists) dir.create({ intermediates: true });
+  return new File(dir, fileName);
+}
+
 /** VisionCamera wants a plain filesystem path, not a file:// URI. */
 export function toFsPath(uri: string): string {
   return uri.startsWith('file://') ? decodeURIComponent(uri.slice('file://'.length)) : uri;
@@ -73,7 +112,7 @@ export function deleteRecordingFile(fileName: string): void {
  * (app was killed while finalizing). They are offered for recovery, never
  * deleted automatically.
  */
-export function findOrphanRecordings(known: Set<string>): File[] {
+export function findOrphanRecordings(known: ReadonlySet<string>): File[] {
   return recordingsDir()
     .list()
     .filter((e): e is File => e instanceof File)

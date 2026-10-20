@@ -41,3 +41,17 @@ describe('VoiceFollowController', () => {
     expect(c.snapshot()).toMatchObject({ status: 'error', cursor: 3, error: 'audio-capture' });
   });
 });
+
+describe('VoiceFollowController after stop', () => {
+  it('ignores a final result and errors delivered after stop()', () => {
+    const c = new VoiceFollowController(SCRIPT);
+    c.markStarted(0);
+    c.handleResult({ transcript: 'write your script', isFinal: false }, 100);
+    c.stop();
+    const before = c.snapshot();
+    c.handleResult({ transcript: 'write your script before you hit record then read it out loud once keep your takes short', isFinal: true }, 200);
+    c.handleError('network');
+    expect(c.snapshot()).toEqual(before);
+    expect(c.snapshot().status).toBe('idle');
+  });
+});

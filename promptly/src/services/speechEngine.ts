@@ -37,16 +37,27 @@ export class ExpoSpeechEngine implements SpeechEngine {
   private lastOptions: SpeechStartOptions | null = null;
   private audioStartedAt = new Map<string, number>();
   private restartTimer: ReturnType<typeof setTimeout> | null = null;
+  /** A native session was started and has not reported 'end' yet. */
+  private nativeActive = false;
+  /**
+   * 'end' events still owed by sessions we stopped. A stop followed quickly by a
+   * new start (Android) delivers the old session's 'end' while the new one runs;
+   * it must neither restart the recognizer (double start → busy error) nor be
+   * treated as the new session ending.
+   */
+  private staleEnds = 0;
 
   async start(options: SpeechStartOptions): Promise<void> {
     this.lastOptions = options;
     this.running = true;
+    this.clearRestart();
     this.startNative();
   }
 
   private startNative(): void {
     const o = this.lastOptions;
     if (!o) return;
+    this.nativeActive = true;
     ExpoSpeechRecognitionModule.start({
       lang: o.locale,
       interimResults: true,
@@ -78,9 +89,18 @@ export class ExpoSpeechEngine implements SpeechEngine {
 
   async stop(): Promise<void> {
     this.running = false;
-    if (this.restartTimer) clearTimeout(this.restartTimer);
+    this.clearRestart();
+    if (this.nativeActive) {
+      this.nativeActive = false;
+      this.staleEnds++;
+    }
     // stop() (not abort) lets the recognizer finalize persisted audio files.
     ExpoSpeechRecognitionModule.stop();
+  }
+
+  private clearRestart(): void {
+    if (this.restartTimer) clearTimeout(this.restartTimer);
+    this.restartTimer = null;
   }
 
   onResult(cb: Parameters<SpeechEngine['onResult']>[0]): () => void {
@@ -101,13 +121,24 @@ export class ExpoSpeechEngine implements SpeechEngine {
     return () => sub.remove();
   }
 
+  /** Session bookkeeping lives in this listener: register exactly one onEnd per engine. */
   onEnd(cb: () => void): () => void {
     const sub = ExpoSpeechRecognitionModule.addListener('end', () => {
+      if (this.staleEnds > 0) {
+        // End of a session we stopped earlier, not of the current one.
+        this.staleEnds--;
+        return;
+      }
+      this.nativeActive = false;
       cb();
       // Android (and iOS on long sessions) end sessions on their own; restart
       // quickly so following continues. Position is kept by the aligner.
       if (this.running) {
-        this.restartTimer = setTimeout(() => this.running && this.startNative(), Platform.OS === 'android' ? 50 : 150);
+        this.clearRestart();
+        this.restartTimer = setTimeout(() => {
+          this.restartTimer = null;
+          if (this.running && !this.nativeActive) this.startNative();
+        }, Platform.OS === 'android' ? 50 : 150);
       }
     });
     return () => sub.remove();

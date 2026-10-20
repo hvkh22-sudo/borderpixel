@@ -116,6 +116,11 @@ export class VoiceFollowController {
   }
 
   handleResult(e: SpeechResultEvent, now: number): AlignmentResult {
+    // stop() (not abort) lets the recognizer deliver a final result after the take ended;
+    // it must not move the script or flip the status back to 'speaking'/'finished'.
+    if (this.status === 'idle') {
+      return { kind: 'hold', cursor: this.aligner.cursor, charOffset: this.aligner.charOffsetForCursor(), confidence: 0 };
+    }
     const r = this.aligner.update(e.transcript);
     this.lastSpeechAt = now;
     this.lastConfidence = r.confidence;
@@ -132,6 +137,9 @@ export class VoiceFollowController {
   }
 
   handleError(code: SpeechErrorCode): void {
+    // A late error from a recognizer session that was already stopped is not shown.
+    // 'not-allowed' is the exception: start() reports a denied permission before markStarting().
+    if (this.status === 'idle' && code !== 'not-allowed') return;
     this.error = code;
     this.setStatus('error');
   }

@@ -19,7 +19,7 @@ import { useSettings } from '../../state/settings';
 import { radius, spacing } from '../../theme/tokens';
 
 export default function Take() {
-  const { id, audioIssue } = useLocalSearchParams<{ id: string; audioIssue?: string }>();
+  const { id, audioIssue, notice } = useLocalSearchParams<{ id: string; audioIssue?: string; notice?: string }>();
   const { data: rec } = useFocusData(async () => (await getRepositories()).recordings.get(id), [id]);
   const file = rec ? recordingFile(rec.fileName) : null;
   const exists = file?.exists ?? false;
@@ -89,6 +89,11 @@ export default function Take() {
       {audioIssue ? (
         <Text variant="callout" muted center>
           {t('record.failedRecovered')}
+        </Text>
+      ) : null}
+      {notice === 'interrupted' || notice === 'storage_full' ? (
+        <Text variant="callout" muted center accessibilityLiveRegion="polite">
+          {t(notice === 'storage_full' ? 'record.savedStorageFull' : 'record.savedInterrupted')}
         </Text>
       ) : null}
       <Text muted center>
