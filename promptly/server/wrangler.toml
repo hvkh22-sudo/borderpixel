@@ -1,0 +1,28 @@
+name = "promptly-ai-proxy"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Deploying this creates billable infrastructure — founder approval required.
+# Secrets: wrangler secret put ANTHROPIC_API_KEY / REVENUECAT_SECRET_KEY
+
+[vars]
+AI_ENABLED = "false"           # kill switch; set "true" only after approval
+MODEL = "claude-opus-5-5"      # see docs/business/ai-unit-economics.md for the model decision
+MAX_OUTPUT_TOKENS = "4000"
+INPUT_USD_PER_MTOK = "4"       # must match MODEL's published price (cost accounting)
+OUTPUT_USD_PER_MTOK = "20"
+FREE_PER_MONTH = "5"
+PRO_PER_MONTH = "150"
+LIFETIME_GRANT = "300"
+CREDIT_PACK_SIZE = "100"
+IP_PER_DAY = "40"
+DAILY_BUDGET_USD = "5"         # hard daily spend cap across all users
+
+[[durable_objects.bindings]]
+name = "COUNTERS"
+class_name = "Counters"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Counters"]

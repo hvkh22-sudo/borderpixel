@@ -165,11 +165,14 @@ export default function RecordScreen() {
   // Countdown → start. Tap during countdown cancels.
   useEffect(() => {
     if (state.status !== 'countdown') return;
-    if (countdown <= 0) {
-      void beginRecording();
-      return;
-    }
-    const tmo = setTimeout(() => setCountdown((c) => c - 1), 1000);
+    const tmo = setTimeout(() => {
+      if (countdown <= 1) {
+        setCountdown(0);
+        void beginRecording();
+      } else {
+        setCountdown(countdown - 1);
+      }
+    }, 1000);
     return () => clearTimeout(tmo);
   }, [state.status, countdown, beginRecording]);
 

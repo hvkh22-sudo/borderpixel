@@ -1,12 +1,19 @@
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-/** Loads data whenever the screen gains focus; keeps the last value while reloading. */
+/**
+ * Loads data whenever the screen gains focus or `deps` change; keeps the last
+ * value while reloading. `deps` must be JSON-serializable.
+ */
 export function useFocusData<T>(load: () => Promise<T>, deps: unknown[] = []): { data: T | undefined; reload: () => void; error: unknown } {
   const [data, setData] = useState<T>();
   const [error, setError] = useState<unknown>(null);
+  const [version, setVersion] = useState(0);
   const loadRef = useRef(load);
-  loadRef.current = load;
+  useEffect(() => {
+    loadRef.current = load;
+  });
+  const key = JSON.stringify(deps);
   const run = useCallback(() => {
     let alive = true;
     loadRef
@@ -16,8 +23,9 @@ export function useFocusData<T>(load: () => Promise<T>, deps: unknown[] = []): {
     return () => {
       alive = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
+    // `key` and `version` intentionally trigger reloads.
+  }, [key, version]); // eslint-disable-line react-hooks/exhaustive-deps
   useFocusEffect(run);
-  return { data, reload: run, error };
+  const reload = useCallback(() => setVersion((v) => v + 1), []);
+  return { data, reload, error };
 }

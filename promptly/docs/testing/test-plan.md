@@ -1,0 +1,41 @@
+# Test plan
+
+## 0. Automated (run on every change)
+`npm run typecheck && npm test` · `npx expo export --platform ios|android` · `cd server && npm test`.
+
+## 1. Technical PoC on devices (release gate — not yet executed)
+| ID | Test | Pass criteria |
+|---|---|---|
+| REC-01 | 60 s 1080p front-camera take | File plays in Photos/Gallery, correct orientation, ~30 fps |
+| REC-02 | Overlay absence | Export frame-by-frame review: no prompter text/backdrop in any frame (both platforms) |
+| REC-03 | A/V sync | Clap test: audio/video offset ≤ 45 ms (iOS); Android muxed path ≤ 80 ms (adjust after baseline) |
+| REC-04 | Interruptions | Incoming call / Siri / app background during take → file finalized, take saved |
+| REC-05 | Low storage | < 300 MB free → recording blocked with message; mid-take maxFileSize stop saves file |
+| REC-06 | 10-minute take | No crash, file intact, thermal state noted |
+| REC-07 | Rotation / orientation metadata | Portrait + landscape takes display correctly |
+| REC-08 | Front-camera mirroring | Document whether saved file is mirrored; confirm product choice |
+| REC-09 | Mic route change | Plug/unplug wired + Bluetooth mic mid-take: no crash; audio continues |
+| VF-01 | VF + recording coexist (iOS) | Recording has full-quality audio AND prompter follows speech |
+| VF-02 | VF + recording (Android 13/14/15/16) | Video-only + persisted WAV muxed; audio continuous across recognizer restarts |
+| VF-03 | Latency | Word spoken → line moves: median measured and recorded (target to set from baseline) |
+| VF-04 | Behaviors | Pause holds; repeat no back-jump; skip paragraph recovers; tap-to-resync works |
+| CAP-01 | Transcribe 60 s take | Captions produced on-device, ≤ 1× real time on recent devices |
+| CAP-02 | No speech take | "We didn't hear any speech" shown; no fabricated text |
+| CAP-03 | Burn-in | Captioned MP4 matches preview style/position; original unchanged |
+| CAP-04 | SRT | Opens in a subtitle editor; timings match |
+| PUR-01..12 | Sandbox purchases | monthly, annual, lifetime, cancel, decline, pending (Ask to Buy), expiry, renewal, refund, restore, sub→lifetime, offline after purchase, reinstall |
+| AI-01 | Studio happy path | Each tool returns a draft; version history keeps original |
+| AI-02 | Quota / offline / provider error | Correct messages; quota not charged on failure |
+| A11Y-01 | VoiceOver + TalkBack | Full core journey operable |
+
+## 2. Unit coverage map
+aligner (15), voiceFollowController (3), scrollModel (6), captions (16), entitlements (11),
+recordingMachine (7), studio (6), repositories (7), i18n (3); server handler/prompts/validation/
+entitlements (16).
+
+## 3. Voice Follow measurement protocol
+Scripts: 3 lengths (60 / 300 / 1,500 words). Speakers: ≥ 5 incl. non-native accents. Conditions:
+quiet, café noise (~60 dBA), AirPods, wired lav, built-in mic. Speech: normal, fast (~190 WPM), slow,
+with 3 scripted ad-libs, one skipped paragraph, one repeated sentence. Record screen + log
+`VoiceFollowSnapshot` with timestamps; compute: lag in words, false scrolls, backward jumps, recovery
+time after skip/silence, battery % per 10 min. Define thresholds from the first baseline run.

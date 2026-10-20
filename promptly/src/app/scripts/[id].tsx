@@ -33,24 +33,27 @@ export default function Editor() {
   const snapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latest = useRef({ title: '', body: '', dirty: false });
 
-  const load = useCallback(async () => {
-    const repos = await getRepositories();
-    const s = await repos.scripts.get(id);
-    if (!s) {
-      setMissing(true);
-      return;
-    }
-    await repos.scripts.markOpened(id);
-    setTitle(s.title);
-    setBody(s.body);
-    latest.current = { title: s.title, body: s.body, dirty: false };
-    setHistory(createHistory(s.body, Date.now()));
-    setLoaded(true);
-  }, [id]);
-
   useEffect(() => {
-    void load();
-  }, [load]);
+    let alive = true;
+    void (async () => {
+      const repos = await getRepositories();
+      const s = await repos.scripts.get(id);
+      if (!alive) return;
+      if (!s) {
+        setMissing(true);
+        return;
+      }
+      await repos.scripts.markOpened(id);
+      setTitle(s.title);
+      setBody(s.body);
+      latest.current = { title: s.title, body: s.body, dirty: false };
+      setHistory(createHistory(s.body, Date.now()));
+      setLoaded(true);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [id]);
 
   const flush = useCallback(async () => {
     if (!latest.current.dirty) return;
