@@ -8,7 +8,8 @@ export const LIMITS = {
   maxAudienceChars: 200,
   minDurationSec: 10,
   maxDurationSec: 600,
-  maxBodyBytes: 32_000,
+  // 12,000 script chars × up to 3 UTF-8 bytes (CJK) + other fields + JSON overhead.
+  maxBodyBytes: 64_000,
 } as const;
 
 const TOOLS = new Set(['generate', 'improve', 'shorten', 'conversational', 'hook', 'tone', 'platform']);

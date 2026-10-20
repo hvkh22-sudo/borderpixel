@@ -18,9 +18,10 @@ import { useAccess } from '../state/access';
 import { useSession } from '../state/session';
 import { persistableSettings, useSettings, type SettingsState } from '../state/settings';
 import { SPEAKING_RATE_KEY, useSpeakingRate } from '../state/speakingRate';
+import { USAGE_KEY_PREFIX } from '../storage/repositories';
 
 const SETTINGS_KEY = 'settings.v1';
-export const USAGE_VF_KEY = 'usage.voiceFollowSessions';
+export const USAGE_VF_KEY = `${USAGE_KEY_PREFIX}voiceFollowSessions`;
 
 export function useBootstrap(): { ready: boolean; recovered: number } {
   const [ready, setReady] = useState(false);

@@ -209,16 +209,25 @@ export class ScriptRepository {
   }
 
   /** Ids of every stored script and version, including soft-deleted ones, so an import never collides. */
-  async existingIds(): Promise<{ scripts: Map<string, Pick<Script, 'title' | 'body' | 'updatedAt'>>; versions: Set<string> }> {
-    const s = await this.deps.db.getAllAsync<{ id: string; title: string; body: string; updated_at: number }>(
-      'SELECT id, title, body, updated_at FROM scripts',
+  async existingIds(): Promise<{ scripts: Map<string, Pick<Script, 'title' | 'body' | 'updatedAt'> & { deleted: boolean }>; versions: Set<string> }> {
+    const s = await this.deps.db.getAllAsync<{ id: string; title: string; body: string; updated_at: number; deleted_at: number | null }>(
+      'SELECT id, title, body, updated_at, deleted_at FROM scripts',
       [],
     );
     const v = await this.deps.db.getAllAsync<{ id: string }>('SELECT id FROM script_versions', []);
     return {
-      scripts: new Map(s.map((r) => [r.id, { title: r.title, body: r.body, updatedAt: r.updated_at }])),
+      scripts: new Map(s.map((r) => [r.id, { title: r.title, body: r.body, updatedAt: r.updated_at, deleted: r.deleted_at != null }])),
       versions: new Set(v.map((r) => r.id)),
     };
+  }
+
+  /** Bring back a soft-deleted script with the content from a backup (same id). */
+  async restoreImported(s: Script): Promise<void> {
+    await this.deps.db.runAsync(
+      `UPDATE scripts SET title = ?, body = ?, favorite = ?, created_at = ?, updated_at = ?, last_opened_at = ?, folder_id = ?, deleted_at = NULL
+       WHERE id = ?`,
+      [s.title, s.body, s.favorite ? 1 : 0, s.createdAt, s.updatedAt, s.lastOpenedAt, s.folderId, s.id],
+    );
   }
 
   /** Insert an imported script exactly as given (ids are already conflict-free). */
@@ -448,6 +457,9 @@ export class RecordingRepository {
   }
 }
 
+/** Prefix of free-tier usage counters in the key/value store; they survive "Delete all my data". */
+export const USAGE_KEY_PREFIX = 'usage.';
+
 /** JSON key/value store for settings, usage counters and cached state. */
 export class KeyValueStore {
   constructor(private readonly db: SqlExecutor) {}
@@ -482,5 +494,11 @@ export class KeyValueStore {
 
   async clearAll(): Promise<void> {
     await this.db.runAsync('DELETE FROM kv', []);
+  }
+
+  /** Deletes every key except those starting with one of `prefixes` (e.g. free-tier usage counters). */
+  async clearAllExcept(prefixes: string[]): Promise<void> {
+    const keep = prefixes.map(() => "key NOT LIKE ? ESCAPE '\\'").join(' AND ');
+    await this.db.runAsync(`DELETE FROM kv${keep ? ` WHERE ${keep}` : ''}`, prefixes.map((p) => `${escapeLike(p)}%`));
   }
 }

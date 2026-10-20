@@ -26,7 +26,7 @@ export default function Paywall() {
   const plan = paywallPlan(access);
   const [packages, setPackages] = useState<PaywallPackages | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
-  const [selected, setSelected] = useState<PlanKey>(plan.showSubscriptions ? 'annual' : 'lifetime');
+  const [preferred, setSelected] = useState<PlanKey>(plan.showSubscriptions ? 'annual' : 'lifetime');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -48,6 +48,8 @@ export default function Paywall() {
   }
   if (packages?.lifetime && plan.showLifetime)
     options.push({ key: 'lifetime', pkg: packages.lifetime, label: t('paywall.lifetime'), price: t('paywall.once', { price: packages.lifetime.product.priceString }) });
+  // The offering may lack the preferred plan: fall back to the first available one so Subscribe always works.
+  const selected: PlanKey = options.some((o) => o.key === preferred) ? preferred : (options[0]?.key ?? preferred);
 
   const buy = async () => {
     const pkg = options.find((o) => o.key === selected)?.pkg;

@@ -1,5 +1,5 @@
 import * as Clipboard from 'expo-clipboard';
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, AppState, StyleSheet, TextInput, View } from 'react-native';
 
@@ -41,31 +41,53 @@ export default function Editor() {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [folderSheet, setFolderSheet] = useState<'pick' | 'new' | null>(null);
 
-  useEffect(() => {
-    let alive = true;
-    void (async () => {
-      const repos = await getRepositories();
-      const s = await repos.scripts.get(id);
-      if (!alive) return;
-      if (!s) {
-        setMissing(true);
-        return;
-      }
-      await repos.scripts.markOpened(id);
-      const allFolders = await repos.folders.list();
-      if (!alive) return;
-      setFolders(allFolders);
-      setFolderId(s.folderId);
-      setTitle(s.title);
-      setBody(s.body);
-      latest.current = { title: s.title, body: s.body, dirty: false };
-      setHistory(createHistory(s.body, Date.now()));
-      setLoaded(true);
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [id]);
+  // Untitled (or auto-titled) scripts keep taking their title from the first line until the user edits the title.
+  const autoTitle = useRef(false);
+  const loadedOnce = useRef(false);
+
+  // Load on first focus, and reload when returning from a modal (AI Studio applies drafts and restores
+  // versions directly in storage). Pending local edits win; they are flushed before Studio opens.
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true;
+      void (async () => {
+        const repos = await getRepositories();
+        const s = await repos.scripts.get(id);
+        if (!alive) return;
+        if (loadedOnce.current) {
+          if (!s || latest.current.dirty) return;
+          if (s.body === latest.current.body && s.title === latest.current.title) return;
+          if (snapTimer.current) clearTimeout(snapTimer.current);
+          latest.current = { title: s.title, body: s.body, dirty: false };
+          setTitle(s.title);
+          setBody(s.body);
+          // The stored text becomes the newest history version, so undo returns to the pre-AI text.
+          setHistory((h) => pushVersion(h, s.body, 'manual', Date.now()));
+          return;
+        }
+        if (!s) {
+          setMissing(true);
+          return;
+        }
+        await repos.scripts.markOpened(id);
+        const allFolders = await repos.folders.list();
+        if (!alive) return;
+        loadedOnce.current = true;
+        const untitled = t('common.untitled');
+        autoTitle.current = s.title === '' || s.title === untitled || s.title === deriveTitle(s.body, untitled);
+        setFolders(allFolders);
+        setFolderId(s.folderId);
+        setTitle(s.title);
+        setBody(s.body);
+        latest.current = { title: s.title, body: s.body, dirty: false };
+        setHistory(createHistory(s.body, Date.now()));
+        setLoaded(true);
+      })();
+      return () => {
+        alive = false;
+      };
+    }, [id]),
+  );
 
   const flush = useCallback(async () => {
     if (!latest.current.dirty) return;
@@ -96,8 +118,7 @@ export default function Editor() {
 
   const onBody = (text: string) => {
     setBody(text);
-    // Untitled scripts take their title from the first line.
-    const nextTitle = title === t('common.untitled') || title === '' ? deriveTitle(text, t('common.untitled')) : title;
+    const nextTitle = autoTitle.current ? deriveTitle(text, t('common.untitled')) : title;
     if (nextTitle !== title) setTitle(nextTitle);
     schedule(nextTitle, text);
     if (snapTimer.current) clearTimeout(snapTimer.current);
@@ -187,6 +208,7 @@ export default function Editor() {
         testID="editor-title"
         value={title}
         onChangeText={(v) => {
+          autoTitle.current = false;
           setTitle(v);
           schedule(v, body);
         }}
