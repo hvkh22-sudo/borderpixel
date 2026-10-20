@@ -12,6 +12,7 @@ import { estimateSpeakingSeconds } from '../../features/voice-follow/text';
 import { useFocusData } from '../../hooks/useAsyncData';
 import { formatDuration, t } from '../../localization/i18n';
 import { getRepositories } from '../../services/db';
+import { useDurationWpm } from '../../state/speakingRate';
 import type { Script, ScriptSort } from '../../storage/repositories';
 import { useTheme } from '../../theme/ThemeProvider';
 import { radius, spacing } from '../../theme/tokens';
@@ -22,6 +23,7 @@ export default function Library() {
   const [filter, setFilter] = useState<'all' | 'favorites'>('all');
   const [sort, setSort] = useState<ScriptSort>('updated');
   const [undoId, setUndoId] = useState<string | null>(null);
+  const paceWpm = useDurationWpm();
 
   const { data: scripts, reload } = useFocusData(
     async () => (await getRepositories()).scripts.list({ query, favoritesOnly: filter === 'favorites', sort }),
@@ -131,7 +133,7 @@ export default function Library() {
                 {item.body || ' '}
               </Text>
               <Text variant="caption" muted>
-                ~{formatDuration(estimateSpeakingSeconds(item.body))} · {new Date(item.updatedAt).toLocaleDateString()}
+                ~{formatDuration(estimateSpeakingSeconds(item.body, paceWpm))} · {new Date(item.updatedAt).toLocaleDateString()}
               </Text>
             </View>
             <IconButton icon="ellipsis-horizontal" label={t('common.edit')} onPress={() => showActions(item)} />

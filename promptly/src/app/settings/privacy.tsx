@@ -13,6 +13,7 @@ import { config } from '../../services/config';
 import { getRepositories } from '../../services/db';
 import { deleteRecordingFile } from '../../services/files';
 import { useSettings } from '../../state/settings';
+import { useSpeakingRate } from '../../state/speakingRate';
 
 export default function Privacy() {
   const analyticsEnabled = useSettings((s) => s.analyticsEnabled);
@@ -33,6 +34,7 @@ export default function Privacy() {
           await repos.scripts.purgeDeleted(Number.MAX_SAFE_INTEGER);
           await repos.kv.clearAll();
           useSettings.getState().reset();
+          useSpeakingRate.getState().reset();
           Alert.alert(t('privacy.deleted'));
           router.replace('/');
         },

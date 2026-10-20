@@ -6,8 +6,8 @@ Legend: ✅ verified · 🟡 implemented, not verified on device · ⬜ not star
 | Check | Result |
 |---|---|
 | TypeScript typecheck (app) | ✅ `npm run typecheck` clean |
-| Unit tests (app) | ✅ 94 tests / 12 suites (aligner, controller, scroll model, captions, entitlements, recording machine, studio, storage on real SQLite, i18n, platform support) |
-| Screen render tests (Node, mocked native modules, real SQLite) | ✅ Home, Library, Editor (autosave), Prepare (incl. Teleprompter + Voice Follow trial), Paywall, Settings, Studio (history restore), Takes, Subscription, Captions (generate → script correction → edit → save; no-speech; Pro gate) |
+| Unit tests (app) | ✅ 130 tests / 16 suites incl. screen tests (aligner, controller, scroll model, speaking rate, recording presets, captions, entitlements, recording machine, studio, storage on real SQLite, i18n, platform support) |
+| Screen render tests (Node, mocked native modules, real SQLite) | ✅ Home, Library, Editor (autosave), Prepare (incl. Teleprompter + Voice Follow trial, recording presets → Custom, “Use my pace”), Editor duration from learned pace, Paywall, Settings, Studio (history restore), Takes, Subscription, Captions (generate → script correction → edit → save; no-speech; Pro gate) |
 | JS bundle iOS / Android (`expo export`) | ✅ both bundle (Hermes bytecode) |
 | `expo prebuild` (config plugins, permissions) | ✅ generates projects; Info.plist + manifest permissions verified by inspection |
 | Server typecheck + tests | ✅ 18 tests (incl. eval metrics) (quotas, budget cap, refunds, IP limit, entitlement mapping, validation, prompt wrapping) |
@@ -23,6 +23,8 @@ Legend: ✅ verified · 🟡 implemented, not verified on device · ⬜ not star
 | Script library, editor, autosave, undo/redo, search, favorites, duplicate, soft delete | 🟡 | repository layer ✅ tested |
 | Teleprompter manual / timed / display settings / mirror / reading line | 🟡 | geometry ✅ tested; 60 fps unmeasured |
 | Recording (VisionCamera v5), countdown, timer, flip, interruptions, low storage | 🟡 | state machine ✅ tested |
+| Learned speaking rate (P1) | 🟡 | `speakingRate.ts` ✅ unit-tested (weighted median, clamp 80–240, ≥ 10 s, manual jumps excluded); learns from Voice Follow cursor progress and Timed takes that reached the end untouched; used for editor/home/library estimates and “Your pace” in setup. Live measurement accuracy not checked on a device (VF-05) |
+| Recording presets + landscape (P1) | 🟡 | `presets.ts` ✅ unit-tested; setup screen ✅ screen-tested. Landscape camera layout, interface-driven output orientation, landscape target size and 60 fps fallback **not tested on a device** (REC-07, REC-10..12) |
 | Overlay absent from recording | ⬜ | **release blocker until proven per platform** |
 | A/V sync (iOS native, Android muxed) | ⬜ | Android mux offset needs clap test |
 | Voice Follow | 🟡 | aligner ✅ (15 scenario tests); live recognition untested |
