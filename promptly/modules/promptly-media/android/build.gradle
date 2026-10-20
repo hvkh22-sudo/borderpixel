@@ -1,0 +1,24 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'app.promptly'
+version = '0.1.0'
+
+android {
+  namespace "expo.modules.promptlymedia"
+  defaultConfig {
+    versionCode 1
+    versionName "0.1.0"
+  }
+}
+
+dependencies {
+  // Media3 1.11.1 (stable 2026-09-10) — Transformer for burn-in and mux.
+  def media3 = "1.11.1"
+  implementation "androidx.media3:media3-transformer:$media3"
+  implementation "androidx.media3:media3-effect:$media3"
+  implementation "androidx.media3:media3-common:$media3"
+  implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2"
+}

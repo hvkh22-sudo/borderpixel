@@ -1,0 +1,104 @@
+import { useEvent } from 'expo';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useVideoPlayer, VideoView } from 'expo-video';
+import { useEffect, useState } from 'react';
+import { Alert, StyleSheet, View } from 'react-native';
+
+import { Button } from '../../components/Button';
+import { Screen } from '../../components/Screen';
+import { Text } from '../../components/Text';
+import { CaptionPreview } from '../../features/captions/CaptionPreview';
+import { cueAt } from '../../features/captions/captions';
+import { useFocusData } from '../../hooks/useAsyncData';
+import { formatClock, t } from '../../localization/i18n';
+import { getRepositories } from '../../services/db';
+import { deleteRecordingFile, recordingFile } from '../../services/files';
+import { radius, spacing } from '../../theme/tokens';
+
+export default function Take() {
+  const { id, audioIssue } = useLocalSearchParams<{ id: string; audioIssue?: string }>();
+  const { data: rec } = useFocusData(async () => (await getRepositories()).recordings.get(id), [id]);
+  const file = rec ? recordingFile(rec.fileName) : null;
+  const exists = file?.exists ?? false;
+  const player = useVideoPlayer(exists && file ? file.uri : null, (p) => {
+    p.loop = true;
+    p.timeUpdateEventInterval = 0.1;
+  });
+  const time = useEvent(player, 'timeUpdate', { currentTime: 0, currentLiveTimestamp: null, currentOffsetFromLive: null, bufferedPosition: 0 });
+  const [frameWidth, setFrameWidth] = useState(300);
+
+  useEffect(() => {
+    if (exists) player.play();
+  }, [exists, player]);
+
+  if (!rec) return <Screen>{null}</Screen>;
+
+  const activeCue = rec.cues ? cueAt(rec.cues, time.currentTime * 1000) : undefined;
+
+  const remove = () =>
+    Alert.alert(t('preview.delete'), t('preview.deleteConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('common.delete'),
+        style: 'destructive',
+        onPress: async () => {
+          player.pause();
+          deleteRecordingFile(rec.fileName);
+          await (await getRepositories()).recordings.remove(rec.id);
+          router.back();
+        },
+      },
+    ]);
+
+  return (
+    <Screen
+      footer={
+        <View style={styles.footer}>
+          <Button
+            label={rec.cues ? t('preview.editCaptions') : t('preview.addCaptions')}
+            icon="text"
+            variant="secondary"
+            onPress={() => (player.pause(), router.push(`/captions/${rec.id}`))}
+            style={styles.flex}
+            disabled={!exists}
+          />
+          <Button label={t('preview.export')} icon="share-outline" onPress={() => (player.pause(), router.push(`/export/${rec.id}`))} style={styles.flex} disabled={!exists} />
+        </View>
+      }
+    >
+      <View style={styles.video} onLayout={(e) => setFrameWidth(e.nativeEvent.layout.width)}>
+        {exists ? (
+          <>
+            <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="contain" nativeControls />
+            {rec.cues && rec.captionStyle ? <CaptionPreview text={activeCue?.text ?? null} styleId={rec.captionStyle} position={rec.captionPosition} frameWidth={frameWidth} /> : null}
+          </>
+        ) : (
+          <Text center color="#fff">
+            {t('preview.missingFile')}
+          </Text>
+        )}
+      </View>
+      {audioIssue ? (
+        <Text variant="callout" muted center>
+          {t('record.failedRecovered')}
+        </Text>
+      ) : null}
+      <Text muted center>
+        {t('preview.duration', { d: formatClock(rec.durationMs) })} · {new Date(rec.createdAt).toLocaleString()}
+      </Text>
+      <View style={styles.row}>
+        {rec.scriptId ? (
+          <Button label={t('preview.retake')} icon="refresh" variant="ghost" onPress={() => router.replace(`/prepare/${rec.scriptId}`)} />
+        ) : null}
+        <Button label={t('preview.delete')} icon="trash-outline" variant="danger" onPress={remove} />
+      </View>
+    </Screen>
+  );
+}
+
+const styles = StyleSheet.create({
+  flex: { flex: 1 },
+  video: { aspectRatio: 9 / 16, maxHeight: 520, alignSelf: 'center', width: '100%', backgroundColor: '#000', borderRadius: radius.lg, overflow: 'hidden', justifyContent: 'center' },
+  footer: { flexDirection: 'row', gap: spacing.md },
+  row: { flexDirection: 'row', justifyContent: 'center', gap: spacing.md },
+});

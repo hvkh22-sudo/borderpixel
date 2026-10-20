@@ -1,0 +1,86 @@
+/**
+ * AI Script Studio client. Talks only to Promptly's own proxy; no provider
+ * key ever ships in the app. Scripts are sent only when the user taps an AI
+ * action (disclosed in the Studio UI and privacy policy).
+ */
+import { StudioRequest, StudioResponse, validateStudioRequest } from '../features/ai-script-studio/studio';
+import { config, flags } from './config';
+import { appUserId } from './purchases';
+
+export type AiErrorCode =
+  | 'not_configured'
+  | 'invalid_request'
+  | 'quota_exceeded'
+  | 'rate_limited'
+  | 'unauthorized'
+  | 'offline'
+  | 'timeout'
+  | 'server_error';
+
+export class AiError extends Error {
+  constructor(
+    readonly code: AiErrorCode,
+    message?: string,
+  ) {
+    super(message ?? code);
+  }
+}
+
+const TIMEOUT_MS = 45_000;
+
+export function aiAvailable(): boolean {
+  return flags.aiStudio && config.aiBaseUrl.length > 0;
+}
+
+export async function runStudio(req: StudioRequest, signal?: AbortSignal): Promise<StudioResponse> {
+  if (!aiAvailable()) throw new AiError('not_configured');
+  const invalid = validateStudioRequest(req);
+  if (invalid) throw new AiError('invalid_request', invalid);
+  const userId = await appUserId();
+  if (!userId) throw new AiError('not_configured', 'purchases not configured');
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  signal?.addEventListener('abort', () => controller.abort());
+  let res: Response;
+  try {
+    res = await fetch(`${config.aiBaseUrl}/v1/studio`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-app-user-id': userId },
+      body: JSON.stringify(req),
+      signal: controller.signal,
+    });
+  } catch (e) {
+    clearTimeout(timer);
+    if ((e as Error).name === 'AbortError') throw new AiError(signal?.aborted ? 'invalid_request' : 'timeout');
+    throw new AiError('offline');
+  }
+  clearTimeout(timer);
+  if (res.ok) return (await res.json()) as StudioResponse;
+  const body = (await res.json().catch(() => ({}))) as { error?: string };
+  switch (res.status) {
+    case 400:
+      throw new AiError('invalid_request', body.error);
+    case 401:
+    case 403:
+      throw new AiError('unauthorized');
+    case 402:
+      throw new AiError('quota_exceeded');
+    case 429:
+      throw new AiError('rate_limited');
+    default:
+      throw new AiError('server_error', body.error);
+  }
+}
+
+export async function fetchAiBalance(): Promise<{ remaining: number; resetsAt: string | null } | null> {
+  if (!aiAvailable()) return null;
+  const userId = await appUserId();
+  if (!userId) return null;
+  try {
+    const res = await fetch(`${config.aiBaseUrl}/v1/balance`, { headers: { 'x-app-user-id': userId } });
+    return res.ok ? ((await res.json()) as { remaining: number; resetsAt: string | null }) : null;
+  } catch {
+    return null;
+  }
+}

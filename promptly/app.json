@@ -1,0 +1,72 @@
+{
+  "expo": {
+    "name": "Promptly",
+    "slug": "promptly",
+    "scheme": "promptly",
+    "version": "0.1.0",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "app.promptly.placeholder",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Promptly uses the camera to record your videos. Recordings stay on your device.",
+        "NSMicrophoneUsageDescription": "Promptly records your voice with your video and can follow your speech to scroll the script.",
+        "NSSpeechRecognitionUsageDescription": "Voice Follow and automatic captions use speech recognition. Promptly asks for on-device processing where available.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "app.promptly.placeholder",
+      "adaptiveIcon": {
+        "backgroundColor": "#090A0F",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "blockedPermissions": [
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ],
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      "expo-video",
+      [
+        "expo-media-library",
+        {
+          "savePhotosPermission": "Promptly saves your exported videos to your photo library.",
+          "photosPermission": "Promptly saves your exported videos to your photo library.",
+          "isAccessMediaLocationEnabled": false,
+          "granularPermissions": []
+        }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Promptly records your voice with your video and can follow your speech to scroll the script.",
+          "speechRecognitionPermission": "Voice Follow and automatic captions use speech recognition. Promptly asks for on-device processing where available.",
+          "androidSpeechServicePackages": [
+            "com.google.android.googlequicksearchbox",
+            "com.google.android.as"
+          ]
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}
