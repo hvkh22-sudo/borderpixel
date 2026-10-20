@@ -99,6 +99,19 @@ describe('handler', () => {
     expect((await handle(req(IMPROVE), life.deps)).status).toBe(402);
   });
 
+  it('uses credit packs once, only after the monthly allowance, and never re-grants them', async () => {
+    const s = setup({ ent: { plan: 'free', creditPacks: 1 }, config: { creditPackSize: 2 } });
+    const statuses = [];
+    for (let i = 0; i < 5; i++) statuses.push((await handle(req(IMPROVE), s.deps)).status);
+    // 2 free + 2 pack credits, then exhausted.
+    expect(statuses).toEqual([200, 200, 200, 200, 402]);
+    // Next month: the free allowance resets, the pack does not.
+    s.deps.now = () => Date.UTC(2026, 10, 5, 12);
+    const next = [];
+    for (let i = 0; i < 3; i++) next.push((await handle(req(IMPROVE), s.deps)).status);
+    expect(next).toEqual([200, 200, 402]);
+  });
+
   it('caches entitlements', async () => {
     const s = setup({ ent: { plan: 'subscription', creditPacks: 0 } });
     await handle(req(IMPROVE), s.deps);

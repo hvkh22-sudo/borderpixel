@@ -80,7 +80,12 @@ export default function Paywall() {
   };
 
   const triggerKey = trigger === 'voiceFollow' || trigger === 'captionStyle' ? (`paywall.trigger.${trigger}` as TKey) : null;
-  const benefits: TKey[] = ['paywall.benefit1', 'paywall.benefit2', 'paywall.benefit3', 'paywall.benefit4'];
+  const benefits: string[] = [
+    t('paywall.benefit1'),
+    t('paywall.benefit2'),
+    selected === 'lifetime' ? t('paywall.benefitLifetimeAi', { n: LIMITS.lifetimeAiCreditGrant }) : t('paywall.benefit3'),
+    t('paywall.benefit4'),
+  ];
 
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: colors.background }]}>
@@ -97,7 +102,7 @@ export default function Paywall() {
             <View key={b} style={styles.benefit}>
               <Ionicons name="checkmark-circle" size={22} color={colors.primary} />
               <Text variant="callout" style={styles.flex}>
-                {t(b)}
+                {b}
               </Text>
             </View>
           ))}

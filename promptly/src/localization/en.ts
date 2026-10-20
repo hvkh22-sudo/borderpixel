@@ -88,7 +88,12 @@ export const en = {
   },
   studio: {
     title: 'AI Script Studio',
-    disclosure: 'AI requests send the text you provide to Promptly’s AI service to generate a draft. It is not used to train models and is not stored after processing.',
+    disclosure: 'AI requests send the text you enter to Promptly’s server and to Anthropic (Claude), which generates the draft. Anthropic does not train on it; it may keep it for up to 30 days for safety, then deletes it.',
+    consentTitle: 'Before you use AI',
+    consentAllow: 'I agree',
+    consentNotNow: 'Not now',
+    report: 'Report this draft',
+    reported: 'Thanks — we’ll review this kind of output.',
     remaining: '{n} AI requests left',
     tools: {
       generate: 'Write a script',
@@ -292,7 +297,8 @@ export const en = {
     perYear: '{price}/year',
     once: '{price} once',
     annualSave: 'Best value',
-    lifetimeNote: 'All on-device Pro features forever + {n} AI credits. Extra AI credits can be purchased.',
+    lifetimeNote: 'All on-device Pro features forever + {n} one-time AI credits. Monthly AI allowances are part of subscriptions.',
+    benefitLifetimeAi: '{n} AI script credits included (one-time)',
     subscribe: 'Continue',
     restore: 'Restore purchases',
     restored: 'Purchases restored',

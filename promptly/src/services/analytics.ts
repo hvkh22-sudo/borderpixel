@@ -19,6 +19,7 @@ export type AnalyticsEvent =
   | { name: 'captions_generated'; words: number; durationSec: number }
   | { name: 'captions_failed'; code: string }
   | { name: 'ai_request'; tool: string; ok: boolean }
+  | { name: 'ai_output_reported'; tool: string }
   | { name: 'paywall_viewed'; trigger: string }
   | { name: 'purchase_completed'; product: 'monthly' | 'annual' | 'lifetime' | 'credits' }
   | { name: 'purchase_restored'; found: boolean };

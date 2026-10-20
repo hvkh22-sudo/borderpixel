@@ -96,7 +96,12 @@ export const he: Strings = {
   },
   studio: {
     title: 'סטודיו תסריטים AI',
-    disclosure: 'בקשות AI שולחות את הטקסט שהזנתם לשירות ה-AI של Promptly כדי ליצור טיוטה. הטקסט לא משמש לאימון מודלים ולא נשמר אחרי העיבוד.',
+    disclosure: 'בקשות AI שולחות את הטקסט שהזנתם לשרת של Promptly ול-Anthropic (Claude), שיוצרת את הטיוטה. Anthropic לא מאמנת מודלים על הטקסט; היא עשויה לשמור אותו עד 30 יום לצורכי בטיחות ואז מוחקת אותו.',
+    consentTitle: 'לפני השימוש ב-AI',
+    consentAllow: 'אני מסכים/ה',
+    consentNotNow: 'לא עכשיו',
+    report: 'דיווח על הטיוטה',
+    reported: 'תודה — נבדוק תוצרים מהסוג הזה.',
     remaining: 'נותרו {n} בקשות AI',
     tools: {
       generate: 'כתיבת תסריט',
@@ -299,7 +304,8 @@ export const he: Strings = {
     perYear: '{price} לשנה',
     once: '{price} חד-פעמי',
     annualSave: 'המשתלם ביותר',
-    lifetimeNote: 'כל תכונות ה-Pro שבמכשיר לתמיד + {n} קרדיטים ל-AI. אפשר לרכוש קרדיטים נוספים.',
+    lifetimeNote: 'כל תכונות ה-Pro שבמכשיר לתמיד + {n} קרדיטים חד-פעמיים ל-AI. מכסות AI חודשיות כלולות במנויים.',
+    benefitLifetimeAi: '{n} קרדיטים ל-AI לתסריטים (חד-פעמי)',
     subscribe: 'המשך',
     restore: 'שחזור רכישות',
     restored: 'הרכישות שוחזרו',

@@ -39,6 +39,8 @@ export interface SettingsState {
   appearance: Appearance;
   onboardingDone: boolean;
   analyticsEnabled: boolean;
+  /** Explicit consent to send AI Studio text to the named AI provider (Apple 5.1.2(i)). */
+  aiConsent: boolean;
   speechLocale: string;
   prompter: PrompterSettings;
   camera: CameraSettings;
@@ -65,7 +67,8 @@ export const DEFAULT_SETTINGS: SettingsState = {
   hydrated: false,
   appearance: 'system',
   onboardingDone: false,
-  analyticsEnabled: true,
+  analyticsEnabled: false,
+  aiConsent: false,
   speechLocale: 'en-US',
   prompter: DEFAULT_PROMPTER,
   camera: { position: 'front', resolution: '1080p', fps: 30 },

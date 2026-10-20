@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
@@ -21,7 +21,9 @@ import {
 import { t, type TKey } from '../localization/i18n';
 import { AiError, aiAvailable, runStudio } from '../services/ai';
 import { track } from '../services/analytics';
+import { config } from '../services/config';
 import { getRepositories } from '../services/db';
+import { useSettings } from '../state/settings';
 import { deriveTitle, type Script, type ScriptVersionRow } from '../storage/repositories';
 import { useTheme } from '../theme/ThemeProvider';
 import { radius, spacing, typography } from '../theme/tokens';
@@ -52,6 +54,8 @@ export default function Studio() {
   const [compare, setCompare] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const aiConsent = useSettings((st) => st.aiConsent);
+  const [reported, setReported] = useState(false);
 
   useEffect(() => {
     if (!params.scriptId) return;
@@ -71,6 +75,7 @@ export default function Studio() {
     setBusy(true);
     setError(null);
     setResult(null);
+    setReported(false);
     abortRef.current = new AbortController();
     try {
       const res = await runStudio(req, abortRef.current.signal);
@@ -122,6 +127,29 @@ export default function Studio() {
       </Screen>
     );
   }
+
+  if (!aiConsent) {
+    return (
+      <Screen>
+        <Card>
+          <Ionicons name="shield-checkmark-outline" size={28} color={colors.primary} />
+          <Text variant="headline">{t('studio.consentTitle')}</Text>
+          <Text>{t('studio.disclosure')}</Text>
+          <Button label={t('studio.consentAllow')} onPress={() => useSettings.getState().set({ aiConsent: true })} />
+          <Button label={t('studio.consentNotNow')} variant="ghost" onPress={() => router.back()} />
+        </Card>
+        {versions.length > 0 ? <VersionList versions={versions} onRestore={restoreVersion} /> : null}
+      </Screen>
+    );
+  }
+
+  const report = () => {
+    if (!tool) return;
+    track({ name: 'ai_output_reported', tool });
+    setReported(true);
+    // Content is never sent automatically; the user chooses what to include in the email.
+    if (config.supportEmail) void Linking.openURL(`mailto:${config.supportEmail}?subject=${encodeURIComponent(`AI draft report (${tool})`)}`);
+  };
 
   const inputStyle = [styles.input, typography.body, { color: colors.text, backgroundColor: colors.surface, borderColor: colors.border }];
 
@@ -232,6 +260,13 @@ export default function Studio() {
           </Text>
           {tool !== 'hook' ? <Button label={t('studio.useDraft')} onPress={() => apply(result.text)} /> : null}
           <Button label={t('studio.regenerate')} variant="ghost" icon="refresh" onPress={run} disabled={busy} />
+          {reported ? (
+            <Text variant="caption" muted center accessibilityLiveRegion="polite">
+              {t('studio.reported')}
+            </Text>
+          ) : (
+            <Button label={t('studio.report')} variant="ghost" icon="flag-outline" onPress={report} />
+          )}
         </View>
       ) : null}
     </Screen>

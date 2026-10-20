@@ -53,10 +53,20 @@ async function resolveEntitlement(deps: Deps, userId: string): Promise<Entitleme
   return e;
 }
 
+/**
+ * Base allowance per plan. Credit packs are a separate one-time pool used only
+ * after the base allowance is exhausted — never re-granted monthly.
+ */
 function quotaFor(e: Entitlement, cfg: HandlerConfig, month: string) {
-  if (e.plan === 'subscription') return { key: `m:${month}`, limit: cfg.proPerMonth + e.creditPacks * cfg.creditPackSize, resets: true };
-  if (e.plan === 'lifetime') return { key: 'lifetime_total', limit: cfg.lifetimeGrant + e.creditPacks * cfg.creditPackSize, resets: false };
-  return { key: `m:${month}`, limit: cfg.freePerMonth + e.creditPacks * cfg.creditPackSize, resets: true };
+  const credits = { key: 'credits_total', limit: e.creditPacks * cfg.creditPackSize };
+  if (e.plan === 'subscription') return { base: { key: `m:${month}`, limit: cfg.proPerMonth }, credits, resets: true };
+  if (e.plan === 'lifetime') return { base: { key: 'lifetime_total', limit: cfg.lifetimeGrant }, credits, resets: false };
+  return { base: { key: `m:${month}`, limit: cfg.freePerMonth }, credits, resets: true };
+}
+
+async function remainingFor(store: QuotaStore, scope: string, q: ReturnType<typeof quotaFor>): Promise<number> {
+  const [baseUsed, creditsUsed] = await Promise.all([store.get(scope, q.base.key), store.get(scope, q.credits.key)]);
+  return Math.max(0, q.base.limit - baseUsed) + Math.max(0, q.credits.limit - creditsUsed);
 }
 
 export async function handle(req: Request, deps: Deps): Promise<Response> {
@@ -68,8 +78,8 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
   if (req.method === 'GET' && url.pathname === '/v1/balance') {
     const e = await resolveEntitlement(deps, userId);
     const q = quotaFor(e, deps.config, month);
-    const used = await deps.store.get(`user:${userId}`, q.key);
-    return json(200, { remaining: Math.max(0, q.limit - used), resetsAt: q.resets ? monthResetsAt : null, plan: e.plan });
+    const remaining = await remainingFor(deps.store, `user:${userId}`, q);
+    return json(200, { remaining, resetsAt: q.resets ? monthResetsAt : null, plan: e.plan });
   }
 
   if (req.method !== 'POST' || url.pathname !== '/v1/studio') return json(404, { error: 'not_found' });
@@ -105,7 +115,12 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
   }
   const q = quotaFor(ent, deps.config, month);
   const scope = `user:${userId}`;
-  const quota = await deps.store.consume(scope, q.key, q.limit);
+  let chargedKey = q.base.key;
+  let quota = await deps.store.consume(scope, q.base.key, q.base.limit);
+  if (!quota.allowed && q.credits.limit > 0) {
+    chargedKey = q.credits.key;
+    quota = await deps.store.consume(scope, q.credits.key, q.credits.limit);
+  }
   if (!quota.allowed) return json(402, { error: 'quota_exceeded', remaining: 0 });
 
   const started = deps.now();
@@ -120,11 +135,11 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
     const response: StudioResponse = {
       text: out.text,
       alternatives: wantsAlternatives ? out.alternatives : undefined,
-      remaining: Math.max(0, q.limit - quota.used),
+      remaining: await remainingFor(deps.store, scope, q),
     };
     return json(200, response);
   } catch (e) {
-    await deps.store.refund(scope, q.key);
+    await deps.store.refund(scope, chargedKey);
     const kind = e instanceof LlmError ? e.kind : 'upstream';
     deps.log({ event: 'studio_error', tool: parsed.tool, plan: ent.plan, kind, ms: deps.now() - started });
     if (kind === 'rate_limited') return json(429, { error: 'rate_limited' });
