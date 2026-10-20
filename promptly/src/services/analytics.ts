@@ -6,21 +6,26 @@
  * No provider is wired yet: choosing one (and its privacy-label impact) needs
  * founder approval. Until then events go to a sink that is a no-op in release.
  */
+import type { StudioTool } from '../features/ai-script-studio/studio';
+import type { RecordingErrorCode } from '../features/recording/recordingMachine';
+import type { SpeechErrorCode } from '../features/voice-follow/voiceFollowController';
+import type { TranscriptionErrorCode } from './transcription';
+
 export type AnalyticsEvent =
   | { name: 'app_open' }
   | { name: 'onboarding_completed' }
   | { name: 'script_created'; source: 'blank' | 'paste' | 'ai' | 'sample' }
   | { name: 'recording_started'; mode: 'manual' | 'timed' | 'voice' }
   | { name: 'recording_completed'; mode: 'manual' | 'timed' | 'voice'; durationSec: number }
-  | { name: 'recording_failed'; code: string }
+  | { name: 'recording_failed'; code: RecordingErrorCode | 'recorder_error' }
   | { name: 'export_completed'; captions: boolean; kind: 'video' | 'srt' }
   | { name: 'voice_follow_started' }
-  | { name: 'voice_follow_failed'; code: string }
+  | { name: 'voice_follow_failed'; code: SpeechErrorCode }
   | { name: 'captions_generated'; words: number; durationSec: number }
-  | { name: 'captions_failed'; code: string }
-  | { name: 'ai_request'; tool: string; ok: boolean }
-  | { name: 'ai_output_reported'; tool: string }
-  | { name: 'paywall_viewed'; trigger: string }
+  | { name: 'captions_failed'; code: TranscriptionErrorCode }
+  | { name: 'ai_request'; tool: StudioTool; ok: boolean }
+  | { name: 'ai_output_reported'; tool: StudioTool }
+  | { name: 'paywall_viewed'; trigger: 'voiceFollow' | 'captionStyle' | 'general' }
   | { name: 'purchase_completed'; product: 'monthly' | 'annual' | 'lifetime' | 'credits' }
   | { name: 'purchase_restored'; found: boolean };
 

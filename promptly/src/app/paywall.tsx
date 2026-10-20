@@ -31,7 +31,7 @@ export default function Paywall() {
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    track({ name: 'paywall_viewed', trigger: trigger ?? 'general' });
+    track({ name: 'paywall_viewed', trigger: trigger === 'voiceFollow' || trigger === 'captionStyle' ? trigger : 'general' });
     fetchPackages()
       .then((p) => {
         setPackages(p);

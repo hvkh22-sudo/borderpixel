@@ -85,3 +85,14 @@ Requirements checked against these:
 - **Fetched and quoted:** Apple App Review Guidelines (page says "Last Updated: October 16, 2026"), Apple App Privacy Details page, Apple Auto-renewable Subscriptions page, Apple required-reason API docs and reason codes (through the developer.apple.com doc JSON), Expo privacy guide **source** on GitHub `main`, and RevenueCat's iOS `PrivacyInfo.xcprivacy` on GitHub `main`.
 - **Blocked by network policy (proxy 403), so only search snippets were used:** docs.expo.dev, revenuecat.com docs, support.google.com (Play Data safety, Photo/Video Permissions, Subscriptions, AI-Generated Content), and privacy.claude.com (Anthropic retention). Re-read each one manually before submission. The URLs are in the verification logs of the two companion docs.
 - **Not checked at all:** the text of Schedule 2 of the Apple DPLA (developer.apple.com/support/terms). The A4 wording follows common practice and must be confirmed by legal.
+
+## Status update (2026-10-20, after founder decisions)
+- DONE: `ios.privacyManifests` in app.json — required-reason APIs + collected data types, with purchase
+  history / user ID / usage data declared **linked** (founder decision: declare).
+- DONE: Privacy policy, Terms of Use and Support pages hosted in this repo's site at
+  `apps/promptly/{privacy,terms,support}/`; default URLs in `src/services/config.ts`
+  (`https://hvkh22-sudo.github.io/borderpixel/apps/promptly/...` — confirm GitHub Pages is enabled or
+  set `EXPO_PUBLIC_SITE_URL`). Paywall Terms/Privacy links now always appear.
+- DONE: AI consent naming Anthropic (5.1.2(i)); report-draft control (Play generative AI); analytics
+  opt-in default; analytics event fields restricted to enums; lifetime paywall copy; credit pack one-time.
+- OPEN: legal review of the published pages; App Store Connect / Play Console privacy forms entry.

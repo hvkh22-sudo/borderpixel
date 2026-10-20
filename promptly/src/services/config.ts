@@ -4,6 +4,8 @@
  */
 import { Platform } from 'react-native';
 
+const SITE = process.env.EXPO_PUBLIC_SITE_URL || 'https://hvkh22-sudo.github.io/borderpixel/apps/promptly';
+
 export const config = {
   revenueCatApiKey:
     Platform.select({
@@ -11,9 +13,11 @@ export const config = {
       android: process.env.EXPO_PUBLIC_RC_ANDROID_KEY,
     }) ?? '',
   aiBaseUrl: process.env.EXPO_PUBLIC_AI_BASE_URL ?? '',
-  supportEmail: process.env.EXPO_PUBLIC_SUPPORT_EMAIL ?? '',
-  privacyUrl: process.env.EXPO_PUBLIC_PRIVACY_URL ?? '',
-  termsUrl: process.env.EXPO_PUBLIC_TERMS_URL ?? '',
+  supportEmail: process.env.EXPO_PUBLIC_SUPPORT_EMAIL || 'hvkh22@gmail.com',
+  // Hosted from this repository's static site (apps/promptly/*). Override per build if the domain changes.
+  privacyUrl: process.env.EXPO_PUBLIC_PRIVACY_URL || `${SITE}/privacy/`,
+  termsUrl: process.env.EXPO_PUBLIC_TERMS_URL || `${SITE}/terms/`,
+  supportUrl: process.env.EXPO_PUBLIC_SUPPORT_URL || `${SITE}/support/`,
 };
 
 /**
