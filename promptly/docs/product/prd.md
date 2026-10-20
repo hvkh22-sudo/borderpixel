@@ -15,6 +15,8 @@ Status: ✅ verified · 🟡 implemented, device-untested · ⬜ planned
 | ID | Feature | User problem | Priority | Dependencies | Complexity | Op. cost | Acceptance criteria (summary) | Tests | Status |
 |---|---|---|---|---|---|---|---|---|---|
 | SCR-1 | Script library + editor | Scripts scattered across apps | P0 | SQLite | M | 0 | Create/edit/rename/duplicate/delete(undo)/search/favorite; autosave ≤ 1 s; survives kill | repositories.test | 🟡 |
+| SCR-3 | Script folders | Many scripts per series/client get lost in one list | P1 | SQLite (migration 3) | S | 0 | One optional folder per script; create/rename/delete (delete never deletes scripts — they move to No folder); folder chips with counts; move from menu and editor; search/sort inside a folder; empty states; en + he | repositories.test, folders.test | 🟡 |
+| SCR-4 | Local script export / backup | Losing scripts when changing phones | P0 (storage) | expo-sharing, expo-file-system | S | 0 | Export one versioned JSON (scripts + versions + folders) via share sheet; import merges without overwriting (new ids on conflict) | backup.test, folders.test | 🟡 export · ⬜ import UI (expo-document-picker not installed) |
 | SCR-2 | Word count + duration estimate | "How long is my video?" | P0 | — | S | 0 | Live estimate at chosen WPM | text utils | 🟡 |
 | TP-1 | Teleprompter display | Unnatural reading | P0 | Reanimated | M | 0 | Size, spacing, width, reading line, backdrop, mirror, contrast, align; persisted | scrollModel.test | 🟡 |
 | TP-2 | Manual + timed scroll | Racing the text | P0 | — | M | 0 | Play/pause/restart/speed ±10 WPM; drag with inertia; UI-thread animation | scrollModel.test | 🟡 |
@@ -28,7 +30,7 @@ Status: ✅ verified · 🟡 implemented, device-untested · ⬜ planned
 | MON-1 | Free / Pro / Lifetime | Business | P0 | RevenueCat | M | 1% > $2.5k MTR | Gates per pricing-model.md; restore; manage; no overlap purchases | entitlements.test, sandbox PUR-* | 🟡 |
 | SET-1 | Settings, privacy, delete-all | Trust | P0 | — | S | 0 | Appearance, speech language, analytics opt-out, delete all data | manual | 🟡 |
 | A11Y-1 | Accessibility | Inclusive | P0 | — | M | 0 | Labels/roles, 48 pt targets, adjustable steppers, live regions, reduced motion, Dynamic Type cap 1.8× | manual VoiceOver/TalkBack | 🟡 |
-| P1-* | Take mode, mic pre-flight, Bluetooth remote, more caption themes, word highlight, folders, more languages | | P1 | | | | | | ⬜ |
+| P1-* | Take mode, mic pre-flight, Bluetooth remote, more caption themes, word highlight, more languages | | P1 | | | | | | ⬜ |
 | P2-* | Eye-contact correction, AI editing, filler removal, sync, teams | | P2 | | | | | | ⬜ |
 
 \* P0 subject to the device feasibility gate. If VF-1 or CAP-1 cannot pass on a platform, the feature is

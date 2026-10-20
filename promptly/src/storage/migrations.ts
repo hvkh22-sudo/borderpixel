@@ -43,6 +43,15 @@ export const MIGRATIONS: string[] = [
      value TEXT NOT NULL
    );`,
   `ALTER TABLE recordings ADD COLUMN caption_position TEXT NOT NULL DEFAULT 'lower';`,
+  // Script organization: one optional folder per script. NULL folder_id = "No folder".
+  `CREATE TABLE IF NOT EXISTS folders (
+     id TEXT PRIMARY KEY NOT NULL,
+     name TEXT NOT NULL,
+     created_at INTEGER NOT NULL,
+     sort_order INTEGER NOT NULL DEFAULT 0
+   );
+   ALTER TABLE scripts ADD COLUMN folder_id TEXT;
+   CREATE INDEX IF NOT EXISTS idx_scripts_folder ON scripts(folder_id);`,
 ];
 
 export async function migrate(db: SqlExecutor): Promise<number> {

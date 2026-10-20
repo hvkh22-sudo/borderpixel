@@ -6,8 +6,8 @@ Legend: ✅ verified · 🟡 implemented, not verified on device · ⬜ not star
 | Check | Result |
 |---|---|
 | TypeScript typecheck (app) | ✅ `npm run typecheck` clean |
-| Unit tests (app) | ✅ 94 tests / 12 suites (aligner, controller, scroll model, captions, entitlements, recording machine, studio, storage on real SQLite, i18n, platform support) |
-| Screen render tests (Node, mocked native modules, real SQLite) | ✅ Home, Library, Editor (autosave), Prepare (incl. Teleprompter + Voice Follow trial), Paywall, Settings, Studio (history restore), Takes, Subscription, Captions (generate → script correction → edit → save; no-speech; Pro gate) |
+| Unit tests (app) | ✅ 132 tests / 16 suites in total incl. screen tests (aligner, controller, scroll model, captions, entitlements, recording machine, studio, storage + folders + backup merge on real SQLite, i18n en/he parity, platform support) |
+| Screen render tests (Node, mocked native modules, real SQLite) | ✅ Home, Library, Editor (autosave), Prepare (incl. Teleprompter + Voice Follow trial), Paywall, Settings, Studio (history restore), Takes, Subscription, Captions (generate → script correction → edit → save; no-speech; Pro gate), Folders (create, move from menu / into new folder, filter + search inside folder, rename, delete keeps scripts, favorites empty state, editor folder chip), Export my scripts (JSON content, nothing-to-export) |
 | JS bundle iOS / Android (`expo export`) | ✅ both bundle (Hermes bytecode) |
 | `expo prebuild` (config plugins, permissions) | ✅ generates projects; Info.plist + manifest permissions verified by inspection |
 | Server typecheck + tests | ✅ 18 tests (incl. eval metrics) (quotas, budget cap, refunds, IP limit, entitlement mapping, validation, prompt wrapping) |
@@ -21,6 +21,9 @@ Legend: ✅ verified · 🟡 implemented, not verified on device · ⬜ not star
 | Feature | Status | Notes |
 |---|---|---|
 | Script library, editor, autosave, undo/redo, search, favorites, duplicate, soft delete | 🟡 | repository layer ✅ tested |
+| Script folders (one optional folder per script; chip row All · Favorites · folders · New folder; move from script menu and editor chip; rename/delete via long-press; delete moves scripts to No folder) | 🟡 | migration 3 + repository ✅ tested on real SQLite (incl. upgrade from a pre-folder DB); screen flows ✅ tested in Node; bottom sheet, keyboard and long-press not checked on a device; VoiceOver/TalkBack long-press action untested |
+| Export my scripts (Settings › Privacy & data → one versioned JSON: scripts + versions + folders, via share sheet) | 🟡 | serialize/parse/merge ✅ tested (format version check, malformed input rejected, round-trip without loss, re-import adds nothing, never overwrites); share sheet and file hand-off not tried on a device |
+| Import scripts from a backup file | ⬜ | merge logic implemented and tested (`importBackup` in `src/storage/backup.ts`), **no UI**: `expo-document-picker` is not installed (installing needs approval/network); add a picker + Settings row when it is |
 | Teleprompter manual / timed / display settings / mirror / reading line | 🟡 | geometry ✅ tested; 60 fps unmeasured |
 | Recording (VisionCamera v5), countdown, timer, flip, interruptions, low storage | 🟡 | state machine ✅ tested |
 | Overlay absent from recording | ⬜ | **release blocker until proven per platform** |
@@ -32,7 +35,7 @@ Legend: ✅ verified · 🟡 implemented, not verified on device · ⬜ not star
 | Paywall / purchases / restore / lifetime | 🟡 | entitlement logic ✅ tested; no store products |
 | Recording recovery (orphan files) | 🟡 | duration restored via native module when available; Home shows a recovered-takes notice |
 | Accessibility (labels, roles, adjustable steppers, live regions, reduced motion) | 🟡 | VoiceOver/TalkBack pass not done |
-| Localization framework (en) + RTL flag | 🟡 | only English strings |
+| Localization framework (en) + RTL flag | 🟡 | English + Hebrew (folder and export strings included); Hebrew pending native-speaker review on device |
 
 ## Known issues / risks
 - iOS audio-session coexistence (camera audio + recognizer) unproven — fallback designed (DECISIONS D4).

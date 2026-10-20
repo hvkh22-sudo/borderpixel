@@ -2,11 +2,12 @@ import { randomUUID } from 'expo-crypto';
 import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
 
 import { migrate } from '../storage/migrations';
-import { KeyValueStore, RecordingRepository, ScriptRepository } from '../storage/repositories';
+import { FolderRepository, KeyValueStore, RecordingRepository, ScriptRepository } from '../storage/repositories';
 import type { SqlExecutor } from '../storage/sql';
 
 export interface Repositories {
   scripts: ScriptRepository;
+  folders: FolderRepository;
   recordings: RecordingRepository;
   kv: KeyValueStore;
 }
@@ -35,6 +36,7 @@ export function getRepositories(): Promise<Repositories> {
       const deps = { db: exec, newId: randomUUID, now: Date.now };
       return {
         scripts: new ScriptRepository(deps),
+        folders: new FolderRepository(deps),
         recordings: new RecordingRepository(deps),
         kv: new KeyValueStore(exec),
       };

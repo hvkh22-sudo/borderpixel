@@ -10,6 +10,8 @@ export interface Script {
   createdAt: number;
   updatedAt: number;
   lastOpenedAt: number | null;
+  /** `null` means the script is in "No folder". */
+  folderId: string | null;
 }
 
 export interface ScriptVersionRow {
@@ -30,6 +32,7 @@ interface ScriptRow {
   created_at: number;
   updated_at: number;
   last_opened_at: number | null;
+  folder_id: string | null;
 }
 
 const toScript = (r: ScriptRow): Script => ({
@@ -40,6 +43,7 @@ const toScript = (r: ScriptRow): Script => ({
   createdAt: r.created_at,
   updatedAt: r.updated_at,
   lastOpenedAt: r.last_opened_at,
+  folderId: r.folder_id ?? null,
 });
 
 export interface Deps {
@@ -60,7 +64,7 @@ const escapeLike = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
 export class ScriptRepository {
   constructor(private readonly deps: Deps) {}
 
-  async create(input: { title: string; body: string }): Promise<Script> {
+  async create(input: { title: string; body: string; folderId?: string | null }): Promise<Script> {
     const now = this.deps.now();
     const script: Script = {
       id: this.deps.newId(),
@@ -70,10 +74,11 @@ export class ScriptRepository {
       createdAt: now,
       updatedAt: now,
       lastOpenedAt: now,
+      folderId: input.folderId ?? null,
     };
     await this.deps.db.runAsync(
-      'INSERT INTO scripts (id, title, body, favorite, created_at, updated_at, last_opened_at) VALUES (?, ?, ?, 0, ?, ?, ?)',
-      [script.id, script.title, script.body, now, now, now],
+      'INSERT INTO scripts (id, title, body, favorite, created_at, updated_at, last_opened_at, folder_id) VALUES (?, ?, ?, 0, ?, ?, ?, ?)',
+      [script.id, script.title, script.body, now, now, now, script.folderId],
     );
     return script;
   }
@@ -83,7 +88,10 @@ export class ScriptRepository {
     return row ? toScript(row) : null;
   }
 
-  async list(opts: { query?: string; favoritesOnly?: boolean; sort?: ScriptSort } = {}): Promise<Script[]> {
+  /**
+   * `folderId`: omitted = every folder, a string = that folder only, `null` = scripts in "No folder".
+   */
+  async list(opts: { query?: string; favoritesOnly?: boolean; sort?: ScriptSort; folderId?: string | null } = {}): Promise<Script[]> {
     const where = ['deleted_at IS NULL'];
     const params: SqlValue[] = [];
     if (opts.query?.trim()) {
@@ -92,6 +100,11 @@ export class ScriptRepository {
       params.push(q, q);
     }
     if (opts.favoritesOnly) where.push('favorite = 1');
+    if (opts.folderId === null) where.push('folder_id IS NULL');
+    else if (opts.folderId !== undefined) {
+      where.push('folder_id = ?');
+      params.push(opts.folderId);
+    }
     const order =
       opts.sort === 'title'
         ? 'title COLLATE NOCASE ASC'
@@ -126,6 +139,11 @@ export class ScriptRepository {
     await this.deps.db.runAsync(`UPDATE scripts SET ${sets.join(', ')} WHERE id = ?`, params);
   }
 
+  /** Moving is organization, not editing: `updated_at` (and the "Last edited" sort) is unchanged. */
+  async moveToFolder(id: string, folderId: string | null): Promise<void> {
+    await this.deps.db.runAsync('UPDATE scripts SET folder_id = ? WHERE id = ?', [folderId, id]);
+  }
+
   async markOpened(id: string): Promise<void> {
     await this.deps.db.runAsync('UPDATE scripts SET last_opened_at = ? WHERE id = ?', [this.deps.now(), id]);
   }
@@ -133,7 +151,7 @@ export class ScriptRepository {
   async duplicate(id: string, copySuffix: string): Promise<Script | null> {
     const s = await this.get(id);
     if (!s) return null;
-    return this.create({ title: `${s.title} ${copySuffix}`.trim(), body: s.body });
+    return this.create({ title: `${s.title} ${copySuffix}`.trim(), body: s.body, folderId: s.folderId });
   }
 
   /** Soft delete so an accidental delete can be undone from the snackbar. */
@@ -170,11 +188,152 @@ export class ScriptRepository {
   }
 
   async listVersions(scriptId: string): Promise<ScriptVersionRow[]> {
-    const rows = await this.deps.db.getAllAsync<{ id: string; script_id: string; body: string; source: string; created_at: number }>(
+    const rows = await this.deps.db.getAllAsync<VersionDbRow>(
       'SELECT * FROM script_versions WHERE script_id = ? ORDER BY created_at DESC, rowid DESC',
       [scriptId],
     );
-    return rows.map((r) => ({ id: r.id, scriptId: r.script_id, body: r.body, source: r.source, createdAt: r.created_at }));
+    return rows.map(toVersion);
+  }
+
+  // ----- Backup (export / merge import) -----
+
+  /** Every live (not soft-deleted) script and its versions, oldest first. */
+  async exportAll(): Promise<{ scripts: Script[]; versions: ScriptVersionRow[] }> {
+    const scripts = await this.deps.db.getAllAsync<ScriptRow>('SELECT * FROM scripts WHERE deleted_at IS NULL ORDER BY created_at ASC, rowid ASC', []);
+    const versions = await this.deps.db.getAllAsync<VersionDbRow>(
+      `SELECT v.* FROM script_versions v JOIN scripts s ON s.id = v.script_id
+       WHERE s.deleted_at IS NULL ORDER BY v.created_at ASC, v.rowid ASC`,
+      [],
+    );
+    return { scripts: scripts.map(toScript), versions: versions.map(toVersion) };
+  }
+
+  /** Ids of every stored script and version, including soft-deleted ones, so an import never collides. */
+  async existingIds(): Promise<{ scripts: Map<string, Pick<Script, 'title' | 'body' | 'updatedAt'>>; versions: Set<string> }> {
+    const s = await this.deps.db.getAllAsync<{ id: string; title: string; body: string; updated_at: number }>(
+      'SELECT id, title, body, updated_at FROM scripts',
+      [],
+    );
+    const v = await this.deps.db.getAllAsync<{ id: string }>('SELECT id FROM script_versions', []);
+    return {
+      scripts: new Map(s.map((r) => [r.id, { title: r.title, body: r.body, updatedAt: r.updated_at }])),
+      versions: new Set(v.map((r) => r.id)),
+    };
+  }
+
+  /** Insert an imported script exactly as given (ids are already conflict-free). */
+  async insertImported(s: Script): Promise<void> {
+    await this.deps.db.runAsync(
+      `INSERT INTO scripts (id, title, body, favorite, created_at, updated_at, last_opened_at, folder_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [s.id, s.title, s.body, s.favorite ? 1 : 0, s.createdAt, s.updatedAt, s.lastOpenedAt, s.folderId],
+    );
+  }
+
+  async insertImportedVersion(v: ScriptVersionRow): Promise<void> {
+    await this.deps.db.runAsync('INSERT INTO script_versions (id, script_id, body, source, created_at) VALUES (?, ?, ?, ?, ?)', [
+      v.id,
+      v.scriptId,
+      v.body,
+      v.source,
+      v.createdAt,
+    ]);
+  }
+}
+
+interface VersionDbRow {
+  id: string;
+  script_id: string;
+  body: string;
+  source: string;
+  created_at: number;
+}
+
+const toVersion = (r: VersionDbRow): ScriptVersionRow => ({ id: r.id, scriptId: r.script_id, body: r.body, source: r.source, createdAt: r.created_at });
+
+export interface Folder {
+  id: string;
+  name: string;
+  createdAt: number;
+  sortOrder: number;
+}
+
+export interface FolderWithCount extends Folder {
+  /** Live (not soft-deleted) scripts in the folder. */
+  scriptCount: number;
+}
+
+interface FolderRow {
+  id: string;
+  name: string;
+  created_at: number;
+  sort_order: number;
+}
+
+const toFolder = (r: FolderRow): Folder => ({ id: r.id, name: r.name, createdAt: r.created_at, sortOrder: r.sort_order });
+
+export const FOLDER_NAME_MAX = 40;
+
+/** Trim, collapse whitespace and cap the length of a user-entered folder name. */
+export function normalizeFolderName(name: string): string {
+  return name.replace(/\s+/g, ' ').trim().slice(0, FOLDER_NAME_MAX).trim();
+}
+
+export class FolderRepository {
+  constructor(private readonly deps: Deps) {}
+
+  async create(name: string): Promise<Folder> {
+    const clean = normalizeFolderName(name);
+    if (!clean) throw new Error('Folder name is empty');
+    const max = await this.deps.db.getFirstAsync<{ m: number | null }>('SELECT MAX(sort_order) AS m FROM folders', []);
+    const folder: Folder = { id: this.deps.newId(), name: clean, createdAt: this.deps.now(), sortOrder: (max?.m ?? -1) + 1 };
+    await this.insert(folder);
+    return folder;
+  }
+
+  /** Insert a folder exactly as given (used by import; ids are already conflict-free). */
+  async insert(f: Folder): Promise<void> {
+    await this.deps.db.runAsync('INSERT INTO folders (id, name, created_at, sort_order) VALUES (?, ?, ?, ?)', [f.id, f.name, f.createdAt, f.sortOrder]);
+  }
+
+  async get(id: string): Promise<Folder | null> {
+    const row = await this.deps.db.getFirstAsync<FolderRow>('SELECT * FROM folders WHERE id = ?', [id]);
+    return row ? toFolder(row) : null;
+  }
+
+  async rename(id: string, name: string): Promise<void> {
+    const clean = normalizeFolderName(name);
+    if (!clean) return;
+    await this.deps.db.runAsync('UPDATE folders SET name = ? WHERE id = ?', [clean, id]);
+  }
+
+  /**
+   * Deletes only the folder. Its scripts (including soft-deleted ones awaiting
+   * undo) move to "No folder" first, so no script is ever lost with a folder.
+   */
+  async remove(id: string): Promise<void> {
+    await this.deps.db.runAsync('UPDATE scripts SET folder_id = NULL WHERE folder_id = ?', [id]);
+    await this.deps.db.runAsync('DELETE FROM folders WHERE id = ?', [id]);
+  }
+
+  async list(): Promise<Folder[]> {
+    const rows = await this.deps.db.getAllAsync<FolderRow>('SELECT * FROM folders ORDER BY sort_order ASC, created_at ASC', []);
+    return rows.map(toFolder);
+  }
+
+  async listWithCounts(): Promise<FolderWithCount[]> {
+    const rows = await this.deps.db.getAllAsync<FolderRow & { script_count: number }>(
+      `SELECT f.*, (SELECT COUNT(*) FROM scripts s WHERE s.folder_id = f.id AND s.deleted_at IS NULL) AS script_count
+       FROM folders f ORDER BY f.sort_order ASC, f.created_at ASC`,
+      [],
+    );
+    return rows.map((r) => ({ ...toFolder(r), scriptCount: Number(r.script_count) }));
+  }
+
+  /** Used by "Delete all my data". */
+  async clearAll(): Promise<void> {
+    await this.deps.db.runAsync('UPDATE scripts SET folder_id = NULL WHERE folder_id IS NOT NULL', []);
+    await this.deps.db.runAsync('DELETE FROM folders', []);
   }
 }
 

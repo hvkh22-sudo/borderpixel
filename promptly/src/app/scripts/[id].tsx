@@ -4,15 +4,18 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, AppState, StyleSheet, TextInput, View } from 'react-native';
 
 import { Button } from '../../components/Button';
+import { Chip, folderChoiceActions } from '../../components/FolderChips';
 import { IconButton } from '../../components/IconButton';
+import { NameForm } from '../../components/NameForm';
 import { Screen } from '../../components/Screen';
+import { Sheet, SheetActions } from '../../components/Sheet';
 import { Text } from '../../components/Text';
 import { createHistory, currentText, pushVersion, redo, undo, type VersionHistory } from '../../features/ai-script-studio/studio';
 import { countWords, estimateSpeakingSeconds } from '../../features/voice-follow/text';
 import { formatDuration, t } from '../../localization/i18n';
 import { contentDirectionStyle, flipInRtl } from '../../localization/layoutDirection';
 import { getRepositories } from '../../services/db';
-import { deriveTitle } from '../../storage/repositories';
+import { deriveTitle, type Folder } from '../../storage/repositories';
 import { useSettings } from '../../state/settings';
 import { useTheme } from '../../theme/ThemeProvider';
 import { spacing, typography } from '../../theme/tokens';
@@ -33,6 +36,9 @@ export default function Editor() {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const snapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latest = useRef({ title: '', body: '', dirty: false });
+  const [folderId, setFolderId] = useState<string | null>(null);
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [folderSheet, setFolderSheet] = useState<'pick' | 'new' | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -45,6 +51,10 @@ export default function Editor() {
         return;
       }
       await repos.scripts.markOpened(id);
+      const allFolders = await repos.folders.list();
+      if (!alive) return;
+      setFolders(allFolders);
+      setFolderId(s.folderId);
       setTitle(s.title);
       setBody(s.body);
       latest.current = { title: s.title, body: s.body, dirty: false };
@@ -109,6 +119,24 @@ export default function Editor() {
     onBody(next);
   };
 
+  const openFolderPicker = async () => {
+    setFolders(await (await getRepositories()).folders.list());
+    setFolderSheet('pick');
+  };
+
+  const moveTo = async (next: string | null) => {
+    setFolderSheet(null);
+    await (await getRepositories()).scripts.moveToFolder(id, next);
+    setFolderId(next);
+  };
+
+  const createFolderAndMove = async (name: string) => {
+    const repos = await getRepositories();
+    const f = await repos.folders.create(name);
+    setFolders(await repos.folders.list());
+    await moveTo(f.id);
+  };
+
   const startRecording = async () => {
     if (!body.trim()) {
       Alert.alert(t('editor.emptyRecord'));
@@ -127,6 +155,7 @@ export default function Editor() {
   }
 
   const words = countWords(body);
+  const folderLabel = folders.find((f) => f.id === folderId)?.name ?? t('folders.noFolder');
   // Make sure an in-progress edit is part of history before undoing.
   const pendingSnapshot = () => (currentText(history) !== body ? pushVersion(history, body, 'manual', Date.now()) : history);
 
@@ -166,6 +195,17 @@ export default function Editor() {
         editable={loaded}
         returnKeyType="next"
       />
+      {loaded ? (
+        <View style={styles.chipRow}>
+          <Chip
+            icon="folder-outline"
+            label={folderLabel}
+            accessibilityLabel={t('folders.editorChip', { name: folderLabel })}
+            accessibilityHint={t('folders.editorChipHint')}
+            onPress={() => void openFolderPicker()}
+          />
+        </View>
+      ) : null}
       <Text variant="caption" muted accessibilityLiveRegion="polite">
         {t('editor.stats', { words, duration: formatDuration(estimateSpeakingSeconds(body, wpm)) })} · {saveState === 'saved' ? t('editor.saved') : t('editor.saving')}
       </Text>
@@ -182,6 +222,26 @@ export default function Editor() {
         editable={loaded}
         scrollEnabled
       />
+      <Sheet
+        visible={folderSheet !== null}
+        onClose={() => setFolderSheet(null)}
+        title={folderSheet === 'new' ? t('folders.newFolder') : t('folders.moveTitle', { title: title || t('common.untitled') })}
+      >
+        {folderSheet === 'new' ? (
+          <NameForm
+            placeholder={t('folders.namePlaceholder')}
+            submitLabel={t('folders.create')}
+            cancelLabel={t('common.cancel')}
+            onCancel={() => setFolderSheet(null)}
+            onSubmit={(name) => void createFolderAndMove(name)}
+          />
+        ) : (
+          <SheetActions
+            onCancel={() => setFolderSheet(null)}
+            actions={folderChoiceActions(folders, folderId, (next) => void moveTo(next), () => setFolderSheet('new'))}
+          />
+        )}
+      </Sheet>
     </Screen>
   );
 }
@@ -192,4 +252,5 @@ const styles = StyleSheet.create({
   body: { flex: 1, fontSize: 18, lineHeight: 27 },
   footerRow: { flexDirection: 'row', gap: spacing.md },
   headerActions: { flexDirection: 'row' },
+  chipRow: { flexDirection: 'row' },
 });
