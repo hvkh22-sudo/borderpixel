@@ -23,6 +23,21 @@ Last updated: 2026-10-20 (session 2).
 - Original app icon generated from code (`scripts/generate-icons.py`).
 - AI model comparison harness `server/eval` (dry run only; real run needs approval, ≤ $1.46).
 
+## Night session (2026-10-20/21, autonomous; founder asleep)
+Merged into `claude/youthful-volta-vdsr0x`, each with tests (375+ app tests, 50+ server tests), none device-verified:
+- Script folders, scripts backup export + import (merge without overwrite)
+- Learned speaking rate; recording presets (vertical/landscape/60 fps)
+- Microphone check sheet (expo-audio metering, verdicts, input name)
+- Captions: long takes (Android chunked recognition), word-by-word highlight (Pro, preview + native burn-in), Soft Box + Pop styles
+- Recording reliability: session controller, races, records directly into documents dir, watchdogs
+- Performance: per-paragraph teleprompter rendering, faster aligner, memoized lists, debounced search, faster startup
+- Accessibility pass (labels/actions/contrast/targets/announcements)
+- Bluetooth/keyboard remote (native key capture iOS + Android; record toggle opt-in)
+- AI proxy device integrity (App Attest / Play Integrity, mode `report`)
+- Maestro E2E flows (Android device + iOS simulator), Hebrew founder checklist
+- iOS permission prompts localized (en/he); landing page (en/he) at apps/promptly/
+- Two bug reviews; 9 + (in progress) fixes; two native-module reviews (still never compiled)
+
 ## Next actions (in order)
 1. **Build dev clients** with EAS (`docs/testing/device-poc-runbook.md`) and run the PoC checklist in
    `docs/testing/test-plan.md` §1 on at least one iPhone and one Pixel/Samsung (REC-01..05, VF-01..04).
