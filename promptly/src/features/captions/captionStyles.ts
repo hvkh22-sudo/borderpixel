@@ -3,7 +3,7 @@
  * native burn-in renderer (serialized as plain JSON to the native exporter).
  */
 
-export type CaptionStyleId = 'clean' | 'bold' | 'contrast';
+export type CaptionStyleId = 'clean' | 'softBox' | 'bold' | 'pop' | 'contrast';
 
 export interface CaptionStyle {
   id: CaptionStyleId;
@@ -37,6 +37,19 @@ export const CAPTION_STYLES: Record<CaptionStyleId, CaptionStyle> = {
     uppercase: false,
     highlightColor: null,
   },
+  softBox: {
+    id: 'softBox',
+    nameKey: 'captions.style.softBox',
+    pro: false,
+    fontWeight: '600',
+    fontSizeRatio: 0.056,
+    textColor: '#FFFFFF',
+    backgroundColor: 'rgba(20,20,24,0.72)',
+    strokeColor: null,
+    strokeWidthRatio: 0,
+    uppercase: false,
+    highlightColor: '#FFD43B',
+  },
   bold: {
     id: 'bold',
     nameKey: 'captions.style.bold',
@@ -49,6 +62,19 @@ export const CAPTION_STYLES: Record<CaptionStyleId, CaptionStyle> = {
     strokeWidthRatio: 0.006,
     uppercase: true,
     highlightColor: '#FFD43B',
+  },
+  pop: {
+    id: 'pop',
+    nameKey: 'captions.style.pop',
+    pro: true,
+    fontWeight: '900',
+    fontSizeRatio: 0.074,
+    textColor: '#FFFFFF',
+    backgroundColor: null,
+    strokeColor: '#000000',
+    strokeWidthRatio: 0.008,
+    uppercase: false,
+    highlightColor: '#FFE14D',
   },
   contrast: {
     id: 'contrast',
@@ -64,6 +90,13 @@ export const CAPTION_STYLES: Record<CaptionStyleId, CaptionStyle> = {
     highlightColor: null,
   },
 };
+
+/** Display order in the style picker (free styles first). */
+export const CAPTION_STYLE_ORDER: CaptionStyleId[] = ['clean', 'softBox', 'bold', 'pop', 'contrast'];
+
+export function isCaptionStyleId(v: unknown): v is CaptionStyleId {
+  return typeof v === 'string' && Object.prototype.hasOwnProperty.call(CAPTION_STYLES, v);
+}
 
 /** Vertical position as a fraction of video height (centre of caption block). */
 export type CaptionPosition = 'lower' | 'middle' | 'upper';

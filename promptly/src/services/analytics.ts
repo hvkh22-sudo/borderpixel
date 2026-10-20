@@ -25,7 +25,7 @@ export type AnalyticsEvent =
   | { name: 'captions_failed'; code: TranscriptionErrorCode }
   | { name: 'ai_request'; tool: StudioTool; ok: boolean }
   | { name: 'ai_output_reported'; tool: StudioTool }
-  | { name: 'paywall_viewed'; trigger: 'voiceFollow' | 'captionStyle' | 'general' }
+  | { name: 'paywall_viewed'; trigger: 'voiceFollow' | 'captionStyle' | 'captionWordHighlight' | 'general' }
   | { name: 'purchase_completed'; product: 'monthly' | 'annual' | 'lifetime' | 'credits' }
   | { name: 'purchase_restored'; found: boolean };
 

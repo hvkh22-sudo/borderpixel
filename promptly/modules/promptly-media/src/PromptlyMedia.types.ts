@@ -1,9 +1,21 @@
 /** Contract shared by the iOS (AVFoundation) and Android (Media3) implementations. */
 
+/** Timing of the i-th space-separated token of `NativeCue.text`. */
+export interface NativeWordTiming {
+  startMs: number;
+  endMs: number;
+}
+
 export interface NativeCue {
   startMs: number;
   endMs: number;
   text: string;
+  /**
+   * Optional per-word timing (one per space-separated token of `text`). When
+   * present and the style has a highlightColor, the word being spoken is drawn
+   * in that colour. Natives ignore it when the counts do not match.
+   */
+  words?: NativeWordTiming[];
 }
 
 export interface NativeCaptionStyle {
@@ -14,6 +26,8 @@ export interface NativeCaptionStyle {
   strokeColor: string | null;
   strokeWidthRatio: number;
   uppercase: boolean;
+  /** Colour of the active word when cues carry word timing; null/absent = no highlight. */
+  highlightColor?: string | null;
   /** Vertical centre of the caption block, as a fraction of video height. */
   positionY: number;
 }

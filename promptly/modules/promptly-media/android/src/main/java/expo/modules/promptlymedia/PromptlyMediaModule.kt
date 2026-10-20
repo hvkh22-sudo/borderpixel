@@ -17,8 +17,11 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.text.Layout
+import android.text.SpannableString
+import android.text.Spanned
 import android.text.StaticLayout
 import android.text.TextPaint
+import android.text.style.ForegroundColorSpan
 import androidx.annotation.OptIn
 import androidx.core.os.bundleOf
 import androidx.media3.common.C
@@ -52,10 +55,17 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
+class WordTimingRecord : Record {
+  @Field val startMs: Double = 0.0
+  @Field val endMs: Double = 0.0
+}
+
 class CueRecord : Record {
   @Field val startMs: Double = 0.0
   @Field val endMs: Double = 0.0
   @Field val text: String = ""
+  /** One entry per space-separated token of [text]; optional. */
+  @Field val words: List<WordTimingRecord>? = null
 }
 
 class AudioSegmentRecord : Record {
@@ -71,6 +81,7 @@ class CaptionStyleRecord : Record {
   @Field val strokeColor: String? = null
   @Field val strokeWidthRatio: Double = 0.0
   @Field val uppercase: Boolean = false
+  @Field val highlightColor: String? = null
   @Field val positionY: Double = 0.7
 }
 
@@ -359,7 +370,20 @@ private class CaptionOverlay(
   private val videoWidth: Int,
 ) : BitmapOverlay() {
   private val empty: Bitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
-  private val cache = HashMap<Int, Bitmap>()
+  // Keyed by cue index and highlighted word index (-1 = none).
+  private val cache = HashMap<Pair<Int, Int>, Bitmap>()
+  private val highlight: Int? = style.highlightColor?.let { parseColor(it) }
+
+  /** Last word of the cue that has started (stays lit through pauses), or -1. */
+  private fun wordIndexAt(cue: CueRecord, ms: Double): Int {
+    val words = cue.words ?: return -1
+    if (highlight == null || words.size != cue.text.split(" ").size) return -1
+    var idx = -1
+    for (i in words.indices) {
+      if (words[i].startMs <= ms) idx = i else break
+    }
+    return idx
+  }
 
   private fun cueIndexAt(timeUs: Long): Int {
     val ms = timeUs / 1000.0
@@ -380,9 +404,11 @@ private class CaptionOverlay(
   override fun getBitmap(presentationTimeUs: Long): Bitmap {
     val idx = cueIndexAt(presentationTimeUs)
     if (idx < 0) return empty
-    return cache.getOrPut(idx) { render(cues[idx].text) }.also {
-      // Keep memory bounded on long videos.
-      if (cache.size > 8) cache.keys.filter { it != idx }.take(cache.size - 8).forEach { k -> cache.remove(k) }
+    val word = wordIndexAt(cues[idx], presentationTimeUs / 1000.0)
+    val key = Pair(idx, word)
+    return cache.getOrPut(key) { render(cues[idx].text, word) }.also {
+      // Keep memory bounded on long videos: drop bitmaps of earlier cues first.
+      if (cache.size > 8) cache.keys.filter { it != key }.sortedBy { it.first }.take(cache.size - 8).forEach { k -> cache.remove(k) }
     }
   }
 
@@ -393,7 +419,7 @@ private class CaptionOverlay(
 
   override fun getOverlaySettings(presentationTimeUs: Long): StaticOverlaySettings = settings
 
-  private fun render(raw: String): Bitmap {
+  private fun render(raw: String, highlightWord: Int): Bitmap {
     val text = if (style.uppercase) raw.uppercase() else raw
     val fontSize = (videoWidth * style.fontSizeRatio).toFloat()
     val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -434,7 +460,23 @@ private class CaptionOverlay(
       paint.style = Paint.Style.FILL
       paint.color = fill
     }
-    layout.draw(canvas)
+    val hl = highlight
+    if (hl != null && highlightWord >= 0) {
+      // Fill pass with the active word coloured; the stroke pass above stays plain.
+      // Same text and paint, so this layout's metrics match the stroke layout.
+      val starts = text.split(" ").runningFold(0) { acc, w -> acc + w.length + 1 }
+      val spanned = SpannableString(text)
+      if (highlightWord < starts.size - 1) {
+        val end = min(text.length, starts[highlightWord + 1] - 1)
+        spanned.setSpan(ForegroundColorSpan(hl), starts[highlightWord], end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+      }
+      StaticLayout.Builder.obtain(spanned, 0, spanned.length, paint, maxWidth)
+        .setAlignment(Layout.Alignment.ALIGN_CENTER)
+        .build()
+        .draw(canvas)
+    } else {
+      layout.draw(canvas)
+    }
     canvas.restore()
     return bmp
   }

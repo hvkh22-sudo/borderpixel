@@ -7,7 +7,7 @@ Legend: ✅ verified · 🟡 implemented, not verified on device · ⬜ not star
 |---|---|
 | TypeScript typecheck (app) | ✅ `npm run typecheck` clean |
 | Unit tests (app) | ✅ see `npx jest` (merged: aligner, controller, scroll model, speaking rate, recording presets, captions, entitlements, recording machine, studio, storage + folders + backup merge on real SQLite, i18n en/he parity, platform support) |
-| Screen render tests (Node, mocked native modules, real SQLite) | ✅ Home, Library, Editor (autosave, duration from learned pace), Prepare (Teleprompter, Voice Follow trial, presets → Custom, “Use my pace”), Paywall, Settings, Studio (history restore), Takes, Subscription, Captions (generate → script correction → edit → save; no-speech; Pro gate), Folders (create, move, filter + search, rename, delete keeps scripts, editor chip), Scripts export + import |
+| Screen render tests (Node, mocked native modules, real SQLite) | ✅ Home, Library, Editor (autosave, duration from learned pace), Prepare (Teleprompter, Voice Follow trial, presets → Custom, “Use my pace”), Paywall, Settings, Studio (history restore), Takes, Subscription, Captions (generate → script correction → edit → save; no-speech; Pro style gate; word highlight toggle + Pro gate + edit drops highlight; long-take “Part n of m” + cancel; gap / stopped-early notices), Folders (create, move, filter + search, rename, delete keeps scripts, editor chip), Scripts export + import |
 | JS bundle iOS / Android (`expo export`) | ✅ both bundle (Hermes bytecode) |
 | `expo prebuild` (config plugins, permissions) | ✅ generates projects; Info.plist + manifest permissions verified by inspection |
 | Server typecheck + tests | ✅ 18 tests (incl. eval metrics) (quotas, budget cap, refunds, IP limit, entitlement mapping, validation, prompt wrapping) |
@@ -32,7 +32,10 @@ Legend: ✅ verified · 🟡 implemented, not verified on device · ⬜ not star
 | Overlay absent from recording | ⬜ | **release blocker until proven per platform** |
 | A/V sync (iOS native, Android muxed) | ⬜ | Android mux offset needs clap test |
 | Voice Follow | 🟡 | aligner ✅ (15 scenario tests); live recognition untested |
-| Captions (transcribe, script correction, edit, styles, SRT) | 🟡 | pipeline ✅ tested; transcription untested |
+| Captions (transcribe, script correction, edit, styles, SRT) | 🟡 | pipeline ✅ tested; transcription untested on a device |
+| Long-take captions (≤ ~10 min) | 🟡 | Android: WAV cut in JS into 50 s parts (1 s overlap) via expo-file-system FileHandle, recognized sequentially, merged/de-duplicated (`longTake.ts` ✅ unit-tested; service flow ✅ tested with a fake recognizer + in-memory files). A failed part is reported as a gap, never filled. iOS: single request; takes > 60 s whose last word ends > 3 s before the end show a “captions stop at …” notice (heuristic; trailing silence also triggers it). **No real long take recognized on any device**; Android recognizer restart between parts and FileHandle reads on a 20 MB WAV unverified (CAP-05/06) |
+| Word-by-word highlight (Pro) | 🟡 | per-cue word timing kept only with engine word timing, preserved through split/merge/shift, dropped on text edit; preview ✅ screen-tested. Burn-in: Swift (per-word CATextLayer overlays with discrete opacity) and Kotlin (bitmap per cue+active word, span on fill pass only) **written, never compiled or run** (CAP-07) |
+| Caption styles: Clean, Soft Box (free), Creator Bold, Pop, High Contrast (Pro) | 🟡 | registry ✅ tested; burn-in parity with preview not checked on a device |
 | Caption burn-in | 🟡 | behind `EXPO_PUBLIC_FLAG_BURN_IN=on`; native code uncompiled |
 | AI Script Studio | 🟡 | proxy ✅ tested with mock LLM; no live API call made (no key, approval needed) |
 | Paywall / purchases / restore / lifetime | 🟡 | entitlement logic ✅ tested; no store products |

@@ -17,11 +17,24 @@ export interface TimedWord {
   confidence: number;
 }
 
+/** Measured timing of one word inside a cue (absolute ms in the take). */
+export interface CueWord {
+  text: string;
+  startMs: number;
+  endMs: number;
+}
+
 export interface Cue {
   id: string;
   startMs: number;
   endMs: number;
   text: string;
+  /**
+   * Per-word timing, present only when the recognizer reported real word
+   * timing (never for estimated timing). One entry per space-separated token
+   * of `text`; editing the text drops it. Optional: older saved captions have none.
+   */
+  words?: CueWord[];
 }
 
 /** Recognizer segment as delivered by platform engines (may be a word or a phrase). */
@@ -95,17 +108,21 @@ const CLAUSE_END = /[,;:—–]$/;
 export function segmentWords(words: TimedWord[], opts: SegmentationOptions = VERTICAL_SEGMENTATION): Cue[] {
   const cues: Cue[] = [];
   let current: TimedWord[] = [];
+  // Word timings are kept only when every word was timed by the engine.
+  const keepWords = hasWordLevelTiming(words) && words.every((w) => !/\s/.test(w.text.trim()) && w.text.trim().length > 0);
 
   const flush = () => {
     if (current.length === 0) return;
     const first = current[0]!;
     const last = current[current.length - 1]!;
-    cues.push({
+    const cue: Cue = {
       id: `c${cues.length + 1}`,
       startMs: first.startMs,
       endMs: Math.max(last.endMs, first.startMs + opts.minDurationMs),
       text: current.map((w) => w.text).join(' '),
-    });
+    };
+    if (keepWords) cue.words = current.map((w) => ({ text: w.text, startMs: w.startMs, endMs: w.endMs }));
+    cues.push(cue);
     current = [];
   };
 
@@ -223,8 +240,46 @@ function preservePunctuation(recognized: string, scriptWord: string, script: str
 
 // ---------- Editing operations (immutable) ----------
 
+/** Editing a cue's text invalidates its word timings (no highlight for that cue). */
 export function updateCueText(cues: Cue[], id: string, text: string): Cue[] {
-  return cues.map((c) => (c.id === id ? { ...c, text: text.replace(/\s+/g, ' ').trim() } : c));
+  return cues.map((c) => {
+    if (c.id !== id) return c;
+    const next = text.replace(/\s+/g, ' ').trim();
+    if (next === c.text) return c;
+    const { words: _dropped, ...rest } = c;
+    return { ...rest, text: next };
+  });
+}
+
+/** True when the cue's word timings still line up 1:1 with its text tokens. */
+export function cueHasWordTiming(cue: Cue): cue is Cue & { words: CueWord[] } {
+  return !!cue.words && cue.words.length > 0 && cue.words.length === cue.text.split(' ').length;
+}
+
+/**
+ * Index of the word to highlight at `timeMs`: the last word that has started.
+ * Between words the previous one stays lit (avoids flicker). -1 before the
+ * first word or when the cue has no valid word timing.
+ */
+export function activeWordIndex(cue: Cue, timeMs: number): number {
+  if (!cueHasWordTiming(cue)) return -1;
+  let idx = -1;
+  for (let i = 0; i < cue.words.length; i++) {
+    if (cue.words[i]!.startMs <= timeMs) idx = i;
+    else break;
+  }
+  return idx;
+}
+
+/** Drops malformed word timing from untrusted (saved) cue JSON. */
+export function sanitizeCue(raw: Cue): Cue {
+  const { words, ...rest } = raw;
+  const ok =
+    Array.isArray(words) &&
+    words.every((w) => w && typeof w.text === 'string' && Number.isFinite(w.startMs) && Number.isFinite(w.endMs));
+  const cue: Cue = { ...rest };
+  if (ok && words!.length > 0) cue.words = words!.map((w) => ({ text: w.text, startMs: w.startMs, endMs: w.endMs }));
+  return cueHasWordTiming(cue) ? cue : { ...rest };
 }
 
 export function deleteCue(cues: Cue[], id: string): Cue[] {
@@ -241,16 +296,22 @@ export function retimeCue(cues: Cue[], id: string, startMs: number, endMs: numbe
   const e = Math.min(nextStart, Math.round(endMs));
   if (e - s < 100) return cues;
   const next = [...cues];
-  next[i] = { ...cues[i]!, startMs: s, endMs: e };
+  const old = cues[i]!;
+  const d = s - old.startMs;
+  next[i] = { ...old, startMs: s, endMs: e, ...(old.words ? { words: shiftWords(old.words, d) } : {}) };
   return next;
 }
 
 /** Shift every cue by a constant offset (fixes global A/V caption drift). */
 export function shiftAll(cues: Cue[], deltaMs: number): Cue[] {
   return cues
-    .map((c) => ({ ...c, startMs: c.startMs + deltaMs, endMs: c.endMs + deltaMs }))
+    .map((c) => ({ ...c, startMs: c.startMs + deltaMs, endMs: c.endMs + deltaMs, ...(c.words ? { words: shiftWords(c.words, deltaMs) } : {}) }))
     .filter((c) => c.endMs > 0)
     .map((c) => ({ ...c, startMs: Math.max(0, c.startMs) }));
+}
+
+function shiftWords(words: CueWord[], deltaMs: number): CueWord[] {
+  return words.map((w) => ({ ...w, startMs: Math.max(0, w.startMs + deltaMs), endMs: Math.max(0, w.endMs + deltaMs) }));
 }
 
 export function mergeWithNext(cues: Cue[], id: string): Cue[] {
@@ -259,6 +320,7 @@ export function mergeWithNext(cues: Cue[], id: string): Cue[] {
   const a = cues[i]!;
   const b = cues[i + 1]!;
   const merged: Cue = { id: a.id, startMs: a.startMs, endMs: b.endMs, text: `${a.text} ${b.text}` };
+  if (cueHasWordTiming(a) && cueHasWordTiming(b)) merged.words = [...a.words, ...b.words];
   return [...cues.slice(0, i), merged, ...cues.slice(i + 2)];
 }
 
@@ -271,16 +333,22 @@ export function splitCue(cues: Cue[], id: string, atWord: number): Cue[] {
   if (atWord <= 0 || atWord >= words.length) return cues;
   const left = words.slice(0, atWord).join(' ');
   const right = words.slice(atWord).join(' ');
-  const splitMs = Math.round(c.startMs + ((c.endMs - c.startMs) * left.length) / (left.length + right.length));
+  const timed = cueHasWordTiming(c);
+  // With measured word timing, split exactly where the right-hand word starts.
+  const splitMs = timed
+    ? Math.min(c.endMs - 1, Math.max(c.startMs + 1, c.words[atWord]!.startMs))
+    : Math.round(c.startMs + ((c.endMs - c.startMs) * left.length) / (left.length + right.length));
   const usedIds = new Set(cues.map((x) => x.id));
   let n = cues.length + 1;
   while (usedIds.has(`c${n}`)) n++;
-  return [
-    ...cues.slice(0, i),
-    { ...c, endMs: splitMs, text: left },
-    { id: `c${n}`, startMs: splitMs, endMs: c.endMs, text: right },
-    ...cues.slice(i + 1),
-  ];
+  const { words: _w, ...base } = c;
+  const leftCue: Cue = { ...base, endMs: splitMs, text: left };
+  const rightCue: Cue = { id: `c${n}`, startMs: splitMs, endMs: c.endMs, text: right };
+  if (timed) {
+    leftCue.words = c.words.slice(0, atWord);
+    rightCue.words = c.words.slice(atWord);
+  }
+  return [...cues.slice(0, i), leftCue, rightCue, ...cues.slice(i + 1)];
 }
 
 export function cueAt(cues: Cue[], timeMs: number): Cue | undefined {

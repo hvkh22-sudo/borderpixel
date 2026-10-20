@@ -28,13 +28,16 @@
 | CAP-02 | No speech take | "We didn't hear any speech" shown; no fabricated text |
 | CAP-03 | Burn-in | Captioned MP4 matches preview style/position; original unchanged |
 | CAP-04 | SRT | Opens in a subtitle editor; timings match |
+| CAP-05 | Android 10-min take | Shows “Part n of 13”; captions cover the whole take with no doubled or missing words at each ~49 s boundary; Cancel stops within one part; temp WAV parts deleted from cache |
+| CAP-06 | iOS 5–10 min take | Either full captions, or the “captions stop at …” notice when recognition ends early — never invented text; no notice on a take that simply ends in < 3 s of silence |
+| CAP-07 | Word highlight (Pro) | Preview and burned-in MP4 light the spoken word in the style’s highlight colour (Soft Box, Creator Bold, Pop) on both platforms; edited cues render without highlight; free user is sent to the paywall |
 | PUR-01..12 | Sandbox purchases | monthly, annual, lifetime, cancel, decline, pending (Ask to Buy), expiry, renewal, refund, restore, sub→lifetime, offline after purchase, reinstall |
 | AI-01 | Studio happy path | Each tool returns a draft; version history keeps original |
 | AI-02 | Quota / offline / provider error | Correct messages; quota not charged on failure |
 | A11Y-01 | VoiceOver + TalkBack | Full core journey operable |
 
 ## 2. Unit coverage map
-aligner (15), voiceFollowController (3), scrollModel (6), captions (16), entitlements (11),
+aligner (15), voiceFollowController (3), scrollModel (6), captions (27), longTake (14), burnIn (2), transcription service (4), entitlements (11),
 recordingMachine (7), studio (6), repositories (7), i18n (3); server handler/prompts/validation/
 entitlements (16).
 

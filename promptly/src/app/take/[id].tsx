@@ -8,11 +8,14 @@ import { Button } from '../../components/Button';
 import { Screen } from '../../components/Screen';
 import { Text } from '../../components/Text';
 import { CaptionPreview } from '../../features/captions/CaptionPreview';
-import { cueAt } from '../../features/captions/captions';
+import { activeWordIndex, cueAt } from '../../features/captions/captions';
+import { checkFeature } from '../../features/monetization/entitlements';
 import { useFocusData } from '../../hooks/useAsyncData';
 import { formatClock, t } from '../../localization/i18n';
 import { getRepositories } from '../../services/db';
 import { deleteRecordingFile, recordingFile } from '../../services/files';
+import { useAccess } from '../../state/access';
+import { useSettings } from '../../state/settings';
 import { radius, spacing } from '../../theme/tokens';
 
 export default function Take() {
@@ -26,6 +29,10 @@ export default function Take() {
   });
   const time = useEvent(player, 'timeUpdate', { currentTime: 0, currentLiveTimestamp: null, currentOffsetFromLive: null, bufferedPosition: 0 });
   const [frameWidth, setFrameWidth] = useState(300);
+  const wordHighlight = useSettings((s) => s.captionWordHighlight);
+  const access = useAccess((s) => s.access);
+  const usage = useAccess((s) => s.usage);
+  const highlightOn = wordHighlight && checkFeature('captionWordHighlight', access, usage).allowed;
 
   useEffect(() => {
     if (exists) player.play();
@@ -71,7 +78,7 @@ export default function Take() {
         {exists ? (
           <>
             <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="contain" nativeControls />
-            {rec.cues && rec.captionStyle ? <CaptionPreview text={activeCue?.text ?? null} styleId={rec.captionStyle} position={rec.captionPosition} frameWidth={frameWidth} /> : null}
+            {rec.cues && rec.captionStyle ? <CaptionPreview text={activeCue?.text ?? null} styleId={rec.captionStyle} position={rec.captionPosition} frameWidth={frameWidth} activeWord={highlightOn && activeCue ? activeWordIndex(activeCue, time.currentTime * 1000) : -1} /> : null}
           </>
         ) : (
           <Text center color="#fff">

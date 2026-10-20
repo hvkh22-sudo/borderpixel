@@ -1,7 +1,9 @@
 import {
   Cue,
   TimedWord,
+  activeWordIndex,
   assessTranscript,
+  cueHasWordTiming,
   correctWithScript,
   cueAt,
   estimateWordsFromTranscript,
@@ -13,10 +15,12 @@ import {
   segmentWords,
   segmentsToWords,
   shiftAll,
+  sanitizeCue,
   splitCue,
   toSrt,
   updateCueText,
 } from '../captions';
+import { CAPTION_STYLE_ORDER, CAPTION_STYLES, isCaptionStyleId } from '../captionStyles';
 
 function words(text: string, startMs = 0, wordMs = 300, gapMs = 50): TimedWord[] {
   let t = startMs;
@@ -169,5 +173,105 @@ describe('estimateWordsFromTranscript', () => {
     expect(w[2]!.endMs).toBe(3000);
     expect(hasWordLevelTiming(w)).toBe(false);
     expect(estimateWordsFromTranscript('', 0, 1000)).toEqual([]);
+  });
+});
+
+describe('word timing', () => {
+  const timed = (): Cue[] => segmentWords(words('one two three. four five six'));
+
+  it('keeps per-cue word timing only when every word was timed by the engine', () => {
+    const cues = timed();
+    expect(cues.map((c) => c.text)).toEqual(['one two three.', 'four five six']);
+    expect(cues[0]!.words).toEqual([
+      { text: 'one', startMs: 0, endMs: 300 },
+      { text: 'two', startMs: 350, endMs: 650 },
+      { text: 'three.', startMs: 700, endMs: 1000 },
+    ]);
+    expect(cues.every(cueHasWordTiming)).toBe(true);
+    const estimated = segmentWords(estimateWordsFromTranscript('one two three', 0, 3000));
+    expect(estimated[0]!.words).toBeUndefined();
+  });
+
+  it('survives script correction (text changes, timing kept)', () => {
+    const fixed = correctWithScript(words('right your scrip'), 'Write your script');
+    const cues = segmentWords(fixed);
+    expect(cues[0]!.text).toBe('right your script');
+    expect(cues[0]!.words!.map((w) => w.text)).toEqual(['right', 'your', 'script']);
+  });
+
+  it('is dropped when the cue text is edited, and kept on a no-op edit', () => {
+    const cues = timed();
+    expect(updateCueText(cues, 'c1', 'one  two three.')[0]!.words).toHaveLength(3);
+    const edited = updateCueText(cues, 'c1', 'one, two, three!');
+    expect(edited[0]!.words).toBeUndefined();
+    expect(edited[1]!.words).toHaveLength(3);
+  });
+
+  it('splits at the measured word boundary and keeps words on both halves', () => {
+    const split = splitCue(timed(), 'c1', 1);
+    expect(split[0]).toMatchObject({ text: 'one', endMs: 350 });
+    expect(split[1]).toMatchObject({ text: 'two three.', startMs: 350 });
+    expect(split[0]!.words!.map((w) => w.text)).toEqual(['one']);
+    expect(split[1]!.words!.map((w) => w.text)).toEqual(['two', 'three.']);
+  });
+
+  it('merges word timing only when both cues still have it', () => {
+    const cues = timed();
+    expect(mergeWithNext(cues, 'c1')[0]!.words).toHaveLength(6);
+    expect(mergeWithNext(updateCueText(cues, 'c2', 'changed'), 'c1')[0]!.words).toBeUndefined();
+  });
+
+  it('moves word timing with shifts and retiming', () => {
+    const cues = timed();
+    expect(shiftAll(cues, 200)[0]!.words![0]).toMatchObject({ startMs: 200, endMs: 500 });
+    const retimed = retimeCue(cues, 'c2', cues[1]!.startMs + 100, cues[1]!.endMs + 100);
+    expect(retimed[1]!.words![0]!.startMs).toBe(cues[1]!.words![0]!.startMs + 100);
+  });
+
+  it('selects the active word, holding the previous one through pauses', () => {
+    const cue = timed()[0]!;
+    expect(activeWordIndex(cue, -1)).toBe(-1);
+    expect(activeWordIndex(cue, 0)).toBe(0);
+    expect(activeWordIndex(cue, 320)).toBe(0); // gap between "one" and "two"
+    expect(activeWordIndex(cue, 400)).toBe(1);
+    expect(activeWordIndex(cue, 5000)).toBe(2);
+    expect(activeWordIndex({ ...cue, words: undefined }, 400)).toBe(-1);
+    expect(activeWordIndex({ ...cue, text: 'mismatched text' }, 400)).toBe(-1);
+  });
+
+  it('loads old saved cues (no words) and drops malformed word timing', () => {
+    const old = { id: 'c1', startMs: 0, endMs: 1000, text: 'hi there' };
+    expect(sanitizeCue(old)).toEqual(old);
+    const bad = { ...old, words: [{ text: 'hi', startMs: 'x', endMs: 1 }] } as unknown as Cue;
+    expect(sanitizeCue(bad).words).toBeUndefined();
+    const ok: Cue = { ...old, words: [{ text: 'hi', startMs: 0, endMs: 400 }, { text: 'there', startMs: 450, endMs: 900 }] };
+    expect(sanitizeCue(JSON.parse(JSON.stringify(ok)))).toEqual(ok);
+  });
+});
+
+describe('caption style registry', () => {
+  it('lists every style exactly once with a consistent shape', () => {
+    expect([...CAPTION_STYLE_ORDER].sort()).toEqual(Object.keys(CAPTION_STYLES).sort());
+    for (const id of CAPTION_STYLE_ORDER) {
+      const s = CAPTION_STYLES[id];
+      expect(s.id).toBe(id);
+      expect(s.nameKey).toBe(`captions.style.${id}`);
+      expect(s.fontSizeRatio).toBeGreaterThan(0.04);
+      expect(s.fontSizeRatio).toBeLessThan(0.08);
+      if (s.strokeColor) expect(s.strokeWidthRatio).toBeGreaterThan(0);
+    }
+  });
+
+  it('keeps the set small: two free styles, the rest Pro', () => {
+    expect(CAPTION_STYLE_ORDER.filter((id) => !CAPTION_STYLES[id].pro)).toEqual(['clean', 'softBox']);
+    expect(CAPTION_STYLES.pop).toMatchObject({ pro: true, strokeColor: '#000000', textColor: '#FFFFFF' });
+    expect(CAPTION_STYLES.pop.highlightColor).toBeTruthy();
+    expect(CAPTION_STYLES.softBox.backgroundColor).toMatch(/^rgba\(/);
+  });
+
+  it('validates stored style ids', () => {
+    expect(isCaptionStyleId('pop')).toBe(true);
+    expect(isCaptionStyleId('toString')).toBe(false);
+    expect(isCaptionStyleId(null)).toBe(false);
   });
 });

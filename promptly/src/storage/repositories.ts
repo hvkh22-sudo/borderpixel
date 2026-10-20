@@ -1,5 +1,5 @@
-import type { Cue } from '../features/captions/captions';
-import type { CaptionPosition, CaptionStyleId } from '../features/captions/captionStyles';
+import { sanitizeCue, type Cue } from '../features/captions/captions';
+import { isCaptionStyleId, type CaptionPosition, type CaptionStyleId } from '../features/captions/captionStyles';
 import type { SqlExecutor, SqlValue } from './sql';
 
 export interface Script {
@@ -373,7 +373,7 @@ function parseCues(json: string | null): Cue[] | null {
   if (!json) return null;
   try {
     const v = JSON.parse(json) as unknown;
-    return Array.isArray(v) ? (v as Cue[]) : null;
+    return Array.isArray(v) ? (v as Cue[]).map(sanitizeCue) : null;
   } catch {
     return null;
   }
@@ -388,7 +388,7 @@ const toRecording = (r: RecordingRow): Recording => ({
   height: r.height,
   createdAt: r.created_at,
   cues: parseCues(r.captions_json),
-  captionStyle: (r.caption_style as CaptionStyleId | null) ?? null,
+  captionStyle: isCaptionStyleId(r.caption_style) ? r.caption_style : null,
   captionPosition: r.caption_position === 'upper' || r.caption_position === 'middle' ? r.caption_position : 'lower',
   savedToLibrary: r.saved_to_library === 1,
   status: r.status === 'recovered' ? 'recovered' : 'ready',

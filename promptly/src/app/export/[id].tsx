@@ -9,14 +9,17 @@ import { Button } from '../../components/Button';
 import { ListRow } from '../../components/ListRow';
 import { Screen } from '../../components/Screen';
 import { Text } from '../../components/Text';
+import { burnInPayload } from '../../features/captions/burnIn';
 import { toSrt } from '../../features/captions/captions';
-import { CAPTION_POSITION_Y, CAPTION_STYLES } from '../../features/captions/captionStyles';
+import { checkFeature } from '../../features/monetization/entitlements';
 import { t } from '../../localization/i18n';
 import { track } from '../../services/analytics';
 import { support } from '../../services/deviceSupport';
 import { getRepositories } from '../../services/db';
 import { exportsDir, recordingFile } from '../../services/files';
 import { PromptlyMedia, type Job } from '../../services/nativeMedia';
+import { useAccess } from '../../state/access';
+import { useSettings } from '../../state/settings';
 import type { Recording } from '../../storage/repositories';
 import { useTheme } from '../../theme/ThemeProvider';
 import { spacing } from '../../theme/tokens';
@@ -31,6 +34,10 @@ export default function ExportScreen() {
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
   const jobRef = useRef<Job<string> | null>(null);
   const burnInAvailable = support.burnIn().ok;
+  const access = useAccess((s) => s.access);
+  const usage = useAccess((s) => s.usage);
+  const wordHighlight = useSettings((s) => s.captionWordHighlight);
+  const highlightOn = wordHighlight && checkFeature('captionWordHighlight', access, usage).allowed;
 
   useEffect(() => {
     void getRepositories().then((r) => r.recordings.get(id).then((x) => {
@@ -47,21 +54,12 @@ export default function ExportScreen() {
   /** Returns the file to export: original, or a captioned copy (original untouched). */
   const prepareVideo = async (): Promise<string> => {
     if (!burnIn || !hasCaptions || !burnInAvailable) return source.uri;
-    const style = CAPTION_STYLES[rec.captionStyle ?? 'clean'];
+    const payload = burnInPayload(rec.cues!, rec.captionStyle ?? 'clean', rec.captionPosition, highlightOn);
     setStatus({ kind: 'rendering', progress: 0 });
     const job = PromptlyMedia.burnInCaptions(
       source.uri,
-      rec.cues!.map(({ startMs, endMs, text }) => ({ startMs, endMs, text })),
-      {
-        fontWeight: style.fontWeight,
-        fontSizeRatio: style.fontSizeRatio,
-        textColor: style.textColor,
-        backgroundColor: style.backgroundColor,
-        strokeColor: style.strokeColor,
-        strokeWidthRatio: style.strokeWidthRatio,
-        uppercase: style.uppercase,
-        positionY: CAPTION_POSITION_Y[rec.captionPosition],
-      },
+      payload.cues,
+      payload.style,
       (progress) => setStatus({ kind: 'rendering', progress }),
     );
     jobRef.current = job;

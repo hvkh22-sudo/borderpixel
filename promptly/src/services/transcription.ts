@@ -9,13 +9,32 @@
  * with the on-device Google service only; otherwise timing is estimated and
  * flagged so word highlighting is not offered.
  *
+ * Long takes: on Android the WAV is split into ~50 s chunks (1 s overlap) in
+ * JS and recognized one after another, then merged on the take's timeline
+ * (see features/captions/longTake.ts). A chunk that fails is reported as a
+ * gap, never filled in. On iOS a single request is kept; if it ends well
+ * before the take does, the uncovered tail is reported as a gap.
+ *
  * No audio leaves the device unless requiresOnDevice is false AND the user
  * explicitly opted in to cloud recognition (not offered in v1).
  */
+import { File, FileMode } from 'expo-file-system';
 import { AudioEncodingAndroid, AudioSourceOptions, ExpoSpeechRecognitionModule } from 'expo-speech-recognition';
 import { Platform } from 'react-native';
 
 import { RecognizedSegment } from '../features/captions/captions';
+import {
+  chunkByteRange,
+  detectPrematureEnd,
+  mergeChunkResults,
+  offsetSegments,
+  parseWavHeader,
+  planChunks,
+  wavDurationMs,
+  wavHeader,
+  type ChunkResult,
+  type TranscriptGap,
+} from '../features/captions/longTake';
 import { PromptlyMedia } from './nativeMedia';
 
 export type TranscriptionErrorCode =
@@ -35,24 +54,99 @@ export class TranscriptionError extends Error {
 export interface TranscriptionResult {
   segments: RecognizedSegment[];
   transcript: string;
+  /** Parts of the take the engine did not cover (stopped early or failed). */
+  gaps?: TranscriptGap[];
 }
 
-export async function transcribeRecording(
-  videoUri: string,
-  locale: string,
-  signal?: AbortSignal,
-): Promise<TranscriptionResult> {
-  let audioSource: AudioSourceOptions = { uri: videoUri };
-  if (Platform.OS === 'android') {
-    if (!PromptlyMedia.isAvailable()) throw new TranscriptionError('unsupported_device', 'promptly-media module missing');
-    const wav = await PromptlyMedia.extractAudioToWav(videoUri, 16_000);
-    audioSource = {
-      uri: wav.uri,
-      sampleRate: wav.sampleRate,
-      audioChannels: 1,
-      audioEncoding: AudioEncodingAndroid.ENCODING_PCM_16BIT,
-    };
+export interface TranscriptionOptions {
+  signal?: AbortSignal;
+  /** Take duration, used to detect a premature end on iOS. */
+  durationMs?: number;
+  /** Called before each part is recognized (1-based). */
+  onProgress?: (part: number, total: number) => void;
+}
+
+const IOS_PREMATURE_CHECK_MIN_MS = 60_000;
+
+export async function transcribeRecording(videoUri: string, locale: string, opts: TranscriptionOptions = {}): Promise<TranscriptionResult> {
+  const { signal, durationMs = 0, onProgress } = opts;
+  if (Platform.OS !== 'android') {
+    onProgress?.(1, 1);
+    const result = await recognize({ uri: videoUri }, locale, signal);
+    // Short takes often end in silence; only long ones risk the engine giving up.
+    const gap = durationMs > IOS_PREMATURE_CHECK_MIN_MS ? detectPrematureEnd(result.segments, durationMs) : null;
+    return gap ? { ...result, gaps: [gap] } : result;
   }
+  if (!PromptlyMedia.isAvailable()) throw new TranscriptionError('unsupported_device', 'promptly-media module missing');
+  const wav = await PromptlyMedia.extractAudioToWav(videoUri, 16_000);
+  const wavFile = new File(wav.uri);
+  const handle = wavFile.open(FileMode.ReadOnly);
+  try {
+    const fmt = parseWavHeader(await handle.readBytes(256), handle.size ?? 0);
+    const plans = planChunks(wavDurationMs(fmt));
+    const results: ChunkResult[] = [];
+    const transcripts: string[] = [];
+    const gaps: TranscriptGap[] = [];
+    let firstError: TranscriptionError | null = null;
+    for (const plan of plans) {
+      if (signal?.aborted) throw new TranscriptionError('cancelled');
+      onProgress?.(plan.index + 1, plans.length);
+      // Each part is cut from the full WAV just before it is recognized, then deleted.
+      let part: File | null = null;
+      if (plans.length > 1) {
+        const { offset, length } = chunkByteRange(plan, fmt);
+        handle.offset = offset;
+        const pcm = await handle.readBytes(length);
+        const bytes = new Uint8Array(44 + pcm.length);
+        bytes.set(wavHeader(pcm.length, fmt.sampleRate, fmt.channels, fmt.bitsPerSample), 0);
+        bytes.set(pcm, 44);
+        part = new File(wav.uri.replace(/\.wav$/, `_part${plan.index + 1}.wav`));
+        await part.write(bytes);
+      }
+      const source: AudioSourceOptions = {
+        uri: part?.uri ?? wav.uri,
+        sampleRate: fmt.sampleRate,
+        audioChannels: fmt.channels,
+        audioEncoding: AudioEncodingAndroid.ENCODING_PCM_16BIT,
+      };
+      try {
+        const r = await recognize(source, locale, signal);
+        // A part with text but no timing becomes one estimated phrase spanning the part.
+        const segs = r.segments.length || !r.transcript || plans.length === 1 ? r.segments : [{ text: r.transcript, startMs: 0, endMs: plan.endMs - plan.startMs, confidence: -1 }];
+        results.push({ startMs: plan.startMs, endMs: plan.endMs, segments: offsetSegments(segs, plan.startMs) });
+        if (r.transcript) transcripts.push(r.transcript);
+      } catch (e) {
+        const err = e instanceof TranscriptionError ? e : new TranscriptionError('failed', (e as Error).message);
+        if (err.code === 'cancelled' || err.code === 'permission_denied' || err.code === 'language_not_supported') throw err;
+        // Silence in one part is normal; a failed part is reported as a gap, never filled in.
+        if (err.code !== 'no_speech') {
+          firstError ??= err;
+          gaps.push({ startMs: plan.startMs, endMs: plan.endMs, reason: 'failed' });
+        }
+      } finally {
+        if (part) safeDelete(part);
+      }
+    }
+    const segments = mergeChunkResults(results);
+    if (segments.length === 0 && transcripts.length === 0) throw firstError ?? new TranscriptionError('no_speech');
+    return { segments, transcript: transcripts.join(' '), ...(gaps.length ? { gaps } : {}) };
+  } finally {
+    handle.close();
+    safeDelete(wavFile);
+  }
+}
+
+function safeDelete(f: File) {
+  try {
+    if (f.exists) f.delete();
+  } catch {
+    // Cache file; the OS reclaims it if deletion fails.
+  }
+}
+
+/** One recognizer session over one audio source. */
+function recognize(audioSource: AudioSourceOptions, locale: string, signal?: AbortSignal): Promise<TranscriptionResult> {
+  if (signal?.aborted) return Promise.reject(new TranscriptionError('cancelled'));
 
   return new Promise<TranscriptionResult>((resolve, reject) => {
     const segments: RecognizedSegment[] = [];
@@ -66,6 +160,7 @@ export async function transcribeRecording(
       if (settled) return;
       settled = true;
       subs.forEach((s) => s.remove());
+      signal?.removeEventListener('abort', onAbort);
       fn();
     };
 
@@ -113,10 +208,11 @@ export async function transcribeRecording(
       }),
     ];
 
-    signal?.addEventListener('abort', () => {
+    const onAbort = () => {
       ExpoSpeechRecognitionModule.abort();
       finish(() => reject(new TranscriptionError('cancelled')));
-    });
+    };
+    signal?.addEventListener('abort', onAbort);
 
     try {
       ExpoSpeechRecognitionModule.start({

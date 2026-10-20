@@ -19,6 +19,9 @@ import { radius, spacing } from '../theme/tokens';
 
 type PlanKey = 'monthly' | 'annual' | 'lifetime';
 
+const KNOWN_TRIGGERS = ['voiceFollow', 'captionStyle', 'captionWordHighlight'] as const;
+const isKnownTrigger = (v: string | undefined): v is (typeof KNOWN_TRIGGERS)[number] => (KNOWN_TRIGGERS as readonly (string | undefined)[]).includes(v);
+
 export default function Paywall() {
   const { trigger } = useLocalSearchParams<{ trigger?: string }>();
   const { colors } = useTheme();
@@ -31,7 +34,7 @@ export default function Paywall() {
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    track({ name: 'paywall_viewed', trigger: trigger === 'voiceFollow' || trigger === 'captionStyle' ? trigger : 'general' });
+    track({ name: 'paywall_viewed', trigger: isKnownTrigger(trigger) ? trigger : 'general' });
     fetchPackages()
       .then((p) => {
         setPackages(p);
@@ -79,7 +82,7 @@ export default function Paywall() {
     }
   };
 
-  const triggerKey = trigger === 'voiceFollow' || trigger === 'captionStyle' ? (`paywall.trigger.${trigger}` as TKey) : null;
+  const triggerKey = isKnownTrigger(trigger) ? (`paywall.trigger.${trigger}` as TKey) : null;
   const benefits: string[] = [
     t('paywall.benefit1'),
     t('paywall.benefit2'),

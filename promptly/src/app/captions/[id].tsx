@@ -10,8 +10,11 @@ import { ListRow } from '../../components/ListRow';
 import { Segmented } from '../../components/Segmented';
 import { Text } from '../../components/Text';
 import { CaptionPreview } from '../../features/captions/CaptionPreview';
+import { CaptionStylePicker } from '../../features/captions/CaptionStylePicker';
 import {
+  activeWordIndex,
   assessTranscript,
+  cueHasWordTiming,
   correctWithScript,
   cueAt,
   deleteCue,
@@ -59,6 +62,9 @@ export default function CaptionsEditor() {
   const [position, setPosition] = useState<CaptionPosition>(() => useSettings.getState().captionPosition);
   const [useScript, setUseScript] = useState(true);
   const [frameWidth, setFrameWidth] = useState(200);
+  const [part, setPart] = useState<{ n: number; total: number } | null>(null);
+  const wordHighlight = useSettings((s) => s.captionWordHighlight);
+  const highlightAllowed = checkFeature('captionWordHighlight', access, usage).allowed;
   const abortRef = useRef<AbortController | null>(null);
 
   const uri = rec ? recordingFile(rec.fileName).uri : null;
@@ -87,14 +93,20 @@ export default function CaptionsEditor() {
     if (!uri || !rec) return;
     setPhase('working');
     setErrorKey(null);
+    setPart(null);
     const started = Date.now();
     try {
       if (!(await ensureSpeechPermission())) throw new TranscriptionError('permission_denied');
       abortRef.current = new AbortController();
-      const result = await transcribeRecording(uri, speechLocale, abortRef.current.signal);
+      const durationMs = rec.durationMs || player.duration * 1000;
+      const result = await transcribeRecording(uri, speechLocale, {
+        signal: abortRef.current.signal,
+        durationMs,
+        onProgress: (n, total) => setPart({ n, total }),
+      });
       let words = segmentsToWords(result.segments);
       if (words.length === 0 && result.transcript) {
-        words = estimateWordsFromTranscript(result.transcript, 0, rec.durationMs || player.duration * 1000);
+        words = estimateWordsFromTranscript(result.transcript, 0, durationMs);
       }
       if (useScript && scriptBody) words = correctWithScript(words, scriptBody);
       const quality = assessTranscript(words);
@@ -102,6 +114,14 @@ export default function CaptionsEditor() {
       const n: string[] = [];
       if (!hasWordLevelTiming(words)) n.push(t('captions.estimatedTiming'));
       if (quality.lowConfidenceRatio > 0.2) n.push(t('captions.lowConfidence'));
+      // Missing parts are reported, never filled in.
+      for (const g of result.gaps ?? []) {
+        n.push(
+          g.reason === 'stopped_early'
+            ? t('captions.partialEnd', { at: formatClock(g.startMs) })
+            : t('captions.gap', { from: formatClock(g.startMs), to: formatClock(g.endMs) }),
+        );
+      }
       setNotes(n);
       setCues(segmentWords(words));
       setPhase('ready');
@@ -122,12 +142,28 @@ export default function CaptionsEditor() {
     setStyleId(s);
   };
 
+  const toggleHighlight = (v: boolean) => {
+    if (v && !highlightAllowed) {
+      router.push('/paywall?trigger=captionWordHighlight');
+      return;
+    }
+    useSettings.getState().set({ captionWordHighlight: v });
+  };
+
   const save = async () => {
     await (await getRepositories()).recordings.saveCaptions(id, cues, styleId, position);
     router.back();
   };
 
-  const active = cueAt(cues, time.currentTime * 1000);
+  const nowMs = time.currentTime * 1000;
+  const active = cueAt(cues, nowMs);
+  const highlightOn = wordHighlight && highlightAllowed;
+  const anyWordTiming = cues.some(cueHasWordTiming);
+  const highlightHint = !CAPTION_STYLES[styleId].highlightColor
+    ? t('captions.wordHighlightHint')
+    : anyWordTiming && !cues.every(cueHasWordTiming)
+      ? t('captions.wordHighlightEdited')
+      : undefined;
 
   const capSupport = support.captions();
   if (!capSupport.ok) {
@@ -145,7 +181,13 @@ export default function CaptionsEditor() {
     <View style={styles.headerBlock}>
       <View style={styles.video} onLayout={(e) => setFrameWidth(e.nativeEvent.layout.width)}>
         {uri ? <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="contain" nativeControls /> : null}
-        <CaptionPreview text={active?.text ?? null} styleId={styleId} position={position} frameWidth={frameWidth} />
+        <CaptionPreview
+          text={active?.text ?? null}
+          styleId={styleId}
+          position={position}
+          frameWidth={frameWidth}
+          activeWord={highlightOn && active ? activeWordIndex(active, nowMs) : -1}
+        />
       </View>
       {phase !== 'ready' ? (
         <View style={styles.generate}>
@@ -155,6 +197,11 @@ export default function CaptionsEditor() {
               <Text testID="captions-working" muted accessibilityLiveRegion="polite">
                 {t('captions.generating')}
               </Text>
+              {part && part.total > 1 ? (
+                <Text variant="caption" muted accessibilityLiveRegion="polite">
+                  {t('captions.part', { n: part.n, total: part.total })}
+                </Text>
+              ) : null}
               <Button testID="captions-cancel" label={t('common.cancel')} variant="ghost" onPress={() => abortRef.current?.abort()} />
             </>
           ) : (
@@ -182,16 +229,14 @@ export default function CaptionsEditor() {
           <Text variant="overline" muted>
             {t('captions.style.label').toUpperCase()}
           </Text>
-          <Segmented
-            accessibilityLabel={t('captions.style.label')}
-            value={styleId}
-            onChange={chooseStyle}
-            options={(Object.keys(CAPTION_STYLES) as CaptionStyleId[]).map((k) => ({
-              value: k,
-              label: t(CAPTION_STYLES[k].nameKey as Parameters<typeof t>[0]),
-              badge: CAPTION_STYLES[k].pro && !access.isPro ? t('common.pro') : undefined,
-            }))}
-          />
+          <CaptionStylePicker value={styleId} onChange={chooseStyle} showProBadge={!access.isPro} />
+          {anyWordTiming ? (
+            <ListRow
+              title={t('captions.wordHighlight')}
+              subtitle={highlightHint ?? (highlightAllowed ? undefined : t('common.pro'))}
+              toggle={{ value: highlightOn, onChange: toggleHighlight }}
+            />
+          ) : null}
           <Segmented
             accessibilityLabel={t('captions.position')}
             value={position}
