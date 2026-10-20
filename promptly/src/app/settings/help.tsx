@@ -12,7 +12,9 @@ export default function Help() {
     <Screen>
       {strings().help.faq.map((item) => (
         <Card key={item.q}>
-          <Text variant="headline">{item.q}</Text>
+          <Text variant="headline" accessibilityRole="header">
+            {item.q}
+          </Text>
           <Text muted>{item.a}</Text>
         </Card>
       ))}

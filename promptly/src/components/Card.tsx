@@ -9,12 +9,15 @@ interface Props {
   onPress?: () => void;
   onLongPress?: () => void;
   accessibilityLabel?: string;
+  accessibilityHint?: string;
+  /** Label of the long-press action, exposed to VoiceOver/TalkBack as a custom action. */
+  longPressLabel?: string;
   style?: StyleProp<ViewStyle>;
   /** Stable id for end-to-end tests. */
   testID?: string;
 }
 
-export function Card({ children, onPress, onLongPress, accessibilityLabel, style, testID }: Props) {
+export function Card({ children, onPress, onLongPress, accessibilityLabel, accessibilityHint, longPressLabel, style, testID }: Props) {
   const { colors } = useTheme();
   const base = [styles.card, { backgroundColor: colors.surface, borderColor: colors.border }, style];
   if (!onPress) return <View testID={testID} style={base}>{children}</View>;
@@ -23,6 +26,9 @@ export function Card({ children, onPress, onLongPress, accessibilityLabel, style
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
+      accessibilityHint={accessibilityHint}
+      accessibilityActions={onLongPress ? [{ name: 'longpress', label: longPressLabel }] : undefined}
+      onAccessibilityAction={onLongPress ? (e) => e.nativeEvent.actionName === 'longpress' && onLongPress() : undefined}
       onPress={onPress}
       onLongPress={onLongPress}
       style={({ pressed }) => [base, pressed && { opacity: 0.85 }]}

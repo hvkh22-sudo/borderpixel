@@ -5,10 +5,12 @@ import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, View } f
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { PurchasesPackage } from 'react-native-purchases';
 
+import { decorative } from '../components/a11y';
 import { Button } from '../components/Button';
 import { IconButton } from '../components/IconButton';
 import { Text } from '../components/Text';
 import { LIMITS, deriveAccess, paywallPlan } from '../features/monetization/entitlements';
+import { useAnnounce } from '../hooks/useAnnounce';
 import { t, type TKey } from '../localization/i18n';
 import { track } from '../services/analytics';
 import { config } from '../services/config';
@@ -32,6 +34,7 @@ export default function Paywall() {
   const [preferred, setSelected] = useState<PlanKey>(plan.showSubscriptions ? 'annual' : 'lifetime');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  useAnnounce(message);
 
   useEffect(() => {
     track({ name: 'paywall_viewed', trigger: isKnownTrigger(trigger) ? trigger : 'general' });
@@ -105,7 +108,7 @@ export default function Paywall() {
         <View style={styles.benefits}>
           {benefits.map((b) => (
             <View key={b} style={styles.benefit}>
-              <Ionicons name="checkmark-circle" size={22} color={colors.primary} />
+              <Ionicons {...decorative} name="checkmark-circle" size={22} color={colors.primary} />
               <Text variant="callout" style={styles.flex}>
                 {b}
               </Text>
@@ -119,10 +122,10 @@ export default function Paywall() {
           </Text>
         ) : null}
 
-        {!packages && !loadFailed ? <ActivityIndicator color={colors.primary} /> : null}
+        {!packages && !loadFailed ? <ActivityIndicator color={colors.primary} accessibilityLabel={t('common.loading')} /> : null}
         {loadFailed ? <Text testID="paywall-unavailable" muted center>{t('paywall.unavailable')}</Text> : null}
 
-        <View style={styles.options} accessibilityRole="radiogroup">
+        <View style={styles.options} accessibilityRole="radiogroup" accessibilityLabel={t('a11y.plans')}>
           {options.map((o) => {
             const sel = o.key === selected;
             return (
@@ -130,11 +133,11 @@ export default function Paywall() {
                 key={o.key}
                 accessibilityRole="radio"
                 accessibilityState={{ selected: sel }}
-                accessibilityLabel={`${o.label}, ${o.price}`}
+                accessibilityLabel={[o.label, o.price, o.badge].filter(Boolean).join(', ')}
                 onPress={() => setSelected(o.key)}
                 style={[styles.option, { borderColor: sel ? colors.primary : colors.border, backgroundColor: colors.surface }]}
               >
-                <Ionicons name={sel ? 'radio-button-on' : 'radio-button-off'} size={22} color={sel ? colors.primary : colors.textMuted} />
+                <Ionicons {...decorative} name={sel ? 'radio-button-on' : 'radio-button-off'} size={22} color={sel ? colors.primary : colors.textMuted} />
                 <View style={styles.flex}>
                   <Text variant="headline">{o.label}</Text>
                   <Text variant="callout" muted>

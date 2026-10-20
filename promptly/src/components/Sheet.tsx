@@ -1,11 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
-import type { ReactNode } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { useRef, type ComponentRef, type ReactNode } from 'react';
+import { AccessibilityInfo, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useReducedMotion } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { t } from '../localization/i18n';
 import { useTheme } from '../theme/ThemeProvider';
 import { radius, spacing, touchTarget } from '../theme/tokens';
+import { decorative } from './a11y';
 import { Text } from './Text';
 
 interface Props {
@@ -22,17 +24,37 @@ interface Props {
  */
 export function Sheet({ visible, onClose, title, children }: Props) {
   const { colors } = useTheme();
+  const reducedMotion = useReducedMotion();
+  const titleRef = useRef<ComponentRef<typeof View>>(null);
+  // Screen readers start on the sheet title rather than wherever the OS puts focus.
+  const focusTitle = () => {
+    setTimeout(() => {
+      if (titleRef.current) AccessibilityInfo.sendAccessibilityEvent(titleRef.current, 'focus');
+    }, 350);
+  };
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+    <Modal visible={visible} transparent animationType={reducedMotion ? 'fade' : 'slide'} onRequestClose={onClose} onShow={focusTitle} statusBarTranslucent>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <Pressable style={[styles.flex, styles.backdrop]} onPress={onClose} accessibilityRole="button" accessibilityLabel={t('common.close')} />
-        <SafeAreaView edges={['bottom']} style={[styles.panel, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        {/* Tap-outside-to-close for touch users only: every sheet has its own Cancel/Done control,
+            and the escape gesture / Android back close it for screen-reader users. */}
+        <Pressable testID="sheet-backdrop" style={[styles.flex, styles.backdrop]} onPress={onClose} accessible={false} {...decorative} />
+        <SafeAreaView
+          edges={['bottom']}
+          accessibilityViewIsModal
+          onAccessibilityEscape={onClose}
+          style={[styles.panel, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        >
           {title ? (
-            <Text variant="headline" numberOfLines={2} accessibilityRole="header" style={styles.title}>
-              {title}
-            </Text>
+            <View ref={titleRef} accessible accessibilityRole="header" accessibilityLabel={title} style={styles.title}>
+              <Text variant="headline" numberOfLines={3}>
+                {title}
+              </Text>
+            </View>
           ) : null}
-          {children}
+          {/* Scrolls when large Dynamic Type or many folders make the content taller than the screen. */}
+          <ScrollView bounces={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.scroll}>
+            {children}
+          </ScrollView>
         </SafeAreaView>
       </KeyboardAvoidingView>
     </Modal>
@@ -64,11 +86,11 @@ export function SheetActions({ actions, onCancel }: { actions: SheetAction[]; on
           onPress={a.onPress}
           style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surfaceRaised }]}
         >
-          {a.icon ? <Ionicons name={a.icon} size={22} color={a.destructive ? colors.danger : colors.textMuted} /> : null}
-          <Text variant="callout" numberOfLines={1} color={a.destructive ? colors.danger : undefined} style={styles.flex}>
+          {a.icon ? <Ionicons {...decorative} name={a.icon} size={22} color={a.destructive ? colors.danger : colors.textMuted} /> : null}
+          <Text variant="callout" numberOfLines={2} color={a.destructive ? colors.danger : undefined} style={styles.flex}>
             {a.label}
           </Text>
-          {a.selected ? <Ionicons name="checkmark" size={20} color={colors.primary} /> : null}
+          {a.selected ? <Ionicons {...decorative} name="checkmark" size={20} color={colors.primary} /> : null}
         </Pressable>
       ))}
       <Pressable
@@ -78,7 +100,7 @@ export function SheetActions({ actions, onCancel }: { actions: SheetAction[]; on
         onPress={onCancel}
         style={({ pressed }) => [styles.row, styles.cancel, { borderTopColor: colors.border }, pressed && { backgroundColor: colors.surfaceRaised }]}
       >
-        <Text variant="callout" color={colors.primary} center style={[styles.flex, styles.cancelText]}>
+        <Text variant="callout" color={colors.primaryText} center style={[styles.flex, styles.cancelText]}>
           {t('common.cancel')}
         </Text>
       </Pressable>
@@ -97,7 +119,9 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg,
     paddingBottom: spacing.sm,
     gap: spacing.sm,
+    maxHeight: '92%',
   },
+  scroll: { flexGrow: 0 },
   title: { paddingHorizontal: spacing.xs },
   row: { minHeight: touchTarget + 4, flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.xs, borderRadius: radius.md },
   cancel: { borderTopWidth: StyleSheet.hairlineWidth, borderRadius: 0, marginTop: spacing.xs },

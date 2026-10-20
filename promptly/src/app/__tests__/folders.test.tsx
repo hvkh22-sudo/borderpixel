@@ -87,7 +87,7 @@ describe('Library folders', () => {
     const s = await mockRepos.scripts.create({ title: 'Hook ideas', body: 'stop scrolling' });
     const f = await mockRepos.folders.create('Hooks');
     await renderScreen(<Library />);
-    await fireEvent(await screen.findByLabelText('Hook ideas'), 'longPress');
+    await fireEvent(await screen.findByLabelText(/^Hook ideas,/), 'longPress');
     await fireEvent.press(await screen.findByLabelText('Move to folder'));
     expect(screen.getByText('Move “Hook ideas” to')).toBeTruthy();
     expect(screen.getByLabelText('No folder').props.accessibilityState.selected).toBe(true);

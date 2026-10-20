@@ -4,7 +4,7 @@ import { Pressable, ScrollView, StyleSheet } from 'react-native';
 import { t } from '../localization/i18n';
 import type { Folder, FolderWithCount } from '../storage/repositories';
 import { useTheme } from '../theme/ThemeProvider';
-import { radius, spacing } from '../theme/tokens';
+import { radius, spacing, touchTarget } from '../theme/tokens';
 import type { SheetAction } from './Sheet';
 import { Text } from './Text';
 
@@ -35,7 +35,9 @@ export function Chip({ label, accessibilityLabel, accessibilityHint, selected, i
       accessibilityHint={accessibilityHint}
       accessibilityState={{ selected: !!selected }}
       accessibilityActions={onLongPress ? [{ name: 'longpress', label: accessibilityHint }] : undefined}
-      onAccessibilityAction={onLongPress}
+      onAccessibilityAction={onLongPress ? (e) => e.nativeEvent.actionName === 'longpress' && onLongPress() : undefined}
+      // 44pt visual + slop = 52pt hit area (row padding keeps the slop inside the scroll view on Android).
+      hitSlop={CHIP_SLOP}
       onPress={onPress}
       onLongPress={onLongPress}
       style={({ pressed }) => [
@@ -104,8 +106,11 @@ export function folderChoiceActions(folders: Folder[], currentId: string | null,
   ];
 }
 
+const CHIP_HEIGHT = 44;
+const CHIP_SLOP = { top: (touchTarget - CHIP_HEIGHT) / 2 + 2, bottom: (touchTarget - CHIP_HEIGHT) / 2 + 2 };
+
 const styles = StyleSheet.create({
-  row: { gap: spacing.sm, paddingHorizontal: spacing.lg },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 40, paddingHorizontal: spacing.md, borderRadius: radius.pill, borderWidth: StyleSheet.hairlineWidth, maxWidth: 220 },
+  row: { gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: CHIP_SLOP.top },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: CHIP_HEIGHT, paddingHorizontal: spacing.md, borderRadius: radius.pill, borderWidth: StyleSheet.hairlineWidth, maxWidth: 220 },
   label: { fontWeight: '600', flexShrink: 1 },
 });

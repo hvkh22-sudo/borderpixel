@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { decorative } from '../components/a11y';
 import { Screen } from '../components/Screen';
 import { Text } from '../components/Text';
 import { deriveTitle } from '../storage/repositories';
@@ -51,7 +52,7 @@ export default function Create() {
           onPress={o.onPress}
           style={({ pressed }) => [styles.option, { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.85 : 1 }]}
         >
-          <View style={[styles.icon, { backgroundColor: colors.primarySoft }]}>
+          <View {...decorative} style={[styles.icon, { backgroundColor: colors.primarySoft }]}>
             <Ionicons name={o.icon} size={22} color={colors.primary} />
           </View>
           <View style={styles.flex}>

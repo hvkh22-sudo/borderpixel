@@ -30,6 +30,7 @@ import {
 } from '../../features/captions/captions';
 import { CAPTION_STYLES, type CaptionPosition, type CaptionStyleId } from '../../features/captions/captionStyles';
 import { checkFeature } from '../../features/monetization/entitlements';
+import { useAnnounce } from '../../hooks/useAnnounce';
 import { formatClock, t } from '../../localization/i18n';
 import { contentDirectionStyle, flipInRtl } from '../../localization/layoutDirection';
 import { track } from '../../services/analytics';
@@ -42,7 +43,7 @@ import { useAccess } from '../../state/access';
 import { useSettings } from '../../state/settings';
 import type { Recording } from '../../storage/repositories';
 import { useTheme } from '../../theme/ThemeProvider';
-import { radius, spacing } from '../../theme/tokens';
+import { radius, spacing, touchTarget } from '../../theme/tokens';
 
 type Phase = 'idle' | 'working' | 'ready' | 'error';
 
@@ -63,6 +64,7 @@ export default function CaptionsEditor() {
   const [useScript, setUseScript] = useState(true);
   const [frameWidth, setFrameWidth] = useState(200);
   const [part, setPart] = useState<{ n: number; total: number } | null>(null);
+  const [justGenerated, setJustGenerated] = useState(false);
   const wordHighlight = useSettings((s) => s.captionWordHighlight);
   const highlightAllowed = checkFeature('captionWordHighlight', access, usage).allowed;
   const abortRef = useRef<AbortController | null>(null);
@@ -125,6 +127,7 @@ export default function CaptionsEditor() {
       setNotes(n);
       setCues(segmentWords(words));
       setPhase('ready');
+      setJustGenerated(true);
       track({ name: 'captions_generated', words: words.length, durationSec: Math.round((Date.now() - started) / 1000) });
     } catch (e) {
       const code = e instanceof TranscriptionError ? e.code : 'failed';
@@ -164,6 +167,18 @@ export default function CaptionsEditor() {
     : anyWordTiming && !cues.every(cueHasWordTiming)
       ? t('captions.wordHighlightEdited')
       : undefined;
+
+  // Android reads the live-region texts below; VoiceOver needs explicit announcements.
+  useAnnounce(
+    phase === 'working'
+      ? part && part.total > 1
+        ? `${t('captions.generating')} ${t('captions.part', { n: part.n, total: part.total })}`
+        : t('captions.generating')
+      : phase === 'error' && errorKey
+        ? t(errorKey as Parameters<typeof t>[0])
+        : null,
+  );
+  useAnnounce(justGenerated ? t('a11y.captionsReady', { n: cues.length }) : null, 'all');
 
   const capSupport = support.captions();
   if (!capSupport.ok) {
@@ -226,7 +241,7 @@ export default function CaptionsEditor() {
               {n}
             </Text>
           ))}
-          <Text variant="overline" muted>
+          <Text variant="overline" muted accessibilityRole="header" accessibilityLabel={t('captions.style.label')}>
             {t('captions.style.label').toUpperCase()}
           </Text>
           <CaptionStylePicker value={styleId} onChange={chooseStyle} showProBadge={!access.isPro} />
@@ -249,8 +264,8 @@ export default function CaptionsEditor() {
           />
           <View style={styles.shiftRow}>
             <Text variant="callout">{t('captions.shiftAll')}</Text>
-            <IconButton icon="play-back" iconStyle={flipInRtl()} label={`${t('captions.shiftAll')} −0.1s`} onPress={() => setCues((c) => shiftAll(c, -100))} />
-            <IconButton icon="play-forward" iconStyle={flipInRtl()} label={`${t('captions.shiftAll')} +0.1s`} onPress={() => setCues((c) => shiftAll(c, 100))} />
+            <IconButton icon="play-back" iconStyle={flipInRtl()} label={t('a11y.shiftEarlier')} onPress={() => setCues((c) => shiftAll(c, -100))} />
+            <IconButton icon="play-forward" iconStyle={flipInRtl()} label={t('a11y.shiftLater')} onPress={() => setCues((c) => shiftAll(c, 100))} />
           </View>
         </View>
       )}
@@ -266,29 +281,39 @@ export default function CaptionsEditor() {
         contentContainerStyle={styles.list}
         keyboardShouldPersistTaps="handled"
         renderItem={({ item, index }) => (
-          <Pressable
-            onPress={() => {
-              player.currentTime = item.startMs / 1000;
-            }}
-            accessibilityLabel={`${formatClock(item.startMs)} ${item.text}`}
+          // Not one accessible element: on iOS that would hide the text field and the cue buttons
+          // from VoiceOver. The timestamp is its own "play from" button instead.
+          <View
+            testID="caption-cue"
             style={[styles.cue, { backgroundColor: active?.id === item.id ? colors.primarySoft : colors.surface, borderColor: colors.border }]}
           >
-            <Text variant="caption" muted style={styles.time}>
-              {formatClock(item.startMs)}
-            </Text>
+            <Pressable
+              testID="caption-cue-seek"
+              accessibilityRole="button"
+              accessibilityLabel={t('a11y.cueSeek', { time: formatClock(item.startMs) })}
+              accessibilityState={{ selected: active?.id === item.id }}
+              onPress={() => {
+                player.currentTime = item.startMs / 1000;
+              }}
+              style={styles.time}
+            >
+              <Text variant="caption" muted style={styles.timeText}>
+                {formatClock(item.startMs)}
+              </Text>
+            </Pressable>
             <TextInput
               value={item.text}
               onChangeText={(v) => setCues((c) => updateCueText(c, item.id, v))}
               style={[styles.cueInput, { color: colors.text }, contentDirectionStyle(item.text)]}
               multiline
-              accessibilityLabel={`${t('common.edit')} ${index + 1}`}
+              accessibilityLabel={t('a11y.cueText', { n: index + 1, time: formatClock(item.startMs) })}
             />
             <View style={styles.cueActions}>
               <IconButton icon="cut-outline" size={18} label={t('captions.split')} onPress={() => setCues((c) => splitCue(c, item.id, Math.ceil(item.text.split(' ').length / 2)))} />
               <IconButton icon="git-merge-outline" size={18} label={t('captions.merge')} disabled={index === cues.length - 1} onPress={() => setCues((c) => mergeWithNext(c, item.id))} />
               <IconButton icon="trash-outline" size={18} label={t('captions.deleteCue')} onPress={() => setCues((c) => deleteCue(c, item.id))} />
             </View>
-          </Pressable>
+          </View>
         )}
       />
       {phase === 'ready' ? (
@@ -310,7 +335,8 @@ const styles = StyleSheet.create({
   shiftRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   list: { padding: spacing.lg, gap: spacing.sm, paddingBottom: 100 },
   cue: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.sm, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth },
-  time: { width: 40, fontVariant: ['tabular-nums'] },
+  time: { minWidth: 44, minHeight: touchTarget, justifyContent: 'center' },
+  timeText: { fontVariant: ['tabular-nums'] },
   cueInput: { flex: 1, fontSize: 16, paddingVertical: 4 },
   cueActions: { flexDirection: 'row' },
   footer: { padding: spacing.lg, borderTopWidth: StyleSheet.hairlineWidth },

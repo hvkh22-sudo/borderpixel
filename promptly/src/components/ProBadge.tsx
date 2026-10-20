@@ -8,7 +8,7 @@ export function ProBadge() {
   const { colors } = useTheme();
   return (
     <View style={[styles.badge, { backgroundColor: colors.primarySoft }]}>
-      <Text variant="overline" color={colors.primary}>
+      <Text variant="overline" color={colors.primaryText}>
         {t('common.pro')}
       </Text>
     </View>

@@ -5,6 +5,7 @@ import * as Sharing from 'expo-sharing';
 import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { decorative } from '../../components/a11y';
 import { Button } from '../../components/Button';
 import { ListRow } from '../../components/ListRow';
 import { Screen } from '../../components/Screen';
@@ -12,6 +13,7 @@ import { Text } from '../../components/Text';
 import { burnInPayload } from '../../features/captions/burnIn';
 import { toSrt } from '../../features/captions/captions';
 import { checkFeature } from '../../features/monetization/entitlements';
+import { useAnnounce } from '../../hooks/useAnnounce';
 import { t } from '../../localization/i18n';
 import { track } from '../../services/analytics';
 import { support } from '../../services/deviceSupport';
@@ -46,6 +48,12 @@ export default function ExportScreen() {
     }));
     return () => jobRef.current?.cancel();
   }, [id, burnInAvailable]);
+
+  // Progress is announced in 25 % steps (a live region on the percentage would speak every update);
+  // the final status text is a live region on Android and announced on iOS.
+  const milestone = status.kind === 'rendering' ? Math.floor(status.progress * 4) * 25 : null;
+  useAnnounce(milestone === null ? null : t('export.rendering', { p: milestone }), 'all');
+  useAnnounce(status.kind === 'done' || status.kind === 'error' ? status.message : null);
 
   if (!rec) return <Screen>{null}</Screen>;
   const source = recordingFile(rec.fileName);
@@ -124,9 +132,18 @@ export default function ExportScreen() {
         ) : null}
       </View>
       {status.kind === 'rendering' ? (
-        <View style={styles.actions} accessibilityLiveRegion="polite">
-          <Text center>{t('export.rendering', { p: Math.round(status.progress * 100) })}</Text>
-          <View style={[styles.bar, { backgroundColor: colors.border }]}>
+        <View style={styles.actions}>
+          <Text center {...decorative}>
+            {t('export.rendering', { p: Math.round(status.progress * 100) })}
+          </Text>
+          <View
+            testID="export-progress"
+            accessible
+            accessibilityRole="progressbar"
+            accessibilityLabel={t('export.title')}
+            accessibilityValue={{ min: 0, max: 100, now: Math.round(status.progress * 100) }}
+            style={[styles.bar, { backgroundColor: colors.border }]}
+          >
             <View style={[styles.fill, { width: `${Math.round(status.progress * 100)}%`, backgroundColor: colors.primary }]} />
           </View>
           <Button label={t('common.cancel')} variant="ghost" onPress={() => (jobRef.current?.cancel(), setStatus({ kind: 'idle' }))} />

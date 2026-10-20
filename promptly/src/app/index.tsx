@@ -3,6 +3,7 @@ import { Redirect, router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { decorative } from '../components/a11y';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { EmptyState } from '../components/EmptyState';
@@ -63,18 +64,19 @@ export default function Home() {
           onPress={() => router.push('/create')}
           style={({ pressed }) => [styles.hero, { backgroundColor: colors.primary, opacity: pressed ? 0.9 : 1 }]}
         >
-          <View style={styles.heroIcon}>
+          <View style={styles.heroIcon} {...decorative}>
             <Ionicons name="videocam" size={28} color={colors.primary} />
           </View>
           <View style={styles.flex}>
             <Text variant="title" color="#fff">
               {t('home.create')}
             </Text>
-            <Text variant="callout" color="rgba(255,255,255,0.85)">
+            {/* Full onPrimary: 85 % white on the violet was 3.6:1, below AA for body text. */}
+            <Text variant="callout" color={colors.onPrimary}>
               {t('home.createHint')}
             </Text>
           </View>
-          <Ionicons name="arrow-forward" size={24} color="#fff" style={flipInRtl()} />
+          <Ionicons {...decorative} name="arrow-forward" size={24} color="#fff" style={flipInRtl()} />
         </Pressable>
 
         {recoveredTakes > 0 ? (
@@ -113,7 +115,7 @@ export default function Home() {
               <Button testID="home-see-all-scripts" label={t('home.seeAll')} variant="ghost" onPress={() => router.push('/scripts')} />
             </View>
             {data.scripts.map((s) => (
-              <Card key={s.id} testID="home-script-item" onPress={() => router.push(`/scripts/${s.id}`)} accessibilityLabel={s.title}>
+              <Card key={s.id} testID="home-script-item" onPress={() => router.push(`/scripts/${s.id}`)} accessibilityLabel={`${s.title}, ~${formatDuration(estimateSpeakingSeconds(s.body, paceWpm))}`} accessibilityHint={t('a11y.openScriptHint')}>
                 <Text variant="headline" numberOfLines={1}>
                   {s.title}
                 </Text>
@@ -137,7 +139,7 @@ export default function Home() {
               <Button testID="home-see-all-takes" label={t('home.seeAll')} variant="ghost" onPress={() => router.push('/takes')} />
             </View>
             {data.takes.map((r) => (
-              <Card key={r.id} testID="home-take-item" onPress={() => router.push(`/take/${r.id}`)} accessibilityLabel={new Date(r.createdAt).toLocaleString()}>
+              <Card key={r.id} testID="home-take-item" onPress={() => router.push(`/take/${r.id}`)} accessibilityLabel={[new Date(r.createdAt).toLocaleString(), formatClock(r.durationMs), r.cues ? t('takes.captioned') : null].filter(Boolean).join(', ')}>
                 <View style={styles.takeRow}>
                   <View style={[styles.thumb, { backgroundColor: colors.surfaceRaised }]}>
                     <Ionicons name="play" size={18} color={colors.text} />

@@ -17,6 +17,7 @@ import {
   useVideoOutput,
 } from 'react-native-vision-camera';
 
+import { decorative } from '../../components/a11y';
 import { Button } from '../../components/Button';
 import { IconButton } from '../../components/IconButton';
 import { Text } from '../../components/Text';
@@ -30,6 +31,7 @@ import { breakPaceSegment, createPaceTracker, timedSample, trackCursor, voiceSam
 import { Teleprompter, type TeleprompterHandle } from '../../features/teleprompter/Teleprompter';
 import { countWords } from '../../features/voice-follow/text';
 import { useVoiceFollow } from '../../features/voice-follow/useVoiceFollow';
+import { useAnnounce } from '../../hooks/useAnnounce';
 import { USAGE_VF_KEY } from '../../hooks/useBootstrap';
 import { formatClock, t } from '../../localization/i18n';
 import { track } from '../../services/analytics';
@@ -219,6 +221,33 @@ export default function RecordScreen() {
     return () => sub.remove();
   }, [session]);
 
+  // Screen-reader status. Start is announced on both platforms (the timer is not a live region:
+  // it ticks twice a second); the rest uses live regions on Android and announcements on iOS.
+  const stoppingTake = state.status === 'stopping' || state.status === 'finalizing';
+  const vfMessage =
+    !voice || vf.snapshot.status === 'idle'
+      ? null
+      : vf.snapshot.status === 'speaking' || vf.snapshot.status === 'finished'
+        ? t('record.voiceSpeaking')
+        : vf.snapshot.status === 'lost'
+          ? t('record.voiceLost')
+          : vf.snapshot.status === 'error'
+            ? t('record.voiceError')
+            : t('record.voiceListening');
+  const noticeMessage =
+    notice || state.status === 'recoverableFailure' || state.status === 'unrecoverableFailure'
+      ? state.error === 'low_storage'
+        ? t('record.lowStorage')
+        : state.error === 'camera_unavailable'
+          ? t('record.noCamera')
+          : notice ?? (state.partialFilePath ? t('record.failedRecovered') : t('record.failed'))
+      : null;
+  useAnnounce(state.status === 'recording' ? t('record.recording') : null, 'all');
+  useAnnounce(stoppingTake ? `${t('a11y.recordingStopped')}. ${t('record.finalizing')}` : null);
+  useAnnounce(state.status === 'countdown' && countdown > 0 ? String(countdown) : null);
+  useAnnounce(vfMessage);
+  useAnnounce(noticeMessage);
+
   const onRecordPress = () => {
     if (state.status === 'recording' || state.status === 'starting') return void stopRecording();
     if (state.status === 'countdown') return dispatch({ type: 'CANCEL_COUNTDOWN' });
@@ -251,8 +280,8 @@ export default function RecordScreen() {
     const blocked = !camPerm.canRequestPermission || !micPerm.canRequestPermission;
     return (
       <SafeAreaView style={styles.permission}>
-        <Ionicons name="videocam-outline" size={44} color={palette.violet300} />
-        <Text variant="title" color="#fff" center>
+        <Ionicons {...decorative} name="videocam-outline" size={44} color={palette.violet300} />
+        <Text variant="title" color="#fff" center accessibilityRole="header">
           {t('record.permissionTitle')}
         </Text>
         <Text color={palette.ink200} center>
@@ -328,22 +357,16 @@ export default function RecordScreen() {
             <IconButton testID="record-close" icon="close" label={t('record.close')} color="#fff" background="rgba(0,0,0,0.35)" onPress={close} />
             <View style={styles.center}>
               {recording ? (
-                <View testID="record-timer" style={styles.recPill} accessibilityLiveRegion="polite" accessibilityLabel={`${t('record.recording')} ${formatClock(elapsed)}`}>
-                  <View style={styles.recDot} />
+                <View testID="record-timer" style={styles.recPill} accessible accessibilityLabel={`${t('record.recording')} ${formatClock(elapsed)}`}>
+                  <View style={styles.recDot} {...decorative} />
                   <Text variant="callout" color="#fff" style={styles.tabular}>
                     {formatClock(elapsed)}
                   </Text>
                 </View>
               ) : null}
-              {voice && vfStatus !== 'idle' ? (
+              {vfMessage ? (
                 <Text variant="caption" color={vfStatus === 'error' || vfStatus === 'lost' ? palette.amber500 : palette.ink100} accessibilityLiveRegion="polite">
-                  {vfStatus === 'speaking' || vfStatus === 'finished'
-                    ? t('record.voiceSpeaking')
-                    : vfStatus === 'lost'
-                      ? t('record.voiceLost')
-                      : vfStatus === 'error'
-                        ? t('record.voiceError')
-                        : t('record.voiceListening')}
+                  {vfMessage}
                 </Text>
               ) : null}
             </View>
@@ -385,14 +408,10 @@ export default function RecordScreen() {
             ) : null}
           </View>
 
-          {notice || state.status === 'recoverableFailure' || state.status === 'unrecoverableFailure' ? (
-            <View testID="record-notice" style={styles.notice} accessibilityLiveRegion="assertive">
-              <Text variant="callout" color="#fff" center>
-                {state.error === 'low_storage'
-                  ? t('record.lowStorage')
-                  : state.error === 'camera_unavailable'
-                    ? t('record.noCamera')
-                    : notice ?? (state.partialFilePath ? t('record.failedRecovered') : t('record.failed'))}
+          {noticeMessage ? (
+            <View testID="record-notice" style={styles.notice}>
+              <Text variant="callout" color="#fff" center accessibilityLiveRegion="assertive">
+                {noticeMessage}
               </Text>
               {state.status === 'recoverableFailure' ? <Button label={t('common.retry')} variant="secondary" onPress={() => session.retry()} /> : null}
             </View>
@@ -410,7 +429,7 @@ export default function RecordScreen() {
             {mode === 'timed' ? (
               <>
                 <IconButton icon="remove" label={t('record.slower')} color="#fff" background="rgba(0,0,0,0.35)" onPress={() => setWpm((w) => clampWpm(w - 10))} />
-                <Text variant="caption" color="#fff" style={styles.tabular}>
+                <Text variant="caption" color="#fff" style={styles.tabular} accessibilityLabel={t('prepare.wpm', { n: wpm })}>
                   {wpm}
                 </Text>
                 <IconButton icon="add" label={t('record.faster')} color="#fff" background="rgba(0,0,0,0.35)" onPress={() => setWpm((w) => clampWpm(w + 10))} />
@@ -422,7 +441,10 @@ export default function RecordScreen() {
             testID="record-button"
             accessibilityRole="button"
             accessibilityLabel={recording ? t('record.stop') : t('record.start')}
-            accessibilityState={{ disabled: !(state.status === 'ready' || recording || state.status === 'countdown') }}
+            accessibilityState={{
+              disabled: !(state.status === 'ready' || recording || state.status === 'countdown'),
+              busy: state.status === 'starting' || stoppingTake,
+            }}
             onPress={onRecordPress}
             style={styles.recordOuter}
           >
@@ -450,8 +472,18 @@ export default function RecordScreen() {
       </SafeAreaView>
 
       {state.status === 'countdown' ? (
-        <Pressable testID="record-countdown" style={styles.countdown} onPress={() => dispatch({ type: 'CANCEL_COUNTDOWN' })} accessibilityRole="button" accessibilityLabel={t('record.countdownCancel')}>
-          <Text variant="display" color="#fff" style={styles.countdownText} accessibilityLiveRegion="assertive">
+        <Pressable
+          testID="record-countdown"
+          style={styles.countdown}
+          onPress={() => dispatch({ type: 'CANCEL_COUNTDOWN' })}
+          accessibilityRole="button"
+          accessibilityLabel={`${countdown}, ${t('record.countdownCancel')}`}
+          // Android announces the changing label; iOS gets useAnnounce above.
+          accessibilityLiveRegion="assertive"
+          accessibilityViewIsModal
+        >
+          {/* Already 120 pt: Dynamic Type scaling would only push it off small screens. */}
+          <Text variant="display" color="#fff" style={styles.countdownText} maxFontSizeMultiplier={1}>
             {countdown}
           </Text>
           <Text color="#fff">{t('record.countdownCancel')}</Text>

@@ -34,7 +34,7 @@ export default function Settings() {
       </Section>
       <Section title={t('settings.speechLanguage')}>
         {SPEECH_LOCALES.map((l) => (
-          <ListRow key={l} testID={`settings-speech-${l}`} title={l} value={l === speechLocale ? '✓' : undefined} onPress={() => set({ speechLocale: l })} />
+          <ListRow key={l} testID={`settings-speech-${l}`} title={l} selected={l === speechLocale} onPress={() => set({ speechLocale: l })} />
         ))}
       </Section>
       <Section>

@@ -33,13 +33,15 @@ export function Segmented<T extends string | number>({ options, value, onChange,
             accessibilityState={{ selected }}
             accessibilityLabel={o.badge ? `${o.label}, ${o.badge}` : o.label}
             onPress={() => onChange(o.value)}
+            // 44pt segment + 4pt slop (inside the track padding) = 52pt hit area for Android's 48dp.
+            hitSlop={4}
             style={[styles.item, selected && { backgroundColor: colors.primary }]}
           >
-            <Text variant="callout" color={selected ? colors.onPrimary : colors.text} style={styles.label} numberOfLines={1}>
+            <Text variant="callout" color={selected ? colors.onPrimary : colors.text} style={styles.label} numberOfLines={2}>
               {o.label}
             </Text>
             {o.badge ? (
-              <Text variant="overline" color={selected ? colors.onPrimary : colors.primary}>
+              <Text variant="overline" color={selected ? colors.onPrimary : colors.primaryText}>
                 {o.badge}
               </Text>
             ) : null}
@@ -53,5 +55,5 @@ export function Segmented<T extends string | number>({ options, value, onChange,
 const styles = StyleSheet.create({
   wrap: { flexDirection: 'row', borderRadius: radius.pill, padding: 4, borderWidth: StyleSheet.hairlineWidth, gap: 4 },
   item: { flex: 1, minHeight: 44, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.sm, flexDirection: 'row', gap: 4 },
-  label: { fontWeight: '600' },
+  label: { fontWeight: '600', textAlign: 'center', flexShrink: 1 },
 });

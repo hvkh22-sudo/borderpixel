@@ -7,6 +7,7 @@ import { touchTarget } from '../theme/tokens';
 interface Props {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
+  accessibilityHint?: string;
   onPress: () => void;
   color?: string;
   background?: string;
@@ -19,13 +20,14 @@ interface Props {
   testID?: string;
 }
 
-export function IconButton({ icon, label, onPress, color, background, size = 22, disabled, style, iconStyle, testID }: Props) {
+export function IconButton({ icon, label, accessibilityHint, onPress, color, background, size = 22, disabled, style, iconStyle, testID }: Props) {
   const { colors } = useTheme();
   return (
     <Pressable
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled: !!disabled }}
       hitSlop={8}
       disabled={disabled}

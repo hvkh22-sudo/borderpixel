@@ -107,16 +107,18 @@ describe('Captions editor', () => {
     await fireEvent.press(await screen.findByLabelText('Generate captions'));
     const toggle = await screen.findByLabelText('Highlight the spoken word');
     // Clean has no highlight colour: the row explains which styles show it.
-    expect(screen.getByText('Choose Soft Box, Creator Bold or Pop to see the highlight.')).toBeTruthy();
+    // Toggle rows expose their subtitle as the switch's hint (the visible text is hidden from AT).
+    expect(screen.getByLabelText('Highlight the spoken word').props.accessibilityHint).toBe('Choose Soft Box, Creator Bold or Pop to see the highlight.');
     await fireEvent.press(screen.getByLabelText('Pop'));
     await fireEvent(toggle, 'valueChange', true);
     expect(useSettings.getState().captionWordHighlight).toBe(true);
-    // Playback is at 0 ms: the first word is lit.
-    expect(screen.getByTestId('caption-active-word')).toHaveTextContent('Write', { exact: false });
+    // Playback is at 0 ms: the first word is lit. (The overlay is visual only, hidden from AT.)
+    const hidden = { includeHiddenElements: true };
+    expect(screen.getByTestId('caption-active-word', hidden)).toHaveTextContent('Write', { exact: false });
 
     // Editing the cue drops its word timing, so nothing is highlighted any more.
     await fireEvent.changeText(screen.getByDisplayValue('Write your script'), 'Write your scripts');
-    expect(screen.queryByTestId('caption-active-word')).toBeNull();
+    expect(screen.queryByTestId('caption-active-word', hidden)).toBeNull();
     expect(screen.queryByLabelText('Highlight the spoken word')).toBeNull();
   });
 

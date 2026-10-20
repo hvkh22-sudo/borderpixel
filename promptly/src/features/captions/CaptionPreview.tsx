@@ -24,7 +24,9 @@ export function CaptionPreview({ text, styleId, position, frameWidth, activeWord
   const highlight = s.highlightColor && activeWord >= 0 ? s.highlightColor : null;
   const fontSize = Math.max(10, frameWidth * s.fontSizeRatio);
   return (
-    <View pointerEvents="none" style={[styles.wrap, { top: `${CAPTION_POSITION_Y[position] * 100}%` }]}>
+    // Visual overlay only: the cue text is editable in the cue list, and reading captions aloud
+    // while the video plays would talk over its audio.
+    <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={[styles.wrap, { top: `${CAPTION_POSITION_Y[position] * 100}%` }]}>
       <View style={[styles.box, s.backgroundColor ? { backgroundColor: s.backgroundColor, borderRadius: fontSize * 0.3 } : null, { paddingHorizontal: fontSize * 0.45, paddingVertical: fontSize * 0.25 }]}>
         <Text
           maxFontSizeMultiplier={1}
