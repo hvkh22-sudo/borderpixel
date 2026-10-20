@@ -107,6 +107,13 @@ describe('WAV helpers', () => {
     expect(f.dataBytes).toBe(16_000);
   });
 
+  it('trusts the header size when the file size is unknown, and keeps whole frames', () => {
+    // handle.size can be null; transcription passes 0 then.
+    expect(parseWavHeader(wavHeader(32_000, 16_000), 0).dataBytes).toBe(32_000);
+    // A truncated file with an odd byte count is cut to whole 16-bit frames.
+    expect(parseWavHeader(wavHeader(0, 16_000), 44 + 1001).dataBytes).toBe(1000);
+  });
+
   it('rejects non-WAV input', () => {
     expect(() => parseWavHeader(new Uint8Array(44))).toThrow('Not a WAV file');
   });

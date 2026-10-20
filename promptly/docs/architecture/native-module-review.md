@@ -82,3 +82,26 @@ Status key: **VERIFIED**: matches the source named. **FIXED**: was wrong or risk
 5. **Runtime, Android `extractWav`.** It assumes 16-bit PCM decoder output. Some decoders emit float PCM (`KEY_PCM_ENCODING`), which would produce garbage audio.
 6. **Runtime, multi-sequence `muxAudio`.** Exporting a video sequence together with an audio-only sequence that contains gaps, or a leading gap, needs a device test. Media3 has historically restricted gaps in some sequence configurations.
 7. **Runtime, main thread.** `burnInCaptions` reads `MediaMetadataRetriever` on the main queue before starting, which is brief but blocks the UI.
+
+## Re-review 2026-10-20 (after word-by-word highlight)
+
+Whole module re-read after per-word highlight was added to burn-in on both platforms. Still nothing compiled. Sources: `expo-modules-core` 58.0.23 (installed) and `androidx/media` tag `1.11.1` (`BitmapOverlay.java`, `TextureOverlay.java` fetched from GitHub).
+
+| Area | Status | Notes |
+|---|---|---|
+| Swift `@Field var words: [WordTimingRecord]? = nil` | VERIFIED | `Field<Type: AnyArgument>`; `Optional: AnyArgument where Wrapped: AnyArgument`, `Array: AnyArgument`, `Record` is `Convertible`. `Record.update(withObject:)` skips absent keys, and `DynamicOptionalType` maps `null` to `nil`, so a missing `words` and `highlightColor: null` both decode. |
+| Kotlin `@Field val words: List<WordTimingRecord>? = null` | VERIFIED | `TypeConverterProviderImpl` wraps `ListTypeConverter` → `RecordTypeConverter` in `NullableTypeConverter`; `RecordTypeConverter` skips keys the JS object lacks. |
+| AsyncFunction/Function/Events/sendEvent/CodedException/Queues | VERIFIED | Unchanged since the first review; signatures re-checked. |
+| Swift per-word highlight (overlay `CATextLayer` per word, same attributed string, other glyphs `.clear`) | VERIFIED (reasoned) | Same string, font, paragraph style and frame as the base layer, so glyphs line up. Token split `components(separatedBy: " ")` matches JS `split(' ')` and `cueHasWordTiming`; NSRange lengths are taken from the uppercased text, so `ß`→`SS` stays aligned. |
+| Swift `showOnly` keyTimes | FIXED | keyTimes must be non-decreasing in 0…1. Cue/word times were divided by `total` unclamped, so a negative or inverted time (bad data) or `total == 0` gave an invalid animation (NaN or decreasing keyTimes). Now clamped and guarded. |
+| `isGeometryFlipped` on the parent | VERIFIED (reasoned) | Set on the animation-tool parent only. Word layers are siblings of the base text layer inside the container, so they share the flipped space. |
+| Media3 `BitmapOverlay` contract | VERIFIED | The constructor calls no overridable method, so Kotlin properties (`settings`, `highlight`) are initialised before `getBitmap`/`getOverlaySettings` run. `getTextureId` re-uploads only when the bitmap instance or generation ID changes, so the `(cue, word)` cache works. Evicted bitmaps are left to GC and never recycled; recycling could hit the bitmap the overlay still holds as `lastBitmap`. |
+| Kotlin per-word colour (`SpannableString` + `ForegroundColorSpan`, second `StaticLayout`) | VERIFIED (reasoned) | `ForegroundColorSpan` does not affect metrics, so the fill layout matches the plain stroke layout. Span bounds from `runningFold` are correct. A lambda parameter `w` shadowed the bitmap width `w` (a warning); it is renamed. |
+| Kotlin types and imports | VERIFIED | Double/Long/Int conversions are explicit (`toLong()`, `toFloat()`, `roundToInt()`), and every import is used. |
+| JS ↔ native contract | VERIFIED | Names, argument order and record fields match in `PromptlyMedia.types.ts`, `nativeMedia.ts`, `burnIn.ts`, Swift and Kotlin. Progress is 0–1 on both platforms. |
+| JS WAV split (`longTake.ts` `parseWavHeader`) | FIXED | Chunk walk, `fmt ` offsets (channels @10, rate @12, bits @22) and odd-size padding were correct. Fixes: (1) `transcription.ts` passes `handle.size ?? 0`, and a file size of 0 made `dataBytes` 0, which meant an empty transcript. Unknown size now trusts the header. (2) The file-size fallback could give an odd byte count; it is now truncated to whole frames. (3) A truncated or invalid `fmt ` chunk now throws a clear error. The native `extractAudioToWav` writes a canonical 44-byte header (mono 16-bit PCM), which matches what the recognizer source declares. |
+
+New or remaining risks:
+1. **iOS memory with highlight.** Every cue adds 1 + (number of words) `CATextLayer`s with `contentsScale = 2`. On the export path layer points equal pixels, so scale 1 would be enough. A long take (hundreds of cues) may use a lot of memory, so it needs a device test.
+2. **iOS and Android stroke width differ.** Android draws `2 × ratio × width` centred, so the outer stroke is `ratio × width`. iOS strokeWidth is centred at `ratio × width`, so the outer stroke is half of that. This is visual, not a crash.
+3. **Android `extractWav` cleanup.** If `createDecoderByType` or `configure` throws, the extractor is not released. If decoding throws, `decoder.stop()` in `finally` can mask the original error. The float-PCM risk from earlier still applies.

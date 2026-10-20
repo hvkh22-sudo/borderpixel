@@ -258,10 +258,15 @@ public final class PromptlyMediaModule: Module {
 
   private static func showOnly(_ layer: CALayer, fromMs: Double, toMs: Double, total: Double) {
     layer.opacity = 0
+    guard total > 0 else { return }
     let show = CAKeyframeAnimation(keyPath: "opacity")
-    // Discrete mode: keyTimes runs 0...1 with one more entry than values.
+    // Discrete mode: keyTimes runs 0...1 with one more entry than values, and
+    // must be non-decreasing. Clamp so negative or inverted cue times (bad data)
+    // cannot produce an invalid animation.
+    let start = min(max(fromMs / 1000 / total, 0), 1)
+    let end = min(max(toMs / 1000 / total, start), 1)
     show.values = [0, 1, 0]
-    show.keyTimes = [0, NSNumber(value: fromMs / 1000 / total), NSNumber(value: toMs / 1000 / total), 1]
+    show.keyTimes = [0, NSNumber(value: start), NSNumber(value: end), 1]
     show.calculationMode = .discrete
     show.duration = total
     show.beginTime = AVCoreAnimationBeginTimeAtZero
