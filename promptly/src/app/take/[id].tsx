@@ -55,6 +55,7 @@ export default function Take() {
       footer={
         <View style={styles.footer}>
           <Button
+            testID="take-captions"
             label={rec.cues ? t('preview.editCaptions') : t('preview.addCaptions')}
             icon="text"
             variant="secondary"
@@ -62,11 +63,11 @@ export default function Take() {
             style={styles.flex}
             disabled={!exists}
           />
-          <Button label={t('preview.export')} icon="share-outline" onPress={() => (player.pause(), router.push(`/export/${rec.id}`))} style={styles.flex} disabled={!exists} />
+          <Button testID="take-export" label={t('preview.export')} icon="share-outline" onPress={() => (player.pause(), router.push(`/export/${rec.id}`))} style={styles.flex} disabled={!exists} />
         </View>
       }
     >
-      <View style={styles.video} onLayout={(e) => setFrameWidth(e.nativeEvent.layout.width)}>
+      <View testID="take-video" style={styles.video} onLayout={(e) => setFrameWidth(e.nativeEvent.layout.width)}>
         {exists ? (
           <>
             <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="contain" nativeControls />
@@ -88,9 +89,9 @@ export default function Take() {
       </Text>
       <View style={styles.row}>
         {rec.scriptId ? (
-          <Button label={t('preview.retake')} icon="refresh" variant="ghost" onPress={() => router.replace(`/prepare/${rec.scriptId}`)} />
+          <Button testID="take-retake" label={t('preview.retake')} icon="refresh" variant="ghost" onPress={() => router.replace(`/prepare/${rec.scriptId}`)} />
         ) : null}
-        <Button label={t('preview.delete')} icon="trash-outline" variant="danger" onPress={remove} />
+        <Button testID="take-delete" label={t('preview.delete')} icon="trash-outline" variant="danger" onPress={remove} />
       </View>
     </Screen>
   );

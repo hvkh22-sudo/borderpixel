@@ -1,0 +1,66 @@
+# Captions from a fresh take: generate → wait → save.
+# Tolerates both "not supported on this device" and generation errors (e.g. no speech
+# heard): it screenshots the message and ends without failing.
+# Speak during the recording so there is something to transcribe.
+appId: app.promptly.placeholder
+tags:
+  - core
+  - camera
+---
+- runFlow: shared/launch.yaml
+- runFlow: shared/skip-onboarding.yaml
+- runFlow: shared/new-script-to-prepare.yaml
+- runFlow:
+    file: shared/record-timed-take.yaml
+    env:
+      SHOT_PREFIX: "04"
+
+- tapOn:
+    id: take-captions
+- extendedWaitUntil:
+    visible:
+      id: "(captions-generate|captions-unsupported)"
+    timeout: 15000
+- takeScreenshot: screenshots/04-5-captions-screen
+
+# Branch A: captions not supported on this device → record the message and stop here.
+- runFlow:
+    when:
+      visible:
+        id: captions-unsupported
+    commands:
+      - takeScreenshot: screenshots/04-6-unsupported
+
+# Branch B: supported → generate.
+- runFlow:
+    when:
+      visible:
+        id: captions-generate
+    commands:
+      - tapOn:
+          id: captions-generate
+      # Speech-recognition permission (iOS) if not pre-granted.
+      - runFlow: shared/allow-system-dialogs.yaml
+      - extendedWaitUntil:
+          visible:
+            id: captions-working
+          timeout: 10000
+          optional: true
+      - takeScreenshot: screenshots/04-6-generating
+      - extendedWaitUntil:
+          visible:
+            id: "(captions-save|captions-error)"
+          timeout: 180000
+      - takeScreenshot: screenshots/04-7-result
+      - runFlow:
+          when:
+            visible:
+              id: captions-save
+          commands:
+            - tapOn:
+                id: captions-save
+            - extendedWaitUntil:
+                visible:
+                  id: take-video
+                timeout: 10000
+            - takeScreenshot: screenshots/04-8-take-with-captions

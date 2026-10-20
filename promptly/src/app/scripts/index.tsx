@@ -99,13 +99,15 @@ export default function Library() {
           onCancel={closeSheet}
           actions={[
             {
+              testID: 'script-action-favorite',
               label: s.favorite ? t('library.unfavorite') : t('library.favorite'),
               icon: s.favorite ? 'star' : 'star-outline',
               onPress: () => act((r) => r.scripts.update(s.id, { favorite: !s.favorite })),
             },
-            { label: t('library.moveToFolder'), icon: 'folder-open-outline', onPress: () => setSheet({ kind: 'move', script: s }) },
-            { label: t('common.duplicate'), icon: 'copy-outline', onPress: () => act((r) => r.scripts.duplicate(s.id, t('common.copySuffix'))) },
+            { testID: 'script-action-move', label: t('library.moveToFolder'), icon: 'folder-open-outline', onPress: () => setSheet({ kind: 'move', script: s }) },
+            { testID: 'script-action-duplicate', label: t('common.duplicate'), icon: 'copy-outline', onPress: () => act((r) => r.scripts.duplicate(s.id, t('common.copySuffix'))) },
             {
+              testID: 'script-action-delete',
               label: t('common.delete'),
               icon: 'trash-outline',
               destructive: true,
@@ -151,8 +153,8 @@ export default function Library() {
         <SheetActions
           onCancel={closeSheet}
           actions={[
-            { label: t('common.rename'), icon: 'pencil-outline', onPress: () => setSheet({ kind: 'rename', folder: f }) },
-            { label: t('folders.delete'), icon: 'trash-outline', destructive: true, onPress: () => confirmDeleteFolder(f) },
+            { testID: 'folder-action-rename', label: t('common.rename'), icon: 'pencil-outline', onPress: () => setSheet({ kind: 'rename', folder: f }) },
+            { testID: 'folder-action-delete', label: t('folders.delete'), icon: 'trash-outline', destructive: true, onPress: () => confirmDeleteFolder(f) },
           ]}
         />
       );
@@ -185,6 +187,7 @@ export default function Library() {
         options={{
           headerRight: () => (
             <IconButton
+              testID="library-new-script"
               icon="add"
               label={t('library.newScript')}
               onPress={async () => {
@@ -201,6 +204,7 @@ export default function Library() {
         <View style={[styles.search, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Ionicons name="search" size={18} color={colors.textMuted} />
           <TextInput
+            testID="library-search"
             value={query}
             onChangeText={setQuery}
             placeholder={t('library.search')}
@@ -225,9 +229,9 @@ export default function Library() {
           value={sort}
           onChange={setSort}
           options={[
-            { value: 'updated', label: t('library.sortUpdated') },
-            { value: 'recent', label: t('library.sortRecent') },
-            { value: 'title', label: t('library.sortTitle') },
+            { value: 'updated', label: t('library.sortUpdated'), testID: 'library-sort-updated' },
+            { value: 'recent', label: t('library.sortRecent'), testID: 'library-sort-recent' },
+            { value: 'title', label: t('library.sortTitle'), testID: 'library-sort-title' },
           ]}
         />
       </View>
@@ -238,6 +242,7 @@ export default function Library() {
         ListEmptyComponent={scripts ? empty : undefined}
         renderItem={({ item }) => (
           <Pressable
+            testID="library-script-item"
             accessibilityRole="button"
             accessibilityLabel={item.title}
             accessibilityHint={t('common.edit')}
@@ -262,7 +267,7 @@ export default function Library() {
                 {activeFilter.kind !== 'folder' && item.folderId && folderName.has(item.folderId) ? ` · ${folderName.get(item.folderId)}` : ''}
               </Text>
             </View>
-            <IconButton icon="ellipsis-horizontal" label={t('library.moreActions')} onPress={() => showActions(item)} />
+            <IconButton testID="library-script-more" icon="ellipsis-horizontal" label={t('library.moreActions')} onPress={() => showActions(item)} />
           </Pressable>
         )}
       />
@@ -272,6 +277,7 @@ export default function Library() {
             {t('library.deleted')}
           </Text>
           <Button
+            testID="library-undo"
             label={t('common.undo')}
             variant="ghost"
             onPress={() =>
@@ -281,7 +287,7 @@ export default function Library() {
               })
             }
           />
-          <IconButton icon="close" label={t('common.close')} onPress={() => setUndoId(null)} />
+          <IconButton testID="library-undo-dismiss" icon="close" label={t('common.close')} onPress={() => setUndoId(null)} />
         </View>
       ) : null}
       <Sheet visible={!!sheet} onClose={closeSheet} title={sheetTitle(sheet)}>

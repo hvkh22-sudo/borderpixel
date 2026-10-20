@@ -90,10 +90,10 @@ export default function Paywall() {
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: colors.background }]}>
       <View style={styles.close}>
-        <IconButton icon="close" label={t('common.close')} onPress={() => router.back()} />
+        <IconButton testID="paywall-close" icon="close" label={t('common.close')} onPress={() => router.back()} />
       </View>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text variant="display" accessibilityRole="header">
+        <Text testID="paywall-title" variant="display" accessibilityRole="header">
           {t('paywall.title')}
         </Text>
         <Text muted>{triggerKey ? t(triggerKey) : t('paywall.subtitle')}</Text>
@@ -115,7 +115,7 @@ export default function Paywall() {
         ) : null}
 
         {!packages && !loadFailed ? <ActivityIndicator color={colors.primary} /> : null}
-        {loadFailed ? <Text muted center>{t('paywall.unavailable')}</Text> : null}
+        {loadFailed ? <Text testID="paywall-unavailable" muted center>{t('paywall.unavailable')}</Text> : null}
 
         <View style={styles.options} accessibilityRole="radiogroup">
           {options.map((o) => {
@@ -153,14 +153,14 @@ export default function Paywall() {
           </Text>
         ) : null}
         {message ? (
-          <Text center accessibilityLiveRegion="polite">
+          <Text testID="paywall-message" center accessibilityLiveRegion="polite">
             {message}
           </Text>
         ) : null}
       </ScrollView>
       <View style={styles.footer}>
-        <Button label={t('paywall.subscribe')} size="lg" onPress={buy} loading={busy} disabled={options.length === 0} />
-        <Button label={t('paywall.restore')} variant="ghost" onPress={doRestore} disabled={busy} />
+        <Button testID="paywall-subscribe" label={t('paywall.subscribe')} size="lg" onPress={buy} loading={busy} disabled={options.length === 0} />
+        <Button testID="paywall-restore" label={t('paywall.restore')} variant="ghost" onPress={doRestore} disabled={busy} />
         <Text variant="caption" muted center>
           {t('paywall.legal')}
         </Text>

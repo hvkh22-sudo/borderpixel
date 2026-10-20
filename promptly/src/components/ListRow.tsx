@@ -16,12 +16,14 @@ interface Props {
   toggle?: { value: boolean; onChange: (v: boolean) => void };
   right?: ReactNode;
   destructive?: boolean;
+  /** Stable id for end-to-end tests: on the row when tappable, else on the switch, else on the row. */
+  testID?: string;
 }
 
-export function ListRow({ title, subtitle, icon, value, onPress, toggle, right, destructive }: Props) {
+export function ListRow({ title, subtitle, icon, value, onPress, toggle, right, destructive, testID }: Props) {
   const { colors } = useTheme();
   const content = (
-    <View style={styles.row}>
+    <View style={styles.row} testID={!onPress && !toggle ? testID : undefined}>
       {icon ? <Ionicons name={icon} size={22} color={destructive ? colors.danger : colors.textMuted} /> : null}
       <View style={styles.text}>
         <Text variant="callout" color={destructive ? colors.danger : undefined}>
@@ -41,6 +43,7 @@ export function ListRow({ title, subtitle, icon, value, onPress, toggle, right, 
       {right}
       {toggle ? (
         <Switch
+          testID={testID}
           value={toggle.value}
           onValueChange={toggle.onChange}
           trackColor={{ true: colors.primary }}
@@ -52,7 +55,7 @@ export function ListRow({ title, subtitle, icon, value, onPress, toggle, right, 
   );
   if (!onPress) return content;
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={title} accessibilityHint={subtitle} onPress={onPress} style={({ pressed }) => pressed && { opacity: 0.7 }}>
+    <Pressable testID={testID} accessibilityRole="button" accessibilityLabel={title} accessibilityHint={subtitle} onPress={onPress} style={({ pressed }) => pressed && { opacity: 0.7 }}>
       {content}
     </Pressable>
   );

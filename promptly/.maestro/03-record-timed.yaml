@@ -1,0 +1,22 @@
+# Record a Timed take: open camera (permission dialogs handled on both platforms),
+# 3 s countdown, record about 8 s, stop, take preview appears.
+# Needs a real camera: physical Android phone (Maestro does not drive physical iPhones;
+# the iOS Simulator has no camera).
+# Tip for the person watching: read the text on screen aloud while it records.
+appId: app.promptly.placeholder
+tags:
+  - core
+  - camera
+---
+- runFlow: shared/launch.yaml
+- runFlow: shared/skip-onboarding.yaml
+- runFlow: shared/new-script-to-prepare.yaml
+- takeScreenshot: screenshots/03-0-setup
+- runFlow:
+    file: shared/record-timed-take.yaml
+    env:
+      SHOT_PREFIX: "03"
+- assertVisible:
+    id: take-captions
+- assertVisible:
+    id: take-export

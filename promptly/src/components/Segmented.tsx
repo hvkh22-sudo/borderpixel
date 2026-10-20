@@ -8,6 +8,8 @@ interface Option<T extends string | number> {
   value: T;
   label: string;
   badge?: string;
+  /** Stable id for end-to-end tests. */
+  testID?: string;
 }
 
 interface Props<T extends string | number> {
@@ -26,6 +28,7 @@ export function Segmented<T extends string | number>({ options, value, onChange,
         return (
           <Pressable
             key={String(o.value)}
+            testID={o.testID}
             accessibilityRole="radio"
             accessibilityState={{ selected }}
             accessibilityLabel={o.badge ? `${o.label}, ${o.badge}` : o.label}

@@ -167,8 +167,8 @@ export default function Editor() {
       contentStyle={styles.content}
       footer={
         <View style={styles.footerRow}>
-          <Button label={t('editor.aiImprove')} icon="sparkles-outline" variant="secondary" onPress={async () => (await flush(), router.push(`/studio?scriptId=${id}`))} />
-          <Button label={t('editor.record')} icon="videocam" variant="record" onPress={startRecording} style={styles.flex} />
+          <Button testID="editor-ai" label={t('editor.aiImprove')} icon="sparkles-outline" variant="secondary" onPress={async () => (await flush(), router.push(`/studio?scriptId=${id}`))} />
+          <Button testID="editor-record" label={t('editor.record')} icon="videocam" variant="record" onPress={startRecording} style={styles.flex} />
         </View>
       }
     >
@@ -176,14 +176,15 @@ export default function Editor() {
         options={{
           headerRight: () => (
             <View style={styles.headerActions}>
-              <IconButton icon="arrow-undo" iconStyle={flipInRtl()} label={t('common.undo')} disabled={history.current === 0 && currentText(history) === body} onPress={() => applyHistory(undo(pendingSnapshot()))} />
-              <IconButton icon="arrow-redo" iconStyle={flipInRtl()} label={t('common.redo')} disabled={history.current >= history.versions.length - 1} onPress={() => applyHistory(redo(history))} />
-              <IconButton icon="clipboard-outline" label={t('editor.pasteAppend')} onPress={pasteAppend} />
+              <IconButton testID="editor-undo" icon="arrow-undo" iconStyle={flipInRtl()} label={t('common.undo')} disabled={history.current === 0 && currentText(history) === body} onPress={() => applyHistory(undo(pendingSnapshot()))} />
+              <IconButton testID="editor-redo" icon="arrow-redo" iconStyle={flipInRtl()} label={t('common.redo')} disabled={history.current >= history.versions.length - 1} onPress={() => applyHistory(redo(history))} />
+              <IconButton testID="editor-paste" icon="clipboard-outline" label={t('editor.pasteAppend')} onPress={pasteAppend} />
             </View>
           ),
         }}
       />
       <TextInput
+        testID="editor-title"
         value={title}
         onChangeText={(v) => {
           setTitle(v);
@@ -199,6 +200,7 @@ export default function Editor() {
       {loaded ? (
         <View style={styles.chipRow}>
           <Chip
+            testID="editor-folder-chip"
             icon="folder-outline"
             label={folderLabel}
             accessibilityLabel={t('folders.editorChip', { name: folderLabel })}
@@ -207,10 +209,11 @@ export default function Editor() {
           />
         </View>
       ) : null}
-      <Text variant="caption" muted accessibilityLiveRegion="polite">
+      <Text testID="editor-stats" variant="caption" muted accessibilityLiveRegion="polite">
         {t('editor.stats', { words, duration: formatDuration(estimateSpeakingSeconds(body, wpm)) })} · {saveState === 'saved' ? t('editor.saved') : t('editor.saving')}
       </Text>
       <TextInput
+        testID="editor-body"
         value={body}
         onChangeText={onBody}
         multiline

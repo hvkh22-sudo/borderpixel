@@ -1,0 +1,44 @@
+# Launch the development build and get past the Expo dev launcher / dev menu.
+# Env:
+#   CLEAR_STATE  "true" to wipe app data first (first-run flow). Default: keep data.
+#   METRO_URL    optional, URL-encoded Metro address, e.g. http%3A%2F%2F192.168.1.20%3A8081
+#                When set, the dev client is pointed at it with a deep link.
+appId: app.promptly.placeholder
+---
+- runFlow:
+    when:
+      true: ${typeof CLEAR_STATE !== 'undefined' && CLEAR_STATE === 'true'}
+    commands:
+      - launchApp:
+          clearState: true
+          permissions:
+            all: allow
+- runFlow:
+    when:
+      true: ${typeof CLEAR_STATE === 'undefined' || CLEAR_STATE !== 'true'}
+    commands:
+      - launchApp:
+          permissions:
+            all: allow
+
+# Point the dev client at Metro (only when METRO_URL is given).
+- runFlow:
+    when:
+      true: ${typeof METRO_URL !== 'undefined' && METRO_URL !== ''}
+    commands:
+      - openLink: exp+promptly://expo-development-client/?url=${METRO_URL}
+
+# Otherwise pick the first discovered dev server in the dev launcher (same Wi-Fi).
+- tapOn:
+    text: "http://.*:8081"
+    optional: true
+
+# First launch of the dev menu shows an intro sheet.
+- tapOn:
+    text: "Continue"
+    optional: true
+
+- extendedWaitUntil:
+    visible:
+      id: "(onboarding-start|home-create)"
+    timeout: 90000

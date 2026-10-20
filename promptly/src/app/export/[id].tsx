@@ -108,7 +108,7 @@ export default function ExportScreen() {
     <Screen>
       {hasCaptions ? (
         burnInAvailable ? (
-          <ListRow title={t('export.withCaptions')} toggle={{ value: burnIn, onChange: setBurnIn }} />
+          <ListRow testID="export-burn-in" title={t('export.withCaptions')} toggle={{ value: burnIn, onChange: setBurnIn }} />
         ) : (
           <Text variant="caption" muted>
             {t('export.withCaptionsUnavailable')}
@@ -116,9 +116,9 @@ export default function ExportScreen() {
         )
       ) : null}
       <View style={styles.actions}>
-        <Button label={t('export.saveToPhotos')} icon="download-outline" onPress={() => run('photos')} disabled={busy} />
-        <Button label={t('export.shareVideo')} icon="share-outline" variant="secondary" onPress={() => run('share')} disabled={busy} />
-        <Button label={t('export.shareSrt')} icon="document-text-outline" variant="secondary" onPress={shareSrt} disabled={!hasCaptions || busy} />
+        <Button testID="export-save-photos" label={t('export.saveToPhotos')} icon="download-outline" onPress={() => run('photos')} disabled={busy} />
+        <Button testID="export-share-video" label={t('export.shareVideo')} icon="share-outline" variant="secondary" onPress={() => run('share')} disabled={busy} />
+        <Button testID="export-share-srt" label={t('export.shareSrt')} icon="document-text-outline" variant="secondary" onPress={shareSrt} disabled={!hasCaptions || busy} />
         {!hasCaptions ? (
           <Text variant="caption" muted center>
             {t('export.noCaptions')}
@@ -134,7 +134,7 @@ export default function ExportScreen() {
           <Button label={t('common.cancel')} variant="ghost" onPress={() => (jobRef.current?.cancel(), setStatus({ kind: 'idle' }))} />
         </View>
       ) : status.kind !== 'idle' ? (
-        <Text center color={status.kind === 'error' ? colors.danger : colors.success} accessibilityLiveRegion="assertive">
+        <Text testID="export-status" center color={status.kind === 'error' ? colors.danger : colors.success} accessibilityLiveRegion="assertive">
           {status.message}
         </Text>
       ) : null}

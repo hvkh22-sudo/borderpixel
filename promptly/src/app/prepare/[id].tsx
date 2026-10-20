@@ -68,7 +68,7 @@ export default function Prepare() {
 
   return (
     <Screen
-      footer={<Button label={t('prepare.start')} icon="videocam" variant="record" size="lg" onPress={() => router.push(`/record/${id}?mode=${mode}`)} />}
+      footer={<Button testID="prepare-start" label={t('prepare.start')} icon="videocam" variant="record" size="lg" onPress={() => router.push(`/record/${id}?mode=${mode}`)} />}
     >
       <View style={styles.preview} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
         {script ? (
@@ -90,6 +90,7 @@ export default function Prepare() {
             return (
               <Pressable
                 key={p.id}
+                testID={`preset-${p.id}`}
                 accessibilityRole="radio"
                 accessibilityState={{ selected }}
                 accessibilityLabel={t(p.nameKey)}
@@ -117,9 +118,9 @@ export default function Prepare() {
             value={mode}
             onChange={chooseMode}
             options={[
-              { value: 'manual', label: t('prepare.modeManual') },
-              { value: 'timed', label: t('prepare.modeTimed') },
-              ...(voiceSupported ? [{ value: 'voice' as const, label: t('prepare.modeVoice'), badge: access.isPro ? undefined : t('common.pro') }] : []),
+              { value: 'manual', label: t('prepare.modeManual'), testID: 'mode-manual' },
+              { value: 'timed', label: t('prepare.modeTimed'), testID: 'mode-timed' },
+              ...(voiceSupported ? [{ value: 'voice' as const, label: t('prepare.modeVoice'), badge: access.isPro ? undefined : t('common.pro'), testID: 'mode-voice' }] : []),
             ]}
           />
           <Text variant="caption" muted>
@@ -196,8 +197,8 @@ export default function Prepare() {
             value={camera.position}
             onChange={(position) => setCamera({ position })}
             options={[
-              { value: 'front', label: t('prepare.front') },
-              { value: 'back', label: t('prepare.back') },
+              { value: 'front', label: t('prepare.front'), testID: 'camera-front' },
+              { value: 'back', label: t('prepare.back'), testID: 'camera-back' },
             ]}
           />
           <Text variant="callout">{t('prepare.orientation')}</Text>
@@ -232,7 +233,7 @@ export default function Prepare() {
             accessibilityLabel={t('prepare.countdown')}
             value={prompter.countdownSec}
             onChange={(countdownSec) => setPrompter({ countdownSec })}
-            options={[0, 3, 5, 10].map((n) => ({ value: n as 0 | 3 | 5 | 10, label: n === 0 ? t('common.off') : t('common.seconds', { n }) }))}
+            options={[0, 3, 5, 10].map((n) => ({ value: n as 0 | 3 | 5 | 10, label: n === 0 ? t('common.off') : t('common.seconds', { n }), testID: `countdown-${n}` }))}
           />
         </View>
       </Section>

@@ -45,6 +45,8 @@ export interface SheetAction {
   onPress: () => void;
   destructive?: boolean;
   selected?: boolean;
+  /** Stable id for end-to-end tests. */
+  testID?: string;
 }
 
 /** A list of tappable rows for a Sheet. A Cancel row is always added last. */
@@ -55,6 +57,7 @@ export function SheetActions({ actions, onCancel }: { actions: SheetAction[]; on
       {actions.map((a, i) => (
         <Pressable
           key={`${i}:${a.label}`}
+          testID={a.testID}
           accessibilityRole="button"
           accessibilityLabel={a.label}
           accessibilityState={{ selected: !!a.selected }}
@@ -69,6 +72,7 @@ export function SheetActions({ actions, onCancel }: { actions: SheetAction[]; on
         </Pressable>
       ))}
       <Pressable
+        testID="sheet-cancel"
         accessibilityRole="button"
         accessibilityLabel={t('common.cancel')}
         onPress={onCancel}

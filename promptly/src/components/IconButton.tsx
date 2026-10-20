@@ -15,12 +15,15 @@ interface Props {
   style?: StyleProp<ViewStyle>;
   /** E.g. `flipInRtl()` for direction-bearing glyphs. */
   iconStyle?: StyleProp<TextStyle>;
+  /** Stable id for end-to-end tests (Maestro `id:` selector). */
+  testID?: string;
 }
 
-export function IconButton({ icon, label, onPress, color, background, size = 22, disabled, style, iconStyle }: Props) {
+export function IconButton({ icon, label, onPress, color, background, size = 22, disabled, style, iconStyle, testID }: Props) {
   const { colors } = useTheme();
   return (
     <Pressable
+      testID={testID}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled: !!disabled }}

@@ -37,3 +37,16 @@ npx expo start --dev-client     # phone and computer on the same network, or use
 7. REC-04 background the app mid-take → take still saved.
 
 Record results in `device-matrix.md` (device, OS, pass/fail, notes, screen recording link).
+
+## 5. Automated flows (Maestro)
+`promptly/.maestro/` holds Maestro flows for the core journeys (first run, scripts, Timed
+recording, captions, export, paywall, Hebrew). With Metro running (`npx expo start --dev-client`),
+run `maestro test .maestro/` from `promptly/` against the development build; setup, per-flow notes
+and limits are in `.maestro/README.md`. The flows tap through the app and save screenshots under
+`promptly/screenshots/`; they do not judge video content. Maestro drives Android phones,
+emulators and the iOS Simulator, **not physical iPhones**: on the iPhone, do the same steps by
+hand. Not yet executed on any device.
+
+What a person must still judge on each phone is in `founder-checklist-he.md` (Hebrew): overlay
+absent from the exported file, clap-test sync, Voice Follow behaviour, caption accuracy, Hebrew
+screens.

@@ -25,6 +25,7 @@ export function NameForm({ placeholder, submitLabel, cancelLabel, initial = '', 
   return (
     <View style={styles.wrap}>
       <TextInput
+        testID="name-form-input"
         value={value}
         onChangeText={setValue}
         placeholder={placeholder}
@@ -37,8 +38,8 @@ export function NameForm({ placeholder, submitLabel, cancelLabel, initial = '', 
         style={[styles.input, { color: colors.text, backgroundColor: colors.background, borderColor: colors.border }, contentDirectionStyle(value)]}
       />
       <View style={styles.buttons}>
-        <Button label={cancelLabel} variant="ghost" onPress={onCancel} style={styles.flex} />
-        <Button label={submitLabel} onPress={submit} disabled={!clean} style={styles.flex} />
+        <Button testID="name-form-cancel" label={cancelLabel} variant="ghost" onPress={onCancel} style={styles.flex} />
+        <Button testID="name-form-submit" label={submitLabel} onPress={submit} disabled={!clean} style={styles.flex} />
       </View>
     </View>
   );
