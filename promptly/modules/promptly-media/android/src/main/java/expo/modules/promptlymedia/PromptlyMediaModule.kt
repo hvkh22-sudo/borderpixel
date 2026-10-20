@@ -253,47 +253,54 @@ class PromptlyMediaModule : Module() {
     }
     extractor.selectTrack(trackIndex)
     val format = extractor.getTrackFormat(trackIndex)
-    val decoder = MediaCodec.createDecoderByType(format.getString(MediaFormat.KEY_MIME)!!)
-    decoder.configure(format, null, null, 0)
-    decoder.start()
-
-    var srcRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
-    var channels = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
     val outFile = File(Uri.parse(outputUri).path ?: outputUri)
-    outFile.parentFile?.mkdirs()
-    val raf = RandomAccessFile(outFile, "rw")
-    raf.setLength(0)
-    raf.write(ByteArray(44)) // header placeholder
     var dataBytes = 0L
-    val resampler = LinearResampler(targetRate)
-    val info = MediaCodec.BufferInfo()
-    var inputDone = false
-    var outputDone = false
+    // Every resource is released on any failure, including decoder creation/configuration.
+    var decoder: MediaCodec? = null
+    var decoderStarted = false
+    var raf: RandomAccessFile? = null
     try {
+      val codec = MediaCodec.createDecoderByType(format.getString(MediaFormat.KEY_MIME)!!)
+      decoder = codec
+      codec.configure(format, null, null, 0)
+      codec.start()
+      decoderStarted = true
+
+      var srcRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
+      var channels = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+      outFile.parentFile?.mkdirs()
+      val file = RandomAccessFile(outFile, "rw")
+      raf = file
+      file.setLength(0)
+      file.write(ByteArray(44)) // header placeholder
+      val resampler = LinearResampler(targetRate)
+      val info = MediaCodec.BufferInfo()
+      var inputDone = false
+      var outputDone = false
       while (!outputDone) {
         if (!inputDone) {
-          val inIdx = decoder.dequeueInputBuffer(10_000)
+          val inIdx = codec.dequeueInputBuffer(10_000)
           if (inIdx >= 0) {
-            val buf = decoder.getInputBuffer(inIdx)!!
+            val buf = codec.getInputBuffer(inIdx)!!
             val size = extractor.readSampleData(buf, 0)
             if (size < 0) {
-              decoder.queueInputBuffer(inIdx, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+              codec.queueInputBuffer(inIdx, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
               inputDone = true
             } else {
-              decoder.queueInputBuffer(inIdx, 0, size, extractor.sampleTime, 0)
+              codec.queueInputBuffer(inIdx, 0, size, extractor.sampleTime, 0)
               extractor.advance()
             }
           }
         }
-        val outIdx = decoder.dequeueOutputBuffer(info, 10_000)
+        val outIdx = codec.dequeueOutputBuffer(info, 10_000)
         when {
           outIdx == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
-            val f = decoder.outputFormat
+            val f = codec.outputFormat
             srcRate = f.getInteger(MediaFormat.KEY_SAMPLE_RATE)
             channels = f.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
           }
           outIdx >= 0 -> {
-            val out = decoder.getOutputBuffer(outIdx)!!
+            val out = codec.getOutputBuffer(outIdx)!!
             out.position(info.offset)
             out.limit(info.offset + info.size)
             val shorts = out.order(ByteOrder.nativeOrder()).asShortBuffer()
@@ -307,18 +314,18 @@ class PromptlyMediaModule : Module() {
             val resampled = resampler.process(mono, srcRate)
             val bytes = ByteBuffer.allocate(resampled.size * 2).order(ByteOrder.LITTLE_ENDIAN)
             resampled.forEach { bytes.putShort(it) }
-            raf.write(bytes.array())
+            file.write(bytes.array())
             dataBytes += bytes.capacity()
-            decoder.releaseOutputBuffer(outIdx, false)
+            codec.releaseOutputBuffer(outIdx, false)
             if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) outputDone = true
           }
         }
       }
-      writeWavHeader(raf, dataBytes, targetRate)
+      writeWavHeader(file, dataBytes, targetRate)
     } finally {
-      raf.close()
-      decoder.stop()
-      decoder.release()
+      try { raf?.close() } catch (e: java.io.IOException) {}
+      if (decoderStarted) try { decoder?.stop() } catch (e: IllegalStateException) {}
+      decoder?.release()
       extractor.release()
     }
     return mapOf(
