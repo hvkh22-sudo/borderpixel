@@ -19,7 +19,9 @@ import android.os.Looper
 import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
+import androidx.annotation.OptIn
 import androidx.core.os.bundleOf
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
@@ -72,9 +74,12 @@ class CaptionStyleRecord : Record {
   @Field val positionY: Double = 0.7
 }
 
-@UnstableApi
+private class ActiveExport(val transformer: Transformer, val promise: Promise, val outFile: File)
+
+@OptIn(UnstableApi::class)
 class PromptlyMediaModule : Module() {
-  private val transformers = mutableMapOf<String, Transformer>()
+  // Main-thread only: Transformer is bound to the Looper it was built on.
+  private val exports = mutableMapOf<String, ActiveExport>()
   private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
   private val context get() = requireNotNull(appContext.reactContext) { "React context unavailable" }
 
@@ -115,7 +120,7 @@ class PromptlyMediaModule : Module() {
 
     AsyncFunction("muxAudio") { jobId: String, videoUri: String, segments: List<AudioSegmentRecord>, outputUri: String, promise: Promise ->
       val video = EditedMediaItem.Builder(MediaItem.fromUri(videoUri)).setRemoveAudio(true).build()
-      val audioSeq = EditedMediaItemSequence.Builder(setOf(androidx.media3.common.C.TRACK_TYPE_AUDIO))
+      val audioSeq = EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_AUDIO))
       var cursorMs = 0.0
       for (seg in segments.sortedBy { it.offsetMs }) {
         val itemBuilder = MediaItem.Builder().setUri(seg.uri)
@@ -131,10 +136,13 @@ class PromptlyMediaModule : Module() {
         audioSeq.addItem(EditedMediaItem.Builder(itemBuilder.build()).setRemoveVideo(true).build())
         cursorMs = max(cursorMs, seg.offsetMs + wavDurationMs(seg.uri))
       }
-      val composition = Composition.Builder(
-        EditedMediaItemSequence.Builder(video).build(),
-        audioSeq.build(),
-      ).build()
+      val videoSeq = EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_VIDEO)).addItem(video).build()
+      // A sequence must contain at least one item.
+      val composition = if (segments.isEmpty()) {
+        Composition.Builder(videoSeq).build()
+      } else {
+        Composition.Builder(videoSeq, audioSeq.build()).build()
+      }
       runTransformer(jobId, outputUri, promise) { t, path -> t.start(composition, path) }
     }.runOnQueue(Queues.MAIN)
 
@@ -143,7 +151,15 @@ class PromptlyMediaModule : Module() {
     }
 
     Function("cancel") { jobId: String ->
-      mainHandler.post { transformers.remove(jobId)?.cancel() }
+      mainHandler.post {
+        // Transformer.cancel() does not invoke the listener, so settle the promise here.
+        exports.remove(jobId)?.let {
+          it.transformer.cancel()
+          it.outFile.delete()
+          it.promise.reject(CodedException("Cancelled", "Export cancelled", null))
+        }
+      }
+      Unit
     }
   }
 
@@ -156,24 +172,30 @@ class PromptlyMediaModule : Module() {
       .setAudioMimeType(MimeTypes.AUDIO_AAC)
       .addListener(object : Transformer.Listener {
         override fun onCompleted(composition: Composition, exportResult: ExportResult) {
-          transformers.remove(jobId)
+          exports.remove(jobId)
           sendEvent("onProgress", bundleOf("jobId" to jobId, "progress" to 1.0))
           promise.resolve(Uri.fromFile(outFile).toString())
         }
 
         override fun onError(composition: Composition, exportResult: ExportResult, exportException: ExportException) {
-          transformers.remove(jobId)
+          exports.remove(jobId)
           outFile.delete()
           promise.reject(CodedException("ExportFailed", exportException.message ?: "Export failed", exportException))
         }
       })
       .build()
-    transformers[jobId] = transformer
-    start(transformer, outFile.absolutePath)
+    exports[jobId] = ActiveExport(transformer, promise, outFile)
+    try {
+      start(transformer, outFile.absolutePath)
+    } catch (e: RuntimeException) {
+      exports.remove(jobId)
+      promise.reject(CodedException("ExportFailed", e.message ?: "Export failed to start", e))
+      return
+    }
     val holder = ProgressHolder()
     val poll = object : Runnable {
       override fun run() {
-        val t = transformers[jobId] ?: return
+        val t = exports[jobId]?.transformer ?: return
         if (t.getProgress(holder) == Transformer.PROGRESS_STATE_AVAILABLE) {
           sendEvent("onProgress", bundleOf("jobId" to jobId, "progress" to holder.progress / 100.0))
         }
@@ -330,7 +352,7 @@ private class LinearResampler(private val targetRate: Int) {
 }
 
 /** Draws the active cue to a bitmap; Media3 composites it over each frame. */
-@UnstableApi
+@OptIn(UnstableApi::class)
 private class CaptionOverlay(
   private val cues: List<CueRecord>,
   private val style: CaptionStyleRecord,
@@ -364,11 +386,12 @@ private class CaptionOverlay(
     }
   }
 
-  override fun getOverlaySettings(presentationTimeUs: Long): StaticOverlaySettings =
-    StaticOverlaySettings.Builder()
-      // NDC: y = 1 is the top edge.
-      .setBackgroundFrameAnchor(0f, (1 - 2 * style.positionY).toFloat())
-      .build()
+  private val settings = StaticOverlaySettings.Builder()
+    // NDC: y = 1 is the top edge. Builder rejects values outside [-1, 1].
+    .setBackgroundFrameAnchor(0f, (1 - 2 * style.positionY).toFloat().coerceIn(-1f, 1f))
+    .build()
+
+  override fun getOverlaySettings(presentationTimeUs: Long): StaticOverlaySettings = settings
 
   private fun render(raw: String): Bitmap {
     val text = if (style.uppercase) raw.uppercase() else raw

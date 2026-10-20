@@ -66,9 +66,7 @@ public final class PromptlyMediaModule: Module {
     }
 
     Function("cancel") { (jobId: String) in
-      self.lock.lock()
-      let session = self.sessions[jobId]
-      self.lock.unlock()
+      let session = self.lock.withLock { self.sessions[jobId] }
       session?.cancelExport()
     }
   }
@@ -141,23 +139,21 @@ public final class PromptlyMediaModule: Module {
     session.outputFileType = .mp4
     session.shouldOptimizeForNetworkUse = true
 
-    lock.lock()
-    sessions[jobId] = session
-    lock.unlock()
-    defer {
-      lock.lock()
-      sessions[jobId] = nil
-      lock.unlock()
-    }
+    // NSLock.lock() is unavailable from async contexts; withLock is not.
+    lock.withLock { sessions[jobId] = session }
+    defer { lock.withLock { sessions[jobId] = nil } }
 
+    let box = ExportSessionBox(session: session)
     let timer = DispatchSource.makeTimerSource(queue: .global())
     timer.schedule(deadline: .now(), repeating: .milliseconds(250))
-    timer.setEventHandler { [weak self, weak session] in
-      guard let session else { return }
-      self?.sendEvent("onProgress", ["jobId": jobId, "progress": Double(session.progress)])
+    timer.setEventHandler { [weak self] in
+      self?.sendEvent("onProgress", ["jobId": jobId, "progress": Double(box.session.progress)])
     }
     timer.resume()
-    await session.export()
+    // Same pattern as expo-media-library: avoids the iOS 18-only export(to:as:) and Sendable issues of export() async.
+    await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+      box.session.exportAsynchronously { continuation.resume() }
+    }
     timer.cancel()
 
     switch session.status {
@@ -221,8 +217,9 @@ public final class PromptlyMediaModule: Module {
     let total = max(duration, cue.endMs / 1000)
     let start = cue.startMs / 1000 / total
     let end = cue.endMs / 1000 / total
-    show.values = [0, 1, 1, 0]
-    show.keyTimes = [NSNumber(value: start), NSNumber(value: start), NSNumber(value: end), NSNumber(value: end)]
+    // Discrete mode: keyTimes runs 0...1 with one more entry than values.
+    show.values = [0, 1, 0]
+    show.keyTimes = [0, NSNumber(value: start), NSNumber(value: end), 1]
     show.calculationMode = .discrete
     show.duration = total
     show.beginTime = AVCoreAnimationBeginTimeAtZero
@@ -233,7 +230,11 @@ public final class PromptlyMediaModule: Module {
   }
 }
 
-extension UIColor {
+private struct ExportSessionBox: @unchecked Sendable {
+  let session: AVAssetExportSession
+}
+
+fileprivate extension UIColor {
   /// Accepts #RRGGBB, #RRGGBBAA and rgba(r,g,b,a).
   convenience init?(hex: String) {
     let s = hex.trimmingCharacters(in: .whitespaces)
