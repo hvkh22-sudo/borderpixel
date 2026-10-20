@@ -1,7 +1,6 @@
 /* Test-only SqlExecutor backed by Node's built-in SQLite. */
 import type { SqlExecutor, SqlValue } from '../sql';
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const { DatabaseSync } = require('node:sqlite') as {
   DatabaseSync: new (path: string) => {
     exec(sql: string): void;
