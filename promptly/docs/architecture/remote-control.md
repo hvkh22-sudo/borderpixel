@@ -55,9 +55,11 @@ implements no `pressesBegan`/`keyCommands` (only `canBecomeFocused` for `focusab
 Conclusion: no pure-JS path works on either platform, so both are native.
 
 ## iOS implementation
-`modules/promptly-media/ios/RemoteKeyResponder.swift`: while enabled, a hidden, zero-size,
-non-interactive `UIView` with `canBecomeFirstResponder = true` is added to the key window and
-made first responder. `pressesBegan` reads `UIPress.key` (iOS 13.4+; pod minimum is 16.4) and
+`modules/promptly-media/ios/RemoteKeyResponder.swift`: while enabled, a hidden, zero-size
+`UIView` with `canBecomeFirstResponder = true` is added to the key window and made first
+responder. It keeps `isUserInteractionEnabled = true`: UIKit discards press/keyboard events for
+views with interaction disabled, so `pressesBegan` would never fire; the zero frame keeps it from
+receiving touches. `pressesBegan` reads `UIPress.key` (iOS 13.4+; pod minimum is 16.4) and
 maps `UIKeyboardHIDUsage` arrows, PageUp/Down, Space, Return/Enter, keypad Enter; other presses
 go to `super`. It does not adopt `UIKeyInput`, so no software keyboard appears. It re-claims
 first responder on `UIWindow.didBecomeKeyNotification` / `didBecomeActiveNotification` (alerts

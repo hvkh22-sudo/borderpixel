@@ -7,6 +7,7 @@ import {
   clampWpm,
   followAnimationMs,
   lineForChar,
+  maxScroll,
   pixelsPerSecond,
   scrollOffsetForChar,
 } from '../scrollModel';
@@ -37,6 +38,16 @@ describe('scrollModel', () => {
     // Line 2 center = 100; reading line at 30% of 200 = 60 → offset 40.
     expect(scrollOffsetForChar(index, 25, 200, 0.3)).toBe(40);
     expect(scrollOffsetForChar(index, 0, 200, 0.3)).toBe(0);
+  });
+
+  it('uses the renderer\'s scroll range (last line on the reading line), not topPad beyond it', () => {
+    // Renderer: topPad = viewport * readingLine, and offsets run 0..contentHeight.
+    const viewport = 400;
+    const topPad = viewport * 0.3;
+    expect(maxScroll(index, viewport, 0.3, topPad)).toBe(index.contentHeight);
+    for (let c = 0; c <= 40; c++) expect(scrollOffsetForChar(index, c, viewport, 0.3, topPad)).toBeLessThanOrEqual(index.contentHeight);
+    // Generic inset: the bottom of the content may reach the reading line, no further.
+    expect(maxScroll(index, 200, 0.3, 0)).toBe(60);
   });
 
   it('computes timed velocity from WPM', () => {

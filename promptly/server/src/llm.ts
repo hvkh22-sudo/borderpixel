@@ -9,10 +9,17 @@ const OutputSchema = z.object({
   alternatives: z.array(z.string()),
 });
 
+export interface LlmUsage {
+  inputTokens: number;
+  outputTokens: number;
+}
+
 export class LlmError extends Error {
   constructor(
-    readonly kind: 'rate_limited' | 'overloaded' | 'refused' | 'bad_output' | 'upstream',
+    readonly kind: 'rate_limited' | 'overloaded' | 'refused' | 'bad_output' | 'aborted' | 'upstream',
     message?: string,
+    /** Tokens billed for the failed call, when the provider reported them. */
+    readonly usage?: LlmUsage,
   ) {
     super(message ?? kind);
   }
@@ -43,17 +50,19 @@ export class AnthropicLlm implements LlmClient {
         },
         { signal },
       );
-      if (response.stop_reason === 'refusal') throw new LlmError('refused');
+      // Refused and unusable completions are still billed: report their usage.
+      const usage: LlmUsage = { inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens };
+      if (response.stop_reason === 'refusal') throw new LlmError('refused', undefined, usage);
       const out = response.parsed_output;
-      if (!out || !out.script.trim()) throw new LlmError('bad_output');
+      if (!out || !out.script.trim()) throw new LlmError('bad_output', undefined, usage);
       return {
         text: out.script.trim(),
         alternatives: out.alternatives.map((a) => a.trim()).filter(Boolean).slice(0, 3),
-        inputTokens: response.usage.input_tokens,
-        outputTokens: response.usage.output_tokens,
+        ...usage,
       };
     } catch (e) {
       if (e instanceof LlmError) throw e;
+      if (e instanceof Anthropic.APIUserAbortError) throw new LlmError('aborted');
       if (e instanceof Anthropic.RateLimitError) throw new LlmError('rate_limited');
       if (e instanceof Anthropic.InternalServerError) throw new LlmError('overloaded');
       if (e instanceof Anthropic.APIConnectionError) throw new LlmError('upstream', 'connection');

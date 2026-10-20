@@ -30,13 +30,13 @@ const CERT = '6a6a1474b5cbbb2b1aa57e0bc3';
 const FREE: Entitlement = { plan: 'free', creditPacks: 0 };
 const PRO: Entitlement = { plan: 'subscription', creditPacks: 0 };
 
-function setup(opts: { mode?: IntegrityMode; ent?: Entitlement; play?: (token: string) => PlayIntegrityPayload } = {}) {
+function setup(opts: { mode?: IntegrityMode; ent?: Entitlement; play?: (token: string) => PlayIntegrityPayload; allowDevelopmentKeys?: boolean } = {}) {
   const logs: Record<string, string | number>[] = [];
   let now = NOW;
   const config: IntegrityConfig = {
     mode: opts.mode ?? 'report',
     appleAppId: APP_ID,
-    allowDevelopmentKeys: false,
+    allowDevelopmentKeys: opts.allowDevelopmentKeys ?? false,
     androidPackage: PKG,
     androidCertDigests: [CERT],
     ...INTEGRITY_DEFAULTS,
@@ -85,9 +85,9 @@ async function challenge(deps: Deps, user = USER): Promise<string> {
 }
 
 /** Simulates an attested iOS install: registers the fake key the way /v1/integrity/attest stores it. */
-async function iosDevice(ctx: ReturnType<typeof setup>) {
+async function iosDevice(ctx: ReturnType<typeof setup>, environment: 'production' | 'development' = 'production') {
   const dev = await fakeAppAttestKey();
-  await ctx.store.cachePut(`user:${USER}`, `aakey:${dev.keyId}`, { publicKeySpki: dev.publicKeySpki, environment: 'production' }, NOW + 1e10);
+  await ctx.store.cachePut(`user:${USER}`, `aakey:${dev.keyId}`, { publicKeySpki: dev.publicKeySpki, environment }, NOW + 1e10);
   let counter = 0;
   return {
     dev,
@@ -176,6 +176,18 @@ describe('iOS App Attest requests', () => {
     const headers = await ios.headers('{"tool":"generate","topic":"x"}', await challenge(ctx.deps));
     expect((await handle(post('/v1/studio', BODY, headers), ctx.deps)).status).toBe(403);
     expect(lastIntegrityLog(ctx.logs)).toMatchObject({ reason: 'bad_signature' });
+  });
+
+  it('rejects development keys once development keys are no longer allowed', async () => {
+    // Registered while allowDevelopmentKeys was on; the flag has since been turned off.
+    const ctx = setup({ mode: 'enforce' });
+    const ios = await iosDevice(ctx, 'development');
+    expect((await handle(post('/v1/studio', BODY, await ios.headers(BODY, await challenge(ctx.deps))), ctx.deps)).status).toBe(403);
+    expect(lastIntegrityLog(ctx.logs)).toMatchObject({ reason: 'development_key_rejected' });
+
+    const allowed = setup({ mode: 'enforce', allowDevelopmentKeys: true });
+    const devIos = await iosDevice(allowed, 'development');
+    expect((await handle(post('/v1/studio', BODY, await devIos.headers(BODY, await challenge(allowed.deps))), allowed.deps)).status).toBe(200);
   });
 
   it('rejects keys that were never attested', async () => {

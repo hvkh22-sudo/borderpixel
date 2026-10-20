@@ -163,6 +163,34 @@ describe('handler', () => {
     expect(await deps.store.get(`user:${USER}`, 'm:2026-10')).toBe(0);
   });
 
+  it('records spend and keeps the charge for a refused or unusable completion (it was billed)', async () => {
+    for (const kind of ['refused', 'bad_output'] as const) {
+      const { deps } = setup({
+        llm: {
+          async complete() {
+            throw new LlmError(kind, undefined, { inputTokens: 1000, outputTokens: 500 });
+          },
+        },
+      });
+      expect((await handle(req(IMPROVE), deps)).status).toBe(kind === 'refused' ? 422 : 502);
+      expect(await deps.store.get(`user:${USER}`, 'm:2026-10')).toBe(1);
+      expect(await deps.store.get('global', 'spend:2026-10-20')).toBe(14_000);
+    }
+  });
+
+  it('refunds quota for an aborted or failed request but still records known spend', async () => {
+    const { deps } = setup({
+      llm: {
+        async complete() {
+          throw new LlmError('aborted', undefined, { inputTokens: 1000, outputTokens: 0 });
+        },
+      },
+    });
+    expect((await handle(req(IMPROVE), deps)).status).toBe(502);
+    expect(await deps.store.get(`user:${USER}`, 'm:2026-10')).toBe(0);
+    expect(await deps.store.get('global', 'spend:2026-10-20')).toBe(4_000);
+  });
+
   it('maps upstream rate limits to 429', async () => {
     const { deps } = setup({
       llm: {

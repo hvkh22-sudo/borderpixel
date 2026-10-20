@@ -7,6 +7,7 @@ import {
   type TakeOptions,
   type VoiceFollowLike,
 } from '../recordingSession';
+import { isRecordingActive } from '../orphanRecovery';
 import type { PersistedAudio } from '../../voice-follow/voiceFollowController';
 
 interface Deferred<T> {
@@ -409,4 +410,23 @@ describe('RecordingSession', () => {
     h.session.prepare();
     expect(h.status()).toBe('ready');
   });
+});
+
+it('marks the take file as in progress (hidden from orphan recovery) until the take is finalized', async () => {
+  let activeWhileFinalizing: boolean | null = null;
+  const h = setup({
+    finalize: async () => {
+      activeWhileFinalizing = isRecordingActive('take_vis.mp4');
+      return { recordingId: 'rec1', audioMergeFailed: false };
+    },
+  });
+  // Unique name: other tests in this file leave takes in flight.
+  h.deps.newRecordingPath = () => '/docs/recordings/take_vis.mp4';
+  const rec = await startRecording(h);
+  expect(isRecordingActive('take_vis.mp4')).toBe(true);
+  await h.session.stop();
+  rec.finish();
+  await flush();
+  expect(activeWhileFinalizing).toBe(true);
+  expect(isRecordingActive('take_vis.mp4')).toBe(false);
 });

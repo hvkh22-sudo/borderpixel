@@ -11,7 +11,7 @@ import {
   verifyRequestIntegrity,
   type IntegrityDeps,
 } from './integrity';
-import { LlmError } from './llm';
+import { LlmError, type LlmUsage } from './llm';
 import { SYSTEM_PROMPT, buildUserPrompt } from './prompts';
 import type { QuotaStore } from './quota';
 import type { Entitlement, LlmClient, StudioResponse } from './types';
@@ -219,12 +219,11 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
 
   const started = deps.now();
   const { prompt, wantsAlternatives } = buildUserPrompt(parsed);
+  const recordSpend = (u: LlmUsage) =>
+    deps.store.add('global', `spend:${day}`, Math.ceil(u.inputTokens * deps.config.inputUsdPerMTok + u.outputTokens * deps.config.outputUsdPerMTok));
   try {
     const out = await deps.llm.complete(SYSTEM_PROMPT, prompt, wantsAlternatives, req.signal);
-    const costMicro = Math.ceil(
-      (out.inputTokens * deps.config.inputUsdPerMTok + out.outputTokens * deps.config.outputUsdPerMTok),
-    );
-    await deps.store.add('global', `spend:${day}`, costMicro);
+    await recordSpend(out);
     deps.log({ event: 'studio_ok', tool: parsed.tool, plan: ent.plan, in: out.inputTokens, out: out.outputTokens, ms: deps.now() - started });
     const response: StudioResponse = {
       text: out.text,
@@ -233,8 +232,12 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
     };
     return json(200, response);
   } catch (e) {
-    await deps.store.refund(scope, chargedKey);
     const kind = e instanceof LlmError ? e.kind : 'upstream';
+    // Whatever the provider billed counts toward the daily budget.
+    if (e instanceof LlmError && e.usage) await recordSpend(e.usage);
+    // A refused or unusable answer consumed a completion, so it keeps its charge
+    // (otherwise it could be retried for free). Aborts and upstream failures are refunded.
+    if (kind !== 'refused' && kind !== 'bad_output') await deps.store.refund(scope, chargedKey);
     deps.log({ event: 'studio_error', tool: parsed.tool, plan: ent.plan, kind, ms: deps.now() - started });
     if (kind === 'rate_limited') return json(429, { error: 'rate_limited' });
     if (kind === 'refused') return json(422, { error: 'refused' });

@@ -148,6 +148,8 @@ export async function verifyRequestIntegrity(ctx: Ctx, userId: string, headers: 
     const scope = userScope(userId);
     const stored = await ctx.store.cacheGet<StoredKey>(scope, `aakey:${keyId}`, ctx.now());
     if (!stored) return fail('key_not_attested');
+    // Keys registered while development keys were allowed stop working once the flag is off.
+    if (stored.environment === 'development' && !cfg.allowDevelopmentKeys) return fail('development_key_rejected');
     try {
       const previous = await ctx.store.get(scope, `aactr:${keyId}`);
       const { counter } = await verifyAssertion({

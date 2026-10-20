@@ -427,6 +427,8 @@ export default function RecordScreen() {
                   prompterRef.current?.jumpToChar(c);
                 }}
                 onUserScroll={() => {
+                  // A dragged take does not teach a speaking rate (timedSample drops it).
+                  markManualJump();
                 }}
                 onEnd={() => {
                   if (isRecording && timedEndMsRef.current == null) timedEndMsRef.current = playedNow();

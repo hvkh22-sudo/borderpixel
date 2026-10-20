@@ -148,13 +148,16 @@ export function scrollOffsetForChar(
   const line = index.lines[li]!;
   const lineCenter = topInset + line.y + line.height / 2;
   const target = lineCenter - viewportHeight * readingLineRatio;
-  return clamp(target, 0, maxScroll(index, viewportHeight, topInset));
+  return clamp(target, 0, maxScroll(index, viewportHeight, readingLineRatio, topInset));
 }
 
-export function maxScroll(index: LineIndex, viewportHeight: number, topInset = 0): number {
-  // Allow the last line to reach the reading line: content is padded by one
-  // viewport at the bottom in the renderer.
-  return Math.max(0, topInset + index.contentHeight);
+/**
+ * Largest scroll offset: the end of the content sits on the reading line. With the
+ * renderer's geometry (topInset = viewport * readingLine) this is `contentHeight`,
+ * the same bound Timed scrolling, drags and nudges use.
+ */
+export function maxScroll(index: LineIndex, viewportHeight: number, readingLineRatio: number, topInset = 0): number {
+  return Math.max(0, topInset + index.contentHeight - viewportHeight * readingLineRatio);
 }
 
 /**

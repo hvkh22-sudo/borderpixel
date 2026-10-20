@@ -35,6 +35,8 @@ export default function ExportScreen() {
   const [burnIn, setBurnIn] = useState(false);
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
   const jobRef = useRef<Job<string> | null>(null);
+  /** Set when the user cancels a burn-in, whose job then rejects; that is not a failure. */
+  const cancelledRef = useRef(false);
   const burnInAvailable = support.burnIn().ok;
   const access = useAccess((s) => s.access);
   const usage = useAccess((s) => s.usage);
@@ -75,6 +77,7 @@ export default function ExportScreen() {
   };
 
   const run = async (action: 'photos' | 'share') => {
+    cancelledRef.current = false;
     try {
       const uri = await prepareVideo();
       if (action === 'photos') {
@@ -91,7 +94,11 @@ export default function ExportScreen() {
         await Sharing.shareAsync(uri, { mimeType: 'video/mp4', UTI: 'public.mpeg-4' });
       }
       track({ name: 'export_completed', captions: burnIn && hasCaptions, kind: 'video' });
-    } catch {
+    } catch (e) {
+      if (cancelledRef.current || isCancelled(e)) {
+        setStatus({ kind: 'idle' });
+        return;
+      }
       setStatus({ kind: 'error', message: t('export.failed') });
     }
   };
@@ -146,7 +153,7 @@ export default function ExportScreen() {
           >
             <View style={[styles.fill, { width: `${Math.round(status.progress * 100)}%`, backgroundColor: colors.primary }]} />
           </View>
-          <Button label={t('common.cancel')} variant="ghost" onPress={() => (jobRef.current?.cancel(), setStatus({ kind: 'idle' }))} />
+          <Button label={t('common.cancel')} variant="ghost" onPress={() => ((cancelledRef.current = true), jobRef.current?.cancel(), setStatus({ kind: 'idle' }))} />
         </View>
       ) : status.kind !== 'idle' ? (
         <Text testID="export-status" center color={status.kind === 'error' ? colors.danger : colors.success} accessibilityLiveRegion="assertive">
@@ -158,6 +165,12 @@ export default function ExportScreen() {
       </Text>
     </Screen>
   );
+}
+
+/** promptly-media rejects a cancelled job with code "Cancelled" (Android) / "ERR_CANCELLED" (iOS). */
+function isCancelled(e: unknown): boolean {
+  const code = (e as { code?: unknown } | null)?.code;
+  return code === 'Cancelled' || code === 'ERR_CANCELLED';
 }
 
 const styles = StyleSheet.create({

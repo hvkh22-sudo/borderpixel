@@ -16,6 +16,7 @@ import { adoptRecording, recordingFile, recordingNameIfInside, scratchFile, toFi
 import { PromptlyMedia } from '../../services/nativeMedia';
 import type { RecordingStatusRow } from '../../storage/repositories';
 import type { PersistedAudio } from '../voice-follow/voiceFollowController';
+import { markRecordingActive } from './orphanRecovery';
 
 export interface FinalizeInput {
   filePath: string;
@@ -47,6 +48,16 @@ export async function finalizeTake(input: FinalizeInput): Promise<FinalizeResult
   const inPlace = recordingNameIfInside(input.filePath);
   const ext = input.filePath.toLowerCase().endsWith('.mp4') ? 'mp4' : 'mov';
   const rawName = inPlace ?? `${id}.${ext}`;
+  // Orphan recovery may run meanwhile; it must not register this take's files.
+  const release = markRecordingActive(rawName);
+  try {
+    return await finalizeNamed(input, id, inPlace, rawName);
+  } finally {
+    release();
+  }
+}
+
+async function finalizeNamed(input: FinalizeInput, id: string, inPlace: string | null, rawName: string): Promise<FinalizeResult> {
   const raw = inPlace ? recordingFile(inPlace) : await adoptRecording(input.filePath, rawName);
   if (!exists(raw)) throw new Error('recording file missing after adopt');
   const base = rawName.replace(/\.(mov|mp4)$/i, '');

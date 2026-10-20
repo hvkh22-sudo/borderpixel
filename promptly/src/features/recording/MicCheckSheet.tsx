@@ -132,13 +132,22 @@ function MicCheckPanel({ onClose, onResult }: { onClose: () => void; onResult?: 
       setPhase(perm);
       return;
     }
+    // Closed mid-setup: the unmount teardown already ran, so run it again for what was set up since.
+    const abandoned = () => {
+      if (mounted.current) return false;
+      active.current = true;
+      void teardown();
+      return true;
+    };
     try {
       active.current = true;
       await beginMicSession();
+      if (abandoned()) return;
       await recorder.prepareToRecordAsync();
       fileUri.current = recorder.uri;
+      // Never start the mic for a sheet that is gone.
+      if (abandoned()) return;
       recorder.record();
-      if (!mounted.current) return void teardown();
       setPhase('listening');
       // Android only reports the routed device while recording; iOS once prepared.
       recorder

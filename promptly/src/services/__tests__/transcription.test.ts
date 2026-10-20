@@ -9,6 +9,7 @@ type Listener = (e: unknown) => void;
 const mockListeners: Record<string, Listener[]> = {};
 const mockFiles = new Map<string, Uint8Array>();
 const mockStarted: string[] = [];
+let mockSession = 0;
 /** Per part file name: what the fake engine "hears". */
 let mockScript: (uri: string) => { error?: string; segments?: { segment: string; startTimeMillis: number; endTimeMillis: number }[] };
 
@@ -64,14 +65,22 @@ jest.mock('expo-speech-recognition', () => ({
       (mockListeners[name] ??= []).push(cb);
       return { remove: () => (mockListeners[name] = mockListeners[name]!.filter((l) => l !== cb)) };
     },
-    abort: jest.fn(),
+    abort: jest.fn(() => {
+      mockSession++; // the aborted session sends nothing more but its "end"
+      setTimeout(() => [...(mockListeners.end ?? [])].forEach((l) => l({})), 0);
+    }),
     start: ({ audioSource }: { audioSource: { uri: string } }) => {
       mockStarted.push(audioSource.uri);
+      const session = ++mockSession;
       const out = mockScript(audioSource.uri);
       setTimeout(() => {
+        if (session !== mockSession) return;
         const emit = (n: string, e: unknown) => [...(mockListeners[n] ?? [])].forEach((l) => l(e));
         if (out.error) {
+          // As on Android: "error" is sent at once, "end" later from a main-thread
+          // runnable (ExpoSpeechService.teardownAndEnd), after JS has moved on.
           emit('error', { error: out.error, message: out.error });
+          setTimeout(() => emit('end', {}), 0);
           return;
         }
         const segments = (out.segments ?? []).map((s) => ({ ...s, confidence: 0.9 }));
@@ -147,4 +156,22 @@ it('treats a silent part as normal and stops on cancel', async () => {
   await expect(transcribeRecording('file:///docs/take.mp4', 'en-US', { signal: ctrl.signal })).rejects.toMatchObject({ code: 'cancelled' });
   expect(mockStarted.filter((u) => part(u) > 1).length).toBe(2); // from the first run only
   expect(mockFiles.size).toBe(0);
+});
+
+it('does not let the late "end" of a failed part end the next part (Android event order)', async () => {
+  mockScript = (uri) =>
+    part(uri) === 1 ? { error: 'network' } : { segments: [{ segment: `p${part(uri)}`, startTimeMillis: 5_000, endTimeMillis: 5_300 }] };
+  const r = await transcribeRecording('file:///docs/take.mp4', 'en-US');
+  expect(r.segments.map((s) => [s.text, s.startMs])).toEqual([
+    ['p2', 54_000],
+    ['p3', 103_000],
+  ]);
+  expect(r.gaps).toEqual([{ startMs: 0, endMs: 50_000, reason: 'failed' }]);
+});
+
+it('does not let the late "end" of a silent part swallow the next part', async () => {
+  mockScript = (uri) => (part(uri) === 2 ? { error: 'no-speech' } : { segments: [{ segment: `p${part(uri)}`, startTimeMillis: 5_000, endTimeMillis: 5_300 }] });
+  const r = await transcribeRecording('file:///docs/take.mp4', 'en-US');
+  expect(r.segments.map((s) => s.text)).toEqual(['p1', 'p3']);
+  expect(r.gaps).toBeUndefined();
 });
