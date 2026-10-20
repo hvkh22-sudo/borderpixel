@@ -28,6 +28,7 @@ Legend: ✅ verified · 🟡 implemented, not verified on device · ⬜ not star
 | Recording (VisionCamera v5), countdown, timer, flip, interruptions, low storage | 🟡 | state machine ✅ tested |
 | Learned speaking rate (P1) | 🟡 | `speakingRate.ts` ✅ unit-tested (weighted median, clamp 80–240, ≥ 10 s, manual jumps excluded); learns from Voice Follow cursor progress and Timed takes that reached the end untouched; used for editor/home/library estimates and “Your pace” in setup. Live measurement accuracy not checked on a device (VF-05) |
 | Recording presets + landscape (P1) | 🟡 | `presets.ts` ✅ unit-tested; setup screen ✅ screen-tested. Landscape camera layout, interface-driven output orientation, landscape target size and 60 fps fallback **not tested on a device** (REC-07, REC-10..12) |
+| Mic check on setup screen (P1 mic pre-flight) | 🟡 | `micCheck.ts` verdicts ✅ unit-tested; sheet ✅ screen-tested with expo-audio mocked (verdicts, input name, Bluetooth note, permission denied, stop → delete clip → release session before camera). Thresholds are initial estimates; real meter levels, input names and camera audio after the check **not tested on a device** (MIC-01) |
 | Overlay absent from recording | ⬜ | **release blocker until proven per platform** |
 | A/V sync (iOS native, Android muxed) | ⬜ | Android mux offset needs clap test |
 | Voice Follow | 🟡 | aligner ✅ (15 scenario tests); live recognition untested |
