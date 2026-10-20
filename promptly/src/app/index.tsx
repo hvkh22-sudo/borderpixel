@@ -12,6 +12,7 @@ import { SAMPLE_SCRIPT } from '../features/scripts/sample';
 import { estimateSpeakingSeconds } from '../features/voice-follow/text';
 import { useFocusData } from '../hooks/useAsyncData';
 import { formatClock, formatDuration, t } from '../localization/i18n';
+import { flipInRtl } from '../localization/layoutDirection';
 import { track } from '../services/analytics';
 import { getRepositories } from '../services/db';
 import { useSession } from '../state/session';
@@ -70,7 +71,7 @@ export default function Home() {
               {t('home.createHint')}
             </Text>
           </View>
-          <Ionicons name="arrow-forward" size={24} color="#fff" />
+          <Ionicons name="arrow-forward" size={24} color="#fff" style={flipInRtl()} />
         </Pressable>
 
         {recoveredTakes > 0 ? (
@@ -86,7 +87,7 @@ export default function Home() {
               <Text variant="callout" style={styles.flex} accessibilityLiveRegion="polite">
                 {t('home.recovered', { n: recoveredTakes })}
               </Text>
-              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} style={flipInRtl()} />
             </View>
           </Card>
         ) : null}

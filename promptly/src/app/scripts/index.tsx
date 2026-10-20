@@ -168,5 +168,5 @@ const styles = StyleSheet.create({
   list: { paddingHorizontal: spacing.lg, paddingBottom: 120, gap: spacing.md },
   item: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.lg, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  snackbar: { position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: spacing.xxl, flexDirection: 'row', alignItems: 'center', paddingLeft: spacing.lg, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth },
+  snackbar: { position: 'absolute', left: spacing.lg, right: spacing.lg, bottom: spacing.xxl, flexDirection: 'row', alignItems: 'center', paddingStart: spacing.lg, borderRadius: radius.lg, borderWidth: StyleSheet.hairlineWidth },
 });

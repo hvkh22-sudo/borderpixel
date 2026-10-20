@@ -10,6 +10,7 @@ import { Text } from '../../components/Text';
 import { createHistory, currentText, pushVersion, redo, undo, type VersionHistory } from '../../features/ai-script-studio/studio';
 import { countWords, estimateSpeakingSeconds } from '../../features/voice-follow/text';
 import { formatDuration, t } from '../../localization/i18n';
+import { contentDirectionStyle, flipInRtl } from '../../localization/layoutDirection';
 import { getRepositories } from '../../services/db';
 import { deriveTitle } from '../../storage/repositories';
 import { useSettings } from '../../state/settings';
@@ -145,8 +146,8 @@ export default function Editor() {
         options={{
           headerRight: () => (
             <View style={styles.headerActions}>
-              <IconButton icon="arrow-undo" label={t('common.undo')} disabled={history.current === 0 && currentText(history) === body} onPress={() => applyHistory(undo(pendingSnapshot()))} />
-              <IconButton icon="arrow-redo" label={t('common.redo')} disabled={history.current >= history.versions.length - 1} onPress={() => applyHistory(redo(history))} />
+              <IconButton icon="arrow-undo" iconStyle={flipInRtl()} label={t('common.undo')} disabled={history.current === 0 && currentText(history) === body} onPress={() => applyHistory(undo(pendingSnapshot()))} />
+              <IconButton icon="arrow-redo" iconStyle={flipInRtl()} label={t('common.redo')} disabled={history.current >= history.versions.length - 1} onPress={() => applyHistory(redo(history))} />
               <IconButton icon="clipboard-outline" label={t('editor.pasteAppend')} onPress={pasteAppend} />
             </View>
           ),
@@ -160,7 +161,7 @@ export default function Editor() {
         }}
         placeholder={t('editor.titlePlaceholder')}
         placeholderTextColor={colors.textMuted}
-        style={[typography.title, { color: colors.text }]}
+        style={[typography.title, { color: colors.text }, contentDirectionStyle(title)]}
         accessibilityLabel={t('editor.titlePlaceholder')}
         editable={loaded}
         returnKeyType="next"
@@ -175,7 +176,7 @@ export default function Editor() {
         autoFocus={loaded && body.length === 0}
         placeholder={t('editor.bodyPlaceholder')}
         placeholderTextColor={colors.textMuted}
-        style={[typography.body, styles.body, { color: colors.text }]}
+        style={[typography.body, styles.body, { color: colors.text }, contentDirectionStyle(body)]}
         textAlignVertical="top"
         accessibilityLabel={t('editor.bodyPlaceholder')}
         editable={loaded}

@@ -6,6 +6,7 @@ import { EmptyState } from '../components/EmptyState';
 import { Text } from '../components/Text';
 import { useFocusData } from '../hooks/useAsyncData';
 import { formatClock, t } from '../localization/i18n';
+import { flipInRtl } from '../localization/layoutDirection';
 import { getRepositories } from '../services/db';
 import { useTheme } from '../theme/ThemeProvider';
 import { radius, spacing } from '../theme/tokens';
@@ -37,7 +38,7 @@ export default function Takes() {
               {item.cues ? ` · ${t('takes.captioned')}` : ''}
             </Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} style={flipInRtl()} />
         </Pressable>
       )}
     />

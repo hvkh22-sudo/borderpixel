@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Switch, View } from 'react-native';
 
 import { useTheme } from '../theme/ThemeProvider';
 import { spacing, touchTarget } from '../theme/tokens';
+import { flipInRtl } from '../localization/layoutDirection';
 import { Text } from './Text';
 
 interface Props {
@@ -46,7 +47,7 @@ export function ListRow({ title, subtitle, icon, value, onPress, toggle, right, 
           accessibilityLabel={title}
         />
       ) : null}
-      {onPress && !toggle ? <Ionicons name="chevron-forward" size={18} color={colors.textMuted} /> : null}
+      {onPress && !toggle ? <Ionicons name="chevron-forward" size={18} color={colors.textMuted} style={flipInRtl()} /> : null}
     </View>
   );
   if (!onPress) return content;

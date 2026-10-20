@@ -28,6 +28,7 @@ import {
 import { CAPTION_STYLES, type CaptionPosition, type CaptionStyleId } from '../../features/captions/captionStyles';
 import { checkFeature } from '../../features/monetization/entitlements';
 import { formatClock, t } from '../../localization/i18n';
+import { contentDirectionStyle, flipInRtl } from '../../localization/layoutDirection';
 import { track } from '../../services/analytics';
 import { support } from '../../services/deviceSupport';
 import { getRepositories } from '../../services/db';
@@ -203,8 +204,8 @@ export default function CaptionsEditor() {
           />
           <View style={styles.shiftRow}>
             <Text variant="callout">{t('captions.shiftAll')}</Text>
-            <IconButton icon="play-back" label={`${t('captions.shiftAll')} −0.1s`} onPress={() => setCues((c) => shiftAll(c, -100))} />
-            <IconButton icon="play-forward" label={`${t('captions.shiftAll')} +0.1s`} onPress={() => setCues((c) => shiftAll(c, 100))} />
+            <IconButton icon="play-back" iconStyle={flipInRtl()} label={`${t('captions.shiftAll')} −0.1s`} onPress={() => setCues((c) => shiftAll(c, -100))} />
+            <IconButton icon="play-forward" iconStyle={flipInRtl()} label={`${t('captions.shiftAll')} +0.1s`} onPress={() => setCues((c) => shiftAll(c, 100))} />
           </View>
         </View>
       )}
@@ -233,7 +234,7 @@ export default function CaptionsEditor() {
             <TextInput
               value={item.text}
               onChangeText={(v) => setCues((c) => updateCueText(c, item.id, v))}
-              style={[styles.cueInput, { color: colors.text }]}
+              style={[styles.cueInput, { color: colors.text }, contentDirectionStyle(item.text)]}
               multiline
               accessibilityLabel={`${t('common.edit')} ${index + 1}`}
             />

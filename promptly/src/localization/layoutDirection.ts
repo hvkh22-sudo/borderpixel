@@ -11,6 +11,7 @@
  */
 import { I18nManager } from 'react-native';
 
+import { detectDirection, scriptTextAlign } from '../features/teleprompter/textDirection';
 import { isRtl } from './i18n';
 
 export interface DirectionManager {
@@ -36,4 +37,13 @@ export function layoutIsRtl(): boolean {
 /** Transform for direction-bearing icons (chevrons, forward arrows, undo/redo) in a mirrored layout. */
 export function flipInRtl(): { transform: { scaleX: number }[] } | undefined {
   return I18nManager.isRTL ? { transform: [{ scaleX: -1 }] } : undefined;
+}
+
+/**
+ * Style for user content (scripts, captions) in text inputs: direction follows
+ * the content itself; empty text follows the UI so the placeholder reads right.
+ */
+export function contentDirectionStyle(text: string): { writingDirection: 'rtl' | 'ltr'; textAlign: 'left' | 'right' | 'center' } {
+  const direction = detectDirection(text, I18nManager.isRTL ? 'rtl' : 'ltr');
+  return { writingDirection: direction, textAlign: scriptTextAlign('left', direction, I18nManager.isRTL) };
 }

@@ -39,6 +39,24 @@ Every control has a label (and hint where useful); headers marked; status change
 `accessibilityLiveRegion`; the prompter text is exposed as one text element; no information conveyed
 by color alone (Pro badge has text).
 
+## Localization & RTL
+- UI strings: `src/localization/en.ts` (source) and `he.ts` (Hebrew), typed as `Strings` so a missing key
+  fails typecheck; a test also checks every key path and placeholder. The UI language comes from the
+  device (`getLocales()`); `iw` is treated as `he`.
+- **UI language ≠ speech/caption/AI language.** A Hebrew UI does not imply Hebrew Voice Follow, captions
+  or AI drafts; those follow the speech-language setting and recognizer/model support.
+- Layout mirroring: `expo-localization` plugin with `supportsRTL: true` (Android `supportsRtl`, iOS RTL
+  allowed) and `supportedLocales.ios: [en, he]` so iOS resolves the app's localization to Hebrew.
+  `syncLayoutDirection()` aligns `I18nManager` with the UI language at start-up; changes apply on the
+  next launch (no forced reload).
+- Use `start`/`end` (`paddingStart`, `marginEnd`) instead of left/right; flex rows mirror automatically.
+  Direction-bearing icons (chevrons, forward arrows, undo/redo, rewind/forward) use `flipInRtl()`.
+- Script text (prompter, editor, caption cues) follows the **script's content direction**, not the UI
+  (`detectDirection`, first strong character). The prompter's "Start" alignment means the script's
+  start edge.
+- Hebrew UI must not be marketed (store listing, screenshots) until a native speaker has reviewed it
+  on device. Permission prompts (Info.plist / Android strings) are not yet localized.
+
 ## User journeys
 1. First run: Onboarding → Home (empty) → Try sample → Setup → Camera → Take → Export.
 2. Paste flow: Home → Create sheet → Paste → Editor → Record → Setup → Camera.

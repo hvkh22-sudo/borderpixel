@@ -14,9 +14,9 @@ const LETTER = /\p{L}/u;
 /**
  * Direction of the first strong directional character (Unicode bidi rule
  * P2/P3, simplified). Digits, punctuation, emoji and whitespace are neutral.
- * Text with no strong character is 'ltr'.
+ * Text with no strong character (e.g. empty) gets `fallback`.
  */
-export function detectDirection(text: string): TextDirection {
+export function detectDirection(text: string, fallback: TextDirection = 'ltr'): TextDirection {
   for (const ch of text) {
     if (STRONG_RTL.test(ch)) {
       // Hebrew/Arabic blocks also hold neutral points (punctuation, digits, marks);
@@ -26,7 +26,7 @@ export function detectDirection(text: string): TextDirection {
     }
     if (LETTER.test(ch)) return 'ltr';
   }
-  return 'ltr';
+  return fallback;
 }
 
 /**

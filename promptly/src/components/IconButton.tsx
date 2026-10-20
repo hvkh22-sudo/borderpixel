@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 
 import { useTheme } from '../theme/ThemeProvider';
 import { touchTarget } from '../theme/tokens';
@@ -13,9 +13,11 @@ interface Props {
   size?: number;
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
+  /** E.g. `flipInRtl()` for direction-bearing glyphs. */
+  iconStyle?: StyleProp<TextStyle>;
 }
 
-export function IconButton({ icon, label, onPress, color, background, size = 22, disabled, style }: Props) {
+export function IconButton({ icon, label, onPress, color, background, size = 22, disabled, style, iconStyle }: Props) {
   const { colors } = useTheme();
   return (
     <Pressable
@@ -31,7 +33,7 @@ export function IconButton({ icon, label, onPress, color, background, size = 22,
         style,
       ]}
     >
-      <Ionicons name={icon} size={size} color={color ?? colors.text} />
+      <Ionicons name={icon} size={size} color={color ?? colors.text} style={iconStyle} />
     </Pressable>
   );
 }

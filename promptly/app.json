@@ -63,6 +63,18 @@
             "com.google.android.as"
           ]
         }
+      ],
+      [
+        "expo-localization",
+        {
+          "supportsRTL": true,
+          "supportedLocales": {
+            "ios": [
+              "en",
+              "he"
+            ]
+          }
+        }
       ]
     ],
     "experiments": {
