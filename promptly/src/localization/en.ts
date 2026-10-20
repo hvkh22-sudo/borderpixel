@@ -169,7 +169,8 @@ export const en = {
     highContrast: 'High contrast',
     readingGuide: 'Reading guide',
     align: 'Alignment',
-    alignLeft: 'Left',
+    /** Aligns to the start of the line, following the script's own direction. */
+    alignLeft: 'Start',
     alignCenter: 'Center',
     countdown: 'Countdown',
     camera: 'Camera',

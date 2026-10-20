@@ -8,7 +8,7 @@
  * puts that line exactly on the reading line.
  */
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Text, View, type LayoutChangeEvent, type TextLayoutEvent } from 'react-native';
+import { I18nManager, StyleSheet, Text, View, type LayoutChangeEvent, type TextLayoutEvent } from 'react-native';
 import { GestureDetector, useCompetingGestures, usePanGesture, useTapGesture } from 'react-native-gesture-handler';
 import Animated, {
   cancelAnimation,
@@ -23,6 +23,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 
 import type { PrompterSettings, ScrollMode } from '../../state/settings';
 import { countWords } from '../voice-follow/text';
+import { detectDirection, scriptTextAlign } from './textDirection';
 import { LineIndex, buildLineIndex, followAnimationMs, lineForChar, pixelsPerSecond, scrollOffsetForChar } from './scrollModel';
 
 export interface TeleprompterHandle {
@@ -67,6 +68,8 @@ export const Teleprompter = forwardRef<TeleprompterHandle, Props>(function Telep
 
   const topPad = viewport * settings.readingLine;
   const wordCount = useMemo(() => countWords(script), [script]);
+  // Direction follows the script's content, not the UI language.
+  const direction = useMemo(() => detectDirection(script), [script]);
   const contentHeight = lineIndex?.contentHeight ?? 0;
 
   useEffect(() => {
@@ -196,7 +199,8 @@ export const Teleprompter = forwardRef<TeleprompterHandle, Props>(function Telep
     fontSize: settings.fontSize,
     lineHeight: settings.fontSize * settings.lineHeight,
     fontWeight: settings.fontWeight,
-    textAlign: settings.align,
+    textAlign: scriptTextAlign(settings.align, direction, I18nManager.isRTL),
+    writingDirection: direction,
     color: textColor,
     opacity: settings.textOpacity,
   } as const;

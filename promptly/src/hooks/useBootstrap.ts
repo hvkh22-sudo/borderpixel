@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react';
 
 import { deriveAccess } from '../features/monetization/entitlements';
 import { setLanguage } from '../localization/i18n';
+import { syncLayoutDirection } from '../localization/layoutDirection';
 import { setAnalyticsEnabled, track } from '../services/analytics';
 import { getRepositories } from '../services/db';
 import { cleanExports, findOrphanRecordings } from '../services/files';
@@ -30,6 +31,8 @@ export function useBootstrap(): { ready: boolean; recovered: number } {
     (async () => {
       const locale = getLocales()[0];
       setLanguage(locale?.languageCode ?? 'en');
+      // Layout mirroring follows the UI language; a mismatch is fixed for the next launch.
+      if (syncLayoutDirection() && __DEV__) console.info('layout direction updated; restart the app to apply');
       try {
         const repos = await getRepositories();
         const saved = await repos.kv.get<Partial<SettingsState>>(SETTINGS_KEY, {});

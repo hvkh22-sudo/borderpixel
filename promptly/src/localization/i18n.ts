@@ -1,13 +1,15 @@
 /**
  * Minimal, dependency-free i18n. English ships at launch; further languages
- * are added as `Strings`-typed dictionaries once translated and reviewed.
+ * are added as `Strings`-typed dictionaries once translated and reviewed
+ * (Hebrew: implemented, pending native-speaker review on device).
  * UI language support is separate from speech/caption/AI language support.
  */
 import { en, type Strings } from './en';
+import { he } from './he';
 
 type Dict = Strings;
 
-const dictionaries: Record<string, Dict> = { en };
+const dictionaries: Record<string, Dict> = { en, he };
 
 /** Languages written right-to-left; layout mirrors when one is active. */
 export const RTL_LANGUAGES = new Set(['he', 'ar', 'fa', 'ur']);
@@ -15,8 +17,12 @@ export const RTL_LANGUAGES = new Set(['he', 'ar', 'fa', 'ur']);
 let active: Dict = en;
 let activeLanguage = 'en';
 
+/** Legacy ISO 639 codes some Android/Java versions still report. */
+const LEGACY_CODES: Record<string, string> = { iw: 'he', ji: 'yi', in: 'id' };
+
 export function setLanguage(languageCode: string): void {
-  const code = languageCode.split('-')[0]!.toLowerCase();
+  const raw = languageCode.split(/[-_]/)[0]!.toLowerCase();
+  const code = LEGACY_CODES[raw] ?? raw;
   activeLanguage = dictionaries[code] ? code : 'en';
   active = dictionaries[activeLanguage]!;
 }
