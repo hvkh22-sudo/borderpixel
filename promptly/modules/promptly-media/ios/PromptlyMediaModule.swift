@@ -34,11 +34,30 @@ struct CaptionStyleRecord: Record {
 public final class PromptlyMediaModule: Module {
   private var sessions: [String: AVAssetExportSession] = [:]
   private let lock = NSLock()
+  /// Hardware remote keys (main thread only); see RemoteKeyResponder.swift.
+  private var remoteKeys: RemoteKeyController?
 
   public func definition() -> ModuleDefinition {
     Name("PromptlyMedia")
 
-    Events("onProgress")
+    Events("onProgress", "onRemoteKey")
+
+    Function("setRemoteKeysEnabled") { (enabled: Bool) in
+      DispatchQueue.main.async { [weak self] in
+        guard let self else { return }
+        if enabled, self.remoteKeys == nil {
+          self.remoteKeys = RemoteKeyController { [weak self] key, repeating in
+            self?.sendEvent("onRemoteKey", ["key": key, "repeat": repeating])
+          }
+        }
+        self.remoteKeys?.setEnabled(enabled)
+      }
+    }
+
+    OnDestroy {
+      let controller = self.remoteKeys
+      DispatchQueue.main.async { controller?.setEnabled(false) }
+    }
 
     AsyncFunction("getVideoInfo") { (uri: String) async throws -> [String: Any] in
       let asset = AVURLAsset(url: try Self.url(uri))

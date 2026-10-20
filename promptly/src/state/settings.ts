@@ -52,6 +52,10 @@ export interface SettingsState {
   captionPosition: CaptionPosition;
   /** Word-by-word caption highlight (Pro; needs measured word timing). */
   captionWordHighlight: boolean;
+  /** Bluetooth page-turner / keyboard controls the teleprompter on the record screen. */
+  remoteEnabled: boolean;
+  /** Opt-in: the remote's Enter key starts/stops recording. Off by default (ambiguous key). */
+  remoteRecordToggle: boolean;
 }
 
 export const DEFAULT_PROMPTER: PrompterSettings = {
@@ -82,6 +86,8 @@ export const DEFAULT_SETTINGS: SettingsState = {
   camera: { position: 'front', orientation: 'portrait', resolution: '1080p', fps: 30 },
   captionPosition: 'lower',
   captionWordHighlight: false,
+  remoteEnabled: true,
+  remoteRecordToggle: false,
 };
 
 interface SettingsActions {
