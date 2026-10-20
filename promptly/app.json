@@ -147,6 +147,10 @@
     ],
     "experiments": {
       "typedRoutes": false
+    },
+    "locales": {
+      "en": "./locales/en.json",
+      "he": "./locales/he.json"
     }
   }
 }

@@ -1,0 +1,10 @@
+{
+  "ios": {
+    "CFBundleDisplayName": "Promptly",
+    "NSCameraUsageDescription": "Promptly uses the camera to record your videos. Recordings stay on your device.",
+    "NSMicrophoneUsageDescription": "Promptly records your voice with your video and can follow your speech to scroll the script.",
+    "NSSpeechRecognitionUsageDescription": "Voice Follow and automatic captions use speech recognition. Promptly asks for on-device processing where available.",
+    "NSPhotoLibraryAddUsageDescription": "Promptly saves your exported videos to your photo library.",
+    "NSPhotoLibraryUsageDescription": "Promptly saves your exported videos to your photo library."
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "ios": {
+    "CFBundleDisplayName": "Promptly",
+    "NSCameraUsageDescription": "Promptly משתמשת במצלמה כדי להקליט את הסרטונים שלכם. ההקלטות נשמרות במכשיר.",
+    "NSMicrophoneUsageDescription": "Promptly מקליטה את הקול שלכם יחד עם הסרטון, ויכולה לעקוב אחרי הדיבור כדי לגלול את התסריט.",
+    "NSSpeechRecognitionUsageDescription": "מעקב קולי וכתוביות אוטומטיות משתמשים בזיהוי דיבור. Promptly מבקשת עיבוד בתוך המכשיר כשהוא זמין.",
+    "NSPhotoLibraryAddUsageDescription": "Promptly שומרת את הסרטונים שייצאתם בספריית התמונות שלכם.",
+    "NSPhotoLibraryUsageDescription": "Promptly שומרת את הסרטונים שייצאתם בספריית התמונות שלכם."
+  }
+}
