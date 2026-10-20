@@ -13,6 +13,8 @@ export const config = {
       android: process.env.EXPO_PUBLIC_RC_ANDROID_KEY,
     }) ?? '',
   aiBaseUrl: process.env.EXPO_PUBLIC_AI_BASE_URL ?? '',
+  /** Google Cloud project number linked to the Play app (Play Integrity). Public, not a secret. */
+  playCloudProjectNumber: process.env.EXPO_PUBLIC_PLAY_CLOUD_PROJECT_NUMBER ?? '',
   supportEmail: process.env.EXPO_PUBLIC_SUPPORT_EMAIL || 'hvkh22@gmail.com',
   // Hosted from this repository's static site (apps/promptly/*). Override per build if the domain changes.
   privacyUrl: process.env.EXPO_PUBLIC_PRIVACY_URL || `${SITE}/privacy/`,
