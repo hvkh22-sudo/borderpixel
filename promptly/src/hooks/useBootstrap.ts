@@ -1,7 +1,9 @@
 /**
  * App start-up: open DB, hydrate settings, configure purchases, recover
  * orphaned recordings. Each step fails independently — a purchase or storage
- * problem must never block recording.
+ * problem must never block recording. `ready` waits only for settings; orphan
+ * recovery, export cleanup and purchases finish after the first screen
+ * (docs/architecture/performance.md).
  */
 import { getLocales } from 'expo-localization';
 import { useEffect, useState } from 'react';
@@ -37,49 +39,79 @@ export function useBootstrap(): { ready: boolean; recovered: number } {
       setLanguage(locale?.languageCode ?? 'en');
       // Layout mirroring follows the UI language; a mismatch is fixed for the next launch.
       if (syncLayoutDirection() && __DEV__) console.info('layout direction updated; restart the app to apply');
+      let repos: Awaited<ReturnType<typeof getRepositories>> | null = null;
       try {
-        const repos = await getRepositories();
-        const saved = await repos.kv.get<Partial<SettingsState>>(SETTINGS_KEY, {});
+        repos = await getRepositories();
+        const r = repos;
+        // Independent reads: one round of async SQLite hops instead of three in a row.
+        const [saved, vfUsed, speakingRate] = await Promise.all([
+          r.kv.get<Partial<SettingsState>>(SETTINGS_KEY, {}),
+          r.kv.get(USAGE_VF_KEY, 0),
+          r.kv.get<unknown>(SPEAKING_RATE_KEY, null),
+        ]);
         useSettings.getState().hydrate({
           speechLocale: locale?.languageTag ?? 'en-US',
           ...saved,
         });
         setAnalyticsEnabled(useSettings.getState().analyticsEnabled);
-        useAccess.getState().setUsage({ voiceFollowSessionsUsed: await repos.kv.get(USAGE_VF_KEY, 0) });
-        useSpeakingRate.getState().hydrate(await repos.kv.get<unknown>(SPEAKING_RATE_KEY, null));
+        useAccess.getState().setUsage({ voiceFollowSessionsUsed: vfUsed });
+        useSpeakingRate.getState().hydrate(speakingRate);
 
         // Persist settings on change (debounced).
         let timer: ReturnType<typeof setTimeout> | null = null;
         unsubscribeSettings = useSettings.subscribe((s) => {
           if (timer) clearTimeout(timer);
-          timer = setTimeout(() => void repos.kv.set(SETTINGS_KEY, persistableSettings(s)), 400);
+          timer = setTimeout(() => void r.kv.set(SETTINGS_KEY, persistableSettings(s)), 400);
         });
-
-        // Recordings written but never registered (app killed while recording or finalizing).
-        // Single-flight + dedupe inside: StrictMode's double effect cannot register a file twice.
-        const recoveredCount = await recoverOrphanRecordings({
-          knownFileNames: () => repos.recordings.knownFileNames(),
-          findOrphans: (known) => findOrphanRecordings(known),
-          videoInfo: (uri) => (PromptlyMedia.isAvailable() ? PromptlyMedia.getVideoInfo(uri) : Promise.resolve(null)),
-          add: (rec) => repos.recordings.add(rec),
-        });
-        if (alive) setRecovered(recoveredCount);
-        if (recoveredCount > 0) useSession.getState().setRecoveredTakes(recoveredCount);
-        cleanExports(24 * 60 * 60 * 1000);
       } catch (e) {
         if (__DEV__) console.warn('bootstrap storage failed', e);
         useSettings.getState().hydrate({});
       }
       if (alive) setReady(true);
       track({ name: 'app_open' });
+      // Purchases (SDK configure + network/cache) overlap orphan recovery
+      // instead of running after it; neither blocks the first screen.
+      const customerInfo = fetchCustomerInfo().then(
+        (info) => ({ ok: true as const, info }),
+        (error: unknown) => ({ ok: false as const, error }),
+      );
 
-      try {
-        useAccess.getState().setAccess(deriveAccess(await fetchCustomerInfo()));
-        unsubscribePurchases = subscribeCustomerInfo((info) => useAccess.getState().setAccess(deriveAccess(info)));
-        if (!alive) unsubscribePurchases(); // unmounted while fetching
-      } catch (e) {
+      // After first paint: the recovery banner and the Takes list read the
+      // session store reactively, so this no longer delays the first screen.
+      if (repos) {
+        const r = repos;
+        try {
+          // Single-flight + dedupe inside: StrictMode's double effect cannot register a file twice.
+          const recoveredCount = await recoverOrphanRecordings({
+            knownFileNames: () => r.recordings.knownFileNames(),
+            findOrphans: (known) => findOrphanRecordings(known),
+            videoInfo: (uri) => (PromptlyMedia.isAvailable() ? PromptlyMedia.getVideoInfo(uri) : Promise.resolve(null)),
+            add: (rec) => r.recordings.add(rec),
+          });
+          if (alive) setRecovered(recoveredCount);
+          if (recoveredCount > 0) useSession.getState().setRecoveredTakes(recoveredCount);
+        } catch (e) {
+          if (__DEV__) console.warn('orphan recovery failed', e);
+        }
+        try {
+          cleanExports(24 * 60 * 60 * 1000);
+        } catch (e) {
+          if (__DEV__) console.warn('export cleanup failed', e);
+        }
+      }
+
+      const purchases = await customerInfo;
+      if (purchases.ok) {
+        useAccess.getState().setAccess(deriveAccess(purchases.info));
+        try {
+          unsubscribePurchases = subscribeCustomerInfo((info) => useAccess.getState().setAccess(deriveAccess(info)));
+          if (!alive) unsubscribePurchases(); // unmounted while fetching
+        } catch (e) {
+          if (__DEV__) console.warn('purchases unavailable', e);
+        }
+      } else if (__DEV__) {
         // Offline / store unavailable: the SDK cache is used next time; stay on current state.
-        if (__DEV__) console.warn('purchases unavailable', e);
+        console.warn('purchases unavailable', purchases.error);
       }
     })();
     return () => {

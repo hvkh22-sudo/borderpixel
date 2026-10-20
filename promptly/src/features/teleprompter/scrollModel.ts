@@ -48,6 +48,90 @@ export function lineForChar(index: LineIndex, charOffset: number): number {
 }
 
 /**
+ * A hard line of the script (text between newlines), rendered as its own
+ * <Text> so a highlight change re-renders and re-measures only that chunk.
+ * `end` is exclusive and excludes the newline; the newline at `end` belongs
+ * to this chunk for char → line mapping.
+ */
+export interface ScriptChunk {
+  start: number;
+  end: number;
+  text: string;
+}
+
+/** Splits a script at newlines. An empty script has no chunks. */
+export function splitScript(script: string): ScriptChunk[] {
+  if (!script) return [];
+  const chunks: ScriptChunk[] = [];
+  let start = 0;
+  for (;;) {
+    const nl = script.indexOf('\n', start);
+    const end = nl < 0 ? script.length : nl;
+    chunks.push({ start, end, text: script.slice(start, end) });
+    if (nl < 0) break;
+    start = nl + 1;
+  }
+  return chunks;
+}
+
+/** Layout reported by one chunk: its top inside the content view and its lines. */
+export interface ChunkLayout {
+  y?: number;
+  lines?: LayoutLine[];
+}
+
+/**
+ * Combines per-chunk layouts into one script-wide line index (same contract
+ * as buildLineIndex over a single <Text>: line starts are script character
+ * offsets, y is relative to the top of the script). Returns null until every
+ * chunk has reported both its position and its lines.
+ */
+export function buildChunkedLineIndex(chunks: ScriptChunk[], layouts: ChunkLayout[]): LineIndex | null {
+  const starts: number[] = [];
+  const lines: LayoutLine[] = [];
+  for (let c = 0; c < chunks.length; c++) {
+    const layout = layouts[c];
+    if (!layout || layout.y === undefined || !layout.lines) return null;
+    const chunk = chunks[c]!;
+    let offset = chunk.start;
+    const chunkLines = layout.lines.length ? layout.lines : [{ text: '', y: 0, height: 0 }];
+    for (const line of chunkLines) {
+      starts.push(Math.min(offset, Math.max(chunk.start, chunk.end - 1)));
+      lines.push({ text: line.text, y: layout.y + line.y, height: line.height });
+      offset += line.text.length;
+    }
+  }
+  const last = lines[lines.length - 1];
+  return { starts, lines, contentHeight: last ? last.y + last.height : 0 };
+}
+
+/** Index of the line containing content-relative `y`, or -1 (binary search). */
+export function lineAtY(index: LineIndex, y: number): number {
+  const { lines } = index;
+  let lo = 0;
+  let hi = lines.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const l = lines[mid]!;
+    if (y < l.y) hi = mid - 1;
+    else if (y >= l.y + l.height) lo = mid + 1;
+    else return mid;
+  }
+  return -1;
+}
+
+/**
+ * Timed mode, one frame: the next offset, or null when the frame callback
+ * must not write (dragging, or a restart/jump animation owns the offset —
+ * assigning offset.value would cancel that withTiming).
+ */
+export function timedStep(offset: number, pps: number, dtMs: number, max: number, blocked: boolean): number | null {
+  'worklet';
+  if (blocked) return null;
+  return Math.min(max, offset + (pps * Math.min(dtMs, 64)) / 1000);
+}
+
+/**
  * Scroll offset that places the line containing `charOffset` on the reading
  * line, which sits at `readingLineRatio` of the viewport height (0 = top).
  * The script content is assumed to start at `topInset` inside the scroll view.

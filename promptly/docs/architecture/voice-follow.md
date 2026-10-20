@@ -18,7 +18,12 @@
   - forward ≤ 6 words (+ newly spoken words): accept with ≥ 2 matches (1 at script start);
   - larger forward jump: ≥ 3 matches, ≥ 50% confidence, confirmed on two consecutive updates;
   - backward: ignored if ≤ 3 words or < 5 matches; otherwise confirmed twice;
-  - nothing nearby: search the rest of the script with a stricter threshold (skipped paragraphs).
+  - nothing nearby: search the rest of the script with a stricter threshold (skipped paragraphs),
+    skipped outright when fewer than 4 tail words occur anywhere in the script.
+  - "newly spoken words" only counts growth of the hypothesis; a revision to fewer words counts as 1.
+- Cost: script words are interned into a vocabulary; each spoken word's similarity to a vocabulary
+  word is computed lazily once and cached (64 spoken words), and the DP keeps two rolling rows
+  (see performance.md).
 - Manual override (`setCursor`) and tap-to-resync always win.
 
 ## Tested scenarios (src/features/voice-follow/__tests__)
