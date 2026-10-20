@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, Stack } from 'expo-router';
-import { useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { Button } from '../../components/Button';
@@ -13,6 +13,7 @@ import { Sheet, SheetActions } from '../../components/Sheet';
 import { Text } from '../../components/Text';
 import { estimateSpeakingSeconds } from '../../features/voice-follow/text';
 import { useFocusData } from '../../hooks/useAsyncData';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { formatDuration, t } from '../../localization/i18n';
 import { getRepositories } from '../../services/db';
 import { useDurationWpm } from '../../state/speakingRate';
@@ -36,9 +37,63 @@ function sheetTitle(sheet: SheetState | null): string | undefined {
   return t('folders.renameTitle');
 }
 
+type Colors = ReturnType<typeof useTheme>['colors'];
+
+interface ScriptRowProps {
+  item: Script;
+  folderLabel: string | undefined;
+  paceWpm: number;
+  colors: Colors;
+  onOpen: (s: Script) => void;
+  onActions: (s: Script) => void;
+}
+
+/** Memoized: typing in search or opening a sheet does not re-render (or re-tokenize) every row. */
+const ScriptRow = memo(function ScriptRow({ item, folderLabel, paceWpm, colors, onOpen, onActions }: ScriptRowProps) {
+  // Tokenizes the whole body: only redo it when the body or pace changes.
+  const seconds = useMemo(() => estimateSpeakingSeconds(item.body, paceWpm), [item.body, paceWpm]);
+  return (
+    <Pressable
+      testID="library-script-item"
+      accessibilityRole="button"
+      accessibilityLabel={item.title}
+      accessibilityHint={t('common.edit')}
+      accessibilityActions={[{ name: 'longpress', label: t('library.moreActions') }]}
+      onAccessibilityAction={() => onActions(item)}
+      onPress={() => onOpen(item)}
+      onLongPress={() => onActions(item)}
+      style={({ pressed }) => [styles.item, { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.85 : 1 }]}
+    >
+      <View style={styles.flex}>
+        <View style={styles.titleRow}>
+          {item.favorite ? <Ionicons name="star" size={14} color={colors.warning} /> : null}
+          <Text variant="headline" numberOfLines={1} style={styles.flex}>
+            {item.title}
+          </Text>
+        </View>
+        <Text muted numberOfLines={2}>
+          {item.body || ' '}
+        </Text>
+        <Text variant="caption" muted numberOfLines={1}>
+          ~{formatDuration(seconds)} · {new Date(item.updatedAt).toLocaleDateString()}
+          {folderLabel ? ` · ${folderLabel}` : ''}
+        </Text>
+      </View>
+      <IconButton testID="library-script-more" icon="ellipsis-horizontal" label={t('library.moreActions')} onPress={() => onActions(item)} />
+    </Pressable>
+  );
+});
+
+const NO_FOLDERS: FolderWithCount[] = [];
+const openScript = (s: Script) => router.push(`/scripts/${s.id}`);
+
 export default function Library() {
   const { colors } = useTheme();
   const [query, setQuery] = useState('');
+  // SQLite is queried once typing pauses (200 ms), not on every keystroke;
+  // clearing the field applies at once.
+  const debouncedQuery = useDebouncedValue(query, 200);
+  const searchQuery = query === '' ? '' : debouncedQuery;
   const [filter, setFilter] = useState<LibraryFilter>({ kind: 'all' });
   const [sort, setSort] = useState<ScriptSort>('updated');
   const [undoId, setUndoId] = useState<string | null>(null);
@@ -50,12 +105,12 @@ export default function Library() {
     const folders = await repos.folders.listWithCounts();
     // A folder removed meanwhile falls back to All instead of an empty list.
     const folderId = filter.kind === 'folder' && folders.some((f) => f.id === filter.id) ? filter.id : undefined;
-    const scripts = await repos.scripts.list({ query, favoritesOnly: filter.kind === 'favorites', sort, folderId });
+    const scripts = await repos.scripts.list({ query: searchQuery, favoritesOnly: filter.kind === 'favorites', sort, folderId });
     return { folders, scripts, folderId };
-  }, [query, filter, sort]);
+  }, [searchQuery, filter, sort]);
   const scripts = data?.scripts;
-  const folders = data?.folders ?? [];
-  const folderName = new Map(folders.map((f) => [f.id, f.name]));
+  const folders = data?.folders ?? NO_FOLDERS;
+  const folderName = useMemo(() => new Map(folders.map((f) => [f.id, f.name])), [folders]);
   const activeFilter: LibraryFilter = filter.kind === 'folder' && data && !data.folderId ? { kind: 'all' } : filter;
 
   const act = async (fn: (r: Awaited<ReturnType<typeof getRepositories>>) => Promise<unknown>) => {
@@ -87,7 +142,7 @@ export default function Library() {
     ]);
   };
 
-  const showActions = (s: Script) => setSheet({ kind: 'script', script: s });
+  const showActions = useCallback((s: Script) => setSheet({ kind: 'script', script: s }), []);
   const closeSheet = () => setSheet(null);
 
   const renderSheet = () => {
@@ -171,8 +226,23 @@ export default function Library() {
     );
   };
 
-  const empty = query ? (
-    <EmptyState icon="search-outline" title={t('library.emptySearch', { q: query })} />
+  const showFolderLabel = activeFilter.kind !== 'folder';
+  const renderItem = useCallback(
+    ({ item }: { item: Script }) => (
+      <ScriptRow
+        item={item}
+        folderLabel={showFolderLabel && item.folderId ? folderName.get(item.folderId) : undefined}
+        paceWpm={paceWpm}
+        colors={colors}
+        onOpen={openScript}
+        onActions={showActions}
+      />
+    ),
+    [showFolderLabel, folderName, paceWpm, colors, showActions],
+  );
+
+  const empty = searchQuery ? (
+    <EmptyState icon="search-outline" title={t('library.emptySearch', { q: searchQuery })} />
   ) : activeFilter.kind === 'favorites' ? (
     <EmptyState icon="star-outline" title={t('library.emptyFavorites')} body={t('library.emptyFavoritesHint')} />
   ) : activeFilter.kind === 'folder' ? (
@@ -240,36 +310,7 @@ export default function Library() {
         keyExtractor={(s) => s.id}
         contentContainerStyle={styles.list}
         ListEmptyComponent={scripts ? empty : undefined}
-        renderItem={({ item }) => (
-          <Pressable
-            testID="library-script-item"
-            accessibilityRole="button"
-            accessibilityLabel={item.title}
-            accessibilityHint={t('common.edit')}
-            accessibilityActions={[{ name: 'longpress', label: t('library.moreActions') }]}
-            onAccessibilityAction={() => showActions(item)}
-            onPress={() => router.push(`/scripts/${item.id}`)}
-            onLongPress={() => showActions(item)}
-            style={({ pressed }) => [styles.item, { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.85 : 1 }]}
-          >
-            <View style={styles.flex}>
-              <View style={styles.titleRow}>
-                {item.favorite ? <Ionicons name="star" size={14} color={colors.warning} /> : null}
-                <Text variant="headline" numberOfLines={1} style={styles.flex}>
-                  {item.title}
-                </Text>
-              </View>
-              <Text muted numberOfLines={2}>
-                {item.body || ' '}
-              </Text>
-              <Text variant="caption" muted numberOfLines={1}>
-                ~{formatDuration(estimateSpeakingSeconds(item.body, paceWpm))} · {new Date(item.updatedAt).toLocaleDateString()}
-                {activeFilter.kind !== 'folder' && item.folderId && folderName.has(item.folderId) ? ` · ${folderName.get(item.folderId)}` : ''}
-              </Text>
-            </View>
-            <IconButton testID="library-script-more" icon="ellipsis-horizontal" label={t('library.moreActions')} onPress={() => showActions(item)} />
-          </Pressable>
-        )}
+        renderItem={renderItem}
       />
       {undoId ? (
         <View style={[styles.snackbar, { backgroundColor: colors.surfaceRaised, borderColor: colors.border }]} accessibilityLiveRegion="polite">

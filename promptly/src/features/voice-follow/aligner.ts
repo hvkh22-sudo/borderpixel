@@ -69,6 +69,8 @@ interface Candidate {
 const MATCH_WEIGHT = 2;
 const MISMATCH = -1;
 const GAP = -1;
+/** Spoken words whose similarity rows are kept (a tail is 8 words; speech repeats). */
+const SIM_CACHE_SIZE = 64;
 
 export class ScriptAligner {
   readonly tokens: Token[];
@@ -79,9 +81,33 @@ export class ScriptAligner {
   /** Spoken word count of the previous hypothesis in this utterance. */
   private lastSpokenCount = 0;
 
+  /**
+   * Performance (see docs/architecture/performance.md): script words are
+   * interned into a vocabulary so each spoken word is compared once per
+   * distinct script word (cached), and the alignment inner loop is a table
+   * lookup instead of an edit-distance call per cell.
+   */
+  private readonly vocab: string[] = [];
+  /** Vocabulary id of every script token. */
+  private readonly tokenIds: Int32Array;
+  /** spoken norm → similarity (0 when below the threshold) against each vocabulary word. */
+  private readonly simCache = new Map<string, Float32Array>();
+  private readonly spokenOf = new WeakMap<Float32Array, string>();
+
   constructor(script: string, config: Partial<AlignerConfig> = {}) {
     this.tokens = tokenize(script);
     this.config = { ...DEFAULT_ALIGNER_CONFIG, ...config };
+    const ids = new Map<string, number>();
+    this.tokenIds = new Int32Array(this.tokens.length);
+    this.tokens.forEach((t, i) => {
+      let id = ids.get(t.norm);
+      if (id === undefined) {
+        id = this.vocab.length;
+        ids.set(t.norm, id);
+        this.vocab.push(t.norm);
+      }
+      this.tokenIds[i] = id;
+    });
   }
 
   get cursor(): number {
@@ -138,17 +164,24 @@ export class ScriptAligner {
     this.lastHypothesisKey = key;
     // Recognizers may deliver many words at once (final-only results); a step
     // as large as the number of newly spoken words is normal progress.
-    const newWords = spoken.length >= this.lastSpokenCount ? spoken.length - this.lastSpokenCount : spoken.length;
+    // A revision to fewer words (iOS resends the whole transcript) is not new
+    // speech: count it as one word so large moves still need confirmation.
+    // Only resetUtterance() (lastSpokenCount = 0) grants a full-size step.
+    const newWords = spoken.length >= this.lastSpokenCount ? spoken.length - this.lastSpokenCount : 1;
     this.lastSpokenCount = spoken.length;
 
     const { backWindow, forwardWindow } = this.config;
     const from = Math.max(0, this.cursorIndex - backWindow);
     const to = Math.min(this.tokens.length, this.cursorIndex + 1 + forwardWindow);
-    let best = this.align(tail, from, to);
+    const sims = tail.map((w) => this.similarities(w));
+    let best = this.align(sims, from, to);
     if (!best || best.matches < this.config.jumpMinMatches) {
       // Nothing convincing nearby; look further ahead for a skipped section.
-      const far = to < this.tokens.length ? this.align(tail, to, this.tokens.length) : null;
-      if (far && far.matches >= this.config.jumpMinMatches + 1) best = far;
+      // Skipped entirely when too few spoken words occur anywhere in the script
+      // to ever reach the far-jump threshold (the common "unrelated speech" case).
+      const needed = this.config.jumpMinMatches + 1;
+      const far = to < this.tokens.length && this.matchableWords(sims) >= needed ? this.align(sims, to, this.tokens.length) : null;
+      if (far && far.matches >= needed) best = far;
     }
     if (!best) return this.result('hold', 0);
     return this.decide(best, newWords);
@@ -218,48 +251,94 @@ export class ScriptAligner {
   }
 
   /**
-   * Local alignment of `tail` against tokens[from, to). Returns the script
-   * index aligned to (or nearest before) the end of the tail. Candidates whose
-   * alignment does not reach the last spoken words are penalized, and among
-   * equal scores the one closest to the cursor wins.
+   * Similarity row of a spoken word against the vocabulary (cached). Entries
+   * are filled lazily: -1 = not computed yet, 0 = below the threshold.
    */
-  private align(tail: string[], from: number, to: number): Candidate | null {
-    const m = tail.length;
+  private similarities(spoken: string): Float32Array {
+    const cached = this.simCache.get(spoken);
+    if (cached) {
+      // Refresh recency.
+      this.simCache.delete(spoken);
+      this.simCache.set(spoken, cached);
+      return cached;
+    }
+    const row = new Float32Array(this.vocab.length).fill(-1);
+    if (this.simCache.size >= SIM_CACHE_SIZE) this.simCache.delete(this.simCache.keys().next().value!);
+    this.simCache.set(spoken, row);
+    this.spokenOf.set(row, spoken);
+    return row;
+  }
+
+  private sim(row: Float32Array, id: number): number {
+    const cached = row[id]!;
+    if (cached >= 0) return cached;
+    const sim = wordSimilarity(this.spokenOf.get(row)!, this.vocab[id]!);
+    const v = sim >= this.config.minWordSimilarity ? sim : 0;
+    row[id] = v;
+    return v;
+  }
+
+  /** Number of tail words that match at least one script word anywhere. */
+  private matchableWords(sims: Float32Array[]): number {
+    let n = 0;
+    for (const row of sims) {
+      for (let v = 0; v < row.length; v++) {
+        if (this.sim(row, v) > 0) {
+          n++;
+          break;
+        }
+      }
+    }
+    return n;
+  }
+
+  /**
+   * Local alignment of the tail (given as per-word similarity rows) against
+   * tokens[from, to). Returns the script index aligned to (or nearest before)
+   * the end of the tail. Candidates whose alignment does not reach the last
+   * spoken words are penalized, and among equal scores the one closest to the
+   * cursor wins. Uses two rolling rows: O(to - from) memory.
+   */
+  private align(sims: Float32Array[], from: number, to: number): Candidate | null {
+    const m = sims.length;
     const n = to - from;
     if (m === 0 || n <= 0) return null;
-    const minSim = this.config.minWordSimilarity;
-
-    // score[i][j] and match counts, flattened (m+1) x (n+1).
+    const ids = this.tokenIds;
     const width = n + 1;
-    const score = new Float64Array((m + 1) * width);
-    const matches = new Int32Array((m + 1) * width);
+    let prevScore = new Float64Array(width);
+    let prevMatches = new Int32Array(width);
+    let score = new Float64Array(width);
+    let matches = new Int32Array(width);
     let best: Candidate | null = null;
     let bestAdjusted = -Infinity;
 
     for (let i = 1; i <= m; i++) {
-      const spokenWord = tail[i - 1]!;
+      const row = sims[i - 1]!;
+      score[0] = 0;
+      matches[0] = 0;
       for (let j = 1; j <= n; j++) {
-        const sim = wordSimilarity(spokenWord, this.tokens[from + j - 1]!.norm);
-        const isMatch = sim >= minSim;
-        const diagIdx = (i - 1) * width + (j - 1);
-        const diag = score[diagIdx]! + (isMatch ? MATCH_WEIGHT * sim : MISMATCH);
-        const up = score[(i - 1) * width + j]! + GAP;
-        const left = score[i * width + (j - 1)]! + GAP;
+        // Similarities below the threshold are stored as 0 (= no match).
+        const id = ids[from + j - 1]!;
+        const cachedSim = row[id]!;
+        const sim = cachedSim >= 0 ? cachedSim : this.sim(row, id);
+        const isMatch = sim > 0;
+        const diag = prevScore[j - 1]! + (isMatch ? MATCH_WEIGHT * sim : MISMATCH);
+        const up = prevScore[j]! + GAP;
+        const left = score[j - 1]! + GAP;
         let v = 0;
         let mc = 0;
         if (diag >= up && diag >= left && diag > 0) {
           v = diag;
-          mc = matches[diagIdx]! + (isMatch ? 1 : 0);
+          mc = prevMatches[j - 1]! + (isMatch ? 1 : 0);
         } else if (up >= left && up > 0) {
           v = up;
-          mc = matches[(i - 1) * width + j]!;
+          mc = prevMatches[j]!;
         } else if (left > 0) {
           v = left;
-          mc = matches[i * width + (j - 1)]!;
+          mc = matches[j - 1]!;
         }
-        const idx = i * width + j;
-        score[idx] = v;
-        matches[idx] = mc;
+        score[j] = v;
+        matches[j] = mc;
 
         // Only cells where the current script word matched are valid endings.
         if (!isMatch || v <= 0) continue;
@@ -272,6 +351,8 @@ export class ScriptAligner {
           best = { end, matches: mc, score: v, tailLen: m };
         }
       }
+      [prevScore, score] = [score, prevScore];
+      [prevMatches, matches] = [matches, prevMatches];
     }
     return best;
   }

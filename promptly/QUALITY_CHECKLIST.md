@@ -24,13 +24,13 @@ Legend: ✅ verified · 🟡 implemented, not verified on device · ⬜ not star
 | Script folders (one optional folder per script; chip row All · Favorites · folders · New folder; move from script menu and editor chip; rename/delete via long-press; delete moves scripts to No folder) | 🟡 | migration 3 + repository ✅ tested on real SQLite (incl. upgrade from a pre-folder DB); screen flows ✅ tested in Node; bottom sheet, keyboard and long-press not checked on a device; VoiceOver/TalkBack long-press action untested |
 | Export my scripts (Settings › Privacy & data → one versioned JSON: scripts + versions + folders, via share sheet) | 🟡 | serialize/parse/merge ✅ tested (format version check, malformed input rejected, round-trip without loss, re-import adds nothing, never overwrites); share sheet and file hand-off not tried on a device |
 | Import scripts from a backup file | ⬜ | merge logic implemented and tested (`importBackup` in `src/storage/backup.ts`), **no UI**: `expo-document-picker` is not installed (installing needs approval/network); add a picker + Settings row when it is |
-| Teleprompter manual / timed / display settings / mirror / reading line | 🟡 | geometry ✅ tested; 60 fps unmeasured |
+| Teleprompter manual / timed / display settings / mirror / reading line | 🟡 | geometry ✅ tested (incl. per-paragraph chunk layout → same char→scroll mapping; O(1) chunks re-render per Voice Follow update, render-count test); 60 fps, native text re-measure cost and chunk-vs-single-Text visual parity on long scripts **not measured on a device** (docs/architecture/performance.md) |
 | Recording (VisionCamera v5), countdown, timer, flip, interruptions, low storage | 🟡 | state machine ✅ tested |
 | Learned speaking rate (P1) | 🟡 | `speakingRate.ts` ✅ unit-tested (weighted median, clamp 80–240, ≥ 10 s, manual jumps excluded); learns from Voice Follow cursor progress and Timed takes that reached the end untouched; used for editor/home/library estimates and “Your pace” in setup. Live measurement accuracy not checked on a device (VF-05) |
 | Recording presets + landscape (P1) | 🟡 | `presets.ts` ✅ unit-tested; setup screen ✅ screen-tested. Landscape camera layout, interface-driven output orientation, landscape target size and 60 fps fallback **not tested on a device** (REC-07, REC-10..12) |
 | Overlay absent from recording | ⬜ | **release blocker until proven per platform** |
 | A/V sync (iOS native, Android muxed) | ⬜ | Android mux offset needs clap test |
-| Voice Follow | 🟡 | aligner ✅ (15 scenario tests); live recognition untested |
+| Voice Follow | 🟡 | aligner ✅ (scenario tests + 10k-word perf tests; revised-shorter hypothesis no longer widens the step); live recognition untested |
 | Captions (transcribe, script correction, edit, styles, SRT) | 🟡 | pipeline ✅ tested; transcription untested |
 | Caption burn-in | 🟡 | behind `EXPO_PUBLIC_FLAG_BURN_IN=on`; native code uncompiled |
 | AI Script Studio | 🟡 | proxy ✅ tested with mock LLM; no live API call made (no key, approval needed) |

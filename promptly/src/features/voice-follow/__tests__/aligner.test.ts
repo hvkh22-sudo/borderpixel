@@ -180,4 +180,53 @@ describe('ScriptAligner', () => {
     expect(perUpdateMs).toBeLessThan(10);
     expect(a.cursor).toBeGreaterThan(550);
   });
+
+  it('does not widen the step when the recognizer revises to fewer words', () => {
+    const a = new ScriptAligner(SCRIPT);
+    speak(a, scriptWords(0, 10));
+    expect(a.cursor).toBe(9);
+    // iOS resends a shorter, revised transcript whose tail is 9 words ahead:
+    // that is a jump and must be confirmed, not accepted as normal progress.
+    const revised = scriptWords(10, 19).join(' ');
+    const first = a.update(revised);
+    expect(first.kind).toBe('hold');
+    expect(a.cursor).toBe(9);
+    // A fresh utterance with the same words is a legitimate final-only chunk.
+    a.resetUtterance();
+    a.update(revised);
+    expect(a.cursor).toBe(18);
+  });
+
+  describe('performance on a 10,000-word script', () => {
+    const VOCAB = Array.from({ length: 1500 }, (_, i) => `w${i.toString(36)}x${(i * 7919).toString(36)}`);
+    const words = Array.from({ length: 10000 }, (_, i) => VOCAB[(i * 7919) % VOCAB.length]!);
+    const script = words.join(' ');
+
+    it('bounds the cost of unrelated speech (far search)', () => {
+      const a = new ScriptAligner(script);
+      const unrelated = ['totally', 'unrelated', 'speech', 'about', 'weather', 'tomorrow', 'morning', 'coffee'];
+      const hyp: string[] = [];
+      const t0 = performance.now();
+      for (let k = 0; k < 40; k++) {
+        hyp.push(`${unrelated[k % unrelated.length]}${k}`);
+        a.update(hyp.join(' '));
+      }
+      const perUpdateMs = (performance.now() - t0) / 40;
+      expect(a.cursor).toBe(-1);
+      // Before the vocabulary/similarity cache this was ~240 ms per update in Jest.
+      expect(perUpdateMs).toBeLessThan(40);
+    });
+
+    it('still finds a far skipped section quickly', () => {
+      const a = new ScriptAligner(script);
+      speak(a, words.slice(0, 5));
+      const far = words.slice(7000, 7008);
+      const t0 = performance.now();
+      speak(a, far, words.slice(0, 5));
+      const ms = performance.now() - t0;
+      // The vocabulary repeats every 1,500 words; the nearest copy ahead wins.
+      expect(a.cursor).toBe(7007 % 1500);
+      expect(ms / far.length).toBeLessThan(40);
+    });
+  });
 });
