@@ -159,11 +159,13 @@ export function parseBackup(text: string): BackupData {
 export interface ExistingState {
   folders: Folder[];
   /** Every stored script id (including soft-deleted) with the fields used to detect an identical copy. */
-  scripts: Map<string, Pick<Script, 'title' | 'body' | 'updatedAt'>>;
+  scripts: Map<string, Pick<Script, 'title' | 'body' | 'updatedAt'> & { deleted?: boolean }>;
   versionIds: Set<string>;
 }
 
 export interface MergePlan extends BackupData {
+  /** Scripts whose stored copy is soft-deleted: restored in place (same id) with the backup's content. */
+  restoredScripts: Script[];
   /** Scripts already present unchanged (same id, title, body and edit time) — not imported twice. */
   skippedScripts: number;
 }
@@ -174,6 +176,7 @@ const folderKey = (name: string) => normalizeFolderName(name).toLocaleLowerCase(
  * Plans an import that only adds rows. Rules:
  * - A folder whose name matches an existing folder (case-insensitive) is merged into it.
  * - A script identical to a stored one (same id, title, body, updatedAt) is skipped.
+ * - A script whose stored copy is soft-deleted is restored in place with the backup's content.
  * - Any other id that collides gets a fresh id; references are rewritten.
  */
 export function planMerge(existing: ExistingState, incoming: BackupData, newId: () => string): MergePlan {
@@ -208,8 +211,17 @@ export function planMerge(existing: ExistingState, incoming: BackupData, newId: 
   const scriptMap = new Map<string, string>();
   const skipped = new Set<string>();
   const scripts: Script[] = [];
+  const restoredScripts: Script[] = [];
+  const restored = new Set<string>();
   for (const s of incoming.scripts) {
     const stored = existing.scripts.get(s.id);
+    if (stored?.deleted) {
+      // Deleted on this device since the backup: bring it back rather than treating it as present.
+      restored.add(s.id);
+      scriptMap.set(s.id, s.id);
+      restoredScripts.push({ ...s, folderId: s.folderId ? (folderMap.get(s.folderId) ?? null) : null });
+      continue;
+    }
     if (stored && stored.title === s.title && stored.body === s.body && stored.updatedAt === s.updatedAt) {
       skipped.add(s.id);
       scriptMap.set(s.id, s.id);
@@ -224,12 +236,12 @@ export function planMerge(existing: ExistingState, incoming: BackupData, newId: 
   for (const v of incoming.versions) {
     const scriptId = scriptMap.get(v.scriptId);
     if (!scriptId) continue;
-    // Versions of a skipped (already present) script: add only the ones not stored yet.
-    if (skipped.has(v.scriptId) && existing.versionIds.has(v.id)) continue;
+    // Versions of a skipped (already present) or restored script: add only the ones not stored yet.
+    if ((skipped.has(v.scriptId) || restored.has(v.scriptId)) && existing.versionIds.has(v.id)) continue;
     versions.push({ ...v, id: freshId(v.id), scriptId });
   }
 
-  return { folders, scripts, versions, skippedScripts: skipped.size };
+  return { folders, scripts, restoredScripts, versions, skippedScripts: skipped.size };
 }
 
 // ----- Repository glue -----
@@ -258,9 +270,10 @@ export async function importBackup(repos: BackupRepos, text: string, newId: () =
   const plan = planMerge({ folders, scripts: ids.scripts, versionIds: ids.versions }, incoming, newId);
   for (const f of plan.folders) await repos.folders.insert(f);
   for (const s of plan.scripts) await repos.scripts.insertImported(s);
+  for (const s of plan.restoredScripts) await repos.scripts.restoreImported(s);
   for (const v of plan.versions) await repos.scripts.insertImportedVersion(v);
   return {
-    scriptsAdded: plan.scripts.length,
+    scriptsAdded: plan.scripts.length + plan.restoredScripts.length,
     foldersAdded: plan.folders.length,
     versionsAdded: plan.versions.length,
     skippedScripts: plan.skippedScripts,

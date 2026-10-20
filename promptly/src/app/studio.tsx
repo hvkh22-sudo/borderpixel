@@ -11,6 +11,7 @@ import { Text } from '../components/Text';
 import {
   PLATFORMS,
   TONES,
+  applyHook,
   diffWords,
   type Platform,
   type StudioRequest,
@@ -30,12 +31,6 @@ import { radius, spacing, typography } from '../theme/tokens';
 
 const EDIT_TOOLS: StudioTool[] = ['improve', 'shorten', 'conversational', 'hook', 'tone', 'platform'];
 const DURATIONS = [30, 60, 90, 180] as const;
-
-/** Replace the first paragraph (the opening) with the chosen hook. */
-function applyHook(body: string, hook: string): string {
-  const idx = body.indexOf('\n\n');
-  return idx < 0 ? hook : `${hook}${body.slice(idx)}`;
-}
 
 export default function Studio() {
   const params = useLocalSearchParams<{ scriptId?: string; tool?: StudioTool }>();

@@ -44,3 +44,15 @@ it('rejects files that are not backups', async () => {
   await fireEvent.press(screen.getByLabelText('Import scripts'));
   await waitFor(() => expect(Alert.alert).toHaveBeenCalledWith('This file isn’t a Promptly scripts backup.'));
 });
+
+it('restores a script that was deleted after the backup was made', async () => {
+  const s = await mockRepos.scripts.create({ title: 'Oops', body: 'deleted by mistake' });
+  mockPick.mockResolvedValue(serializeBackup(await collectBackup(mockRepos as never), Date.UTC(2026, 9, 20)));
+  await mockRepos.scripts.remove(s.id);
+
+  const Privacy = require('../settings/privacy').default;
+  await renderScreen(<Privacy />);
+  await fireEvent.press(screen.getByLabelText('Import scripts'));
+  await waitFor(() => expect(Alert.alert).toHaveBeenCalledWith('Imported 1 scripts and 0 folders.'));
+  expect((await mockRepos.scripts.get(s.id))?.body).toBe('deleted by mistake');
+});

@@ -65,7 +65,8 @@ describe('handler', () => {
     const r = await handle(req({ tool: 'generate' }), deps);
     expect(r.status).toBe(400);
     expect(await r.json()).toEqual({ error: 'topic_required' });
-    expect((await handle(req({ tool: 'improve', script: 'x'.repeat(40_000) }), deps)).status).toBe(413);
+    expect((await handle(req({ tool: 'improve', script: 'x'.repeat(70_000) }), deps)).status).toBe(413);
+    expect((await handle(req({ tool: 'improve', script: 'x'.repeat(12_001) }), deps)).status).toBe(400);
   });
 
   it('serves a request, reports remaining quota and never logs script text', async () => {
@@ -117,6 +118,35 @@ describe('handler', () => {
     await handle(req(IMPROVE), s.deps);
     await handle(req(IMPROVE), s.deps);
     expect(s.entitlementCalls()).toBe(1);
+  });
+
+  it('accepts a long CJK script within the client character limit', async () => {
+    const { deps } = setup();
+    const body = JSON.stringify({ tool: 'improve', script: '漢'.repeat(12_000) });
+    const r = await handle(req(body, { 'content-length': String(new TextEncoder().encode(body).length) }), deps);
+    expect(r.status).toBe(200);
+  });
+
+  it('re-checks a stale cached entitlement once when quota runs out (new subscriber)', async () => {
+    let ent: Entitlement = { plan: 'free', creditPacks: 0 };
+    let calls = 0;
+    let now = Date.UTC(2026, 9, 20, 12);
+    const s = setup();
+    s.deps.entitlement = async () => (calls++, ent);
+    s.deps.now = () => now;
+    expect((await handle(req(IMPROVE), s.deps)).status).toBe(200);
+    expect((await handle(req(IMPROVE), s.deps)).status).toBe(200);
+    // Free quota exhausted, entitlement just fetched: no extra lookup.
+    expect((await handle(req(IMPROVE), s.deps)).status).toBe(402);
+    expect(calls).toBe(1);
+    // The user subscribes; a minute later the cache is still valid but stale.
+    ent = { plan: 'subscription', creditPacks: 0 };
+    now += 60_000;
+    expect((await handle(req(IMPROVE), s.deps)).status).toBe(200);
+    expect(calls).toBe(2);
+    // The refreshed entitlement is cached again.
+    expect((await handle(req(IMPROVE), s.deps)).status).toBe(402);
+    expect(calls).toBe(2);
   });
 
   it('refunds quota when the model fails', async () => {

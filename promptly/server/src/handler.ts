@@ -65,13 +65,23 @@ function periodKeys(now: number) {
   return { month, day, monthResetsAt: new Date(next).toISOString() };
 }
 
-async function resolveEntitlement(deps: Deps, userId: string): Promise<Entitlement> {
+/** A cached entitlement older than this is re-checked once when quota runs out (the user may have just subscribed). */
+const ENTITLEMENT_RECHECK_MS = 30 * 1000;
+
+type CachedEntitlement = Entitlement & { fetchedAt?: number };
+
+async function resolveEntitlement(deps: Deps, userId: string, opts: { bypassCache?: boolean } = {}): Promise<{ e: Entitlement; fetchedAt: number }> {
   const now = deps.now();
-  const cached = await deps.store.cacheGet<Entitlement>(`user:${userId}`, 'entitlement', now);
-  if (cached) return cached;
+  if (!opts.bypassCache) {
+    const cached = await deps.store.cacheGet<CachedEntitlement>(`user:${userId}`, 'entitlement', now);
+    if (cached) {
+      const { fetchedAt, ...e } = cached;
+      return { e, fetchedAt: fetchedAt ?? 0 };
+    }
+  }
   const e = await deps.entitlement(userId);
-  await deps.store.cachePut(`user:${userId}`, 'entitlement', e, now + ENTITLEMENT_TTL_MS);
-  return e;
+  await deps.store.cachePut<CachedEntitlement>(`user:${userId}`, 'entitlement', { ...e, fetchedAt: now }, now + ENTITLEMENT_TTL_MS);
+  return { e, fetchedAt: now };
 }
 
 /**
@@ -109,7 +119,7 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
   const { month, day, monthResetsAt } = periodKeys(deps.now());
 
   if (req.method === 'GET' && url.pathname === '/v1/balance') {
-    const e = await resolveEntitlement(deps, userId);
+    const { e } = await resolveEntitlement(deps, userId);
     const q = quotaFor(e, deps.config, month);
     const remaining = await remainingFor(deps.store, `user:${userId}`, q);
     return json(200, { remaining, resetsAt: q.resets ? monthResetsAt : null, plan: e.plan });
@@ -157,8 +167,9 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
   }
 
   let ent: Entitlement;
+  let entFetchedAt: number;
   try {
-    ent = await resolveEntitlement(deps, userId);
+    ({ e: ent, fetchedAt: entFetchedAt } = await resolveEntitlement(deps, userId));
   } catch {
     return json(503, { error: 'entitlement_unavailable' });
   }
@@ -183,14 +194,28 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
     }
   }
 
-  const q = quotaFor(ent, deps.config, month);
-  let chargedKey = q.base.key;
-  let quota = await deps.store.consume(scope, q.base.key, q.base.limit);
-  if (!quota.allowed && q.credits.limit > 0) {
-    chargedKey = q.credits.key;
-    quota = await deps.store.consume(scope, q.credits.key, q.credits.limit);
+  const consumeFor = async (e: Entitlement) => {
+    const q = quotaFor(e, deps.config, month);
+    let key = q.base.key;
+    let r = await deps.store.consume(scope, q.base.key, q.base.limit);
+    if (!r.allowed && q.credits.limit > 0) {
+      key = q.credits.key;
+      r = await deps.store.consume(scope, q.credits.key, q.credits.limit);
+    }
+    return { q, chargedKey: key, allowed: r.allowed };
+  };
+  let charge = await consumeFor(ent);
+  if (!charge.allowed && deps.now() - entFetchedAt > ENTITLEMENT_RECHECK_MS) {
+    // A purchase made after the entitlement was cached would otherwise wait out the cache TTL.
+    try {
+      ({ e: ent } = await resolveEntitlement(deps, userId, { bypassCache: true }));
+      charge = await consumeFor(ent);
+    } catch {
+      // RevenueCat unavailable: keep the cached answer.
+    }
   }
-  if (!quota.allowed) return json(402, { error: 'quota_exceeded', remaining: 0 });
+  if (!charge.allowed) return json(402, { error: 'quota_exceeded', remaining: 0 });
+  const { q, chargedKey } = charge;
 
   const started = deps.now();
   const { prompt, wantsAlternatives } = buildUserPrompt(parsed);

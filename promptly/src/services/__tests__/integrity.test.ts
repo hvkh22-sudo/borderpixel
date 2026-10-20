@@ -93,6 +93,16 @@ describe('integrity client', () => {
     expect(h).toEqual({ 'x-integrity-platform': 'android', 'x-integrity-challenge': 'nonce1', 'x-integrity-token': 'TOKEN(sha({"b":1}nonce1))' });
   });
 
+  it('Android: re-prepares an expired token provider once and retries', async () => {
+    const native = nativeMock();
+    native.requestIntegrityCheckAsync.mockRejectedValueOnce(new Error('provider invalid'));
+    const client = createIntegrityClient(env({ platform: 'android', native }));
+    const h = await client.headersFor('{"b":1}', transport());
+    expect(native.prepareIntegrityTokenProviderAsync).toHaveBeenCalledTimes(2);
+    expect(native.requestIntegrityCheckAsync).toHaveBeenCalledTimes(2);
+    expect(h).toEqual({ 'x-integrity-platform': 'android', 'x-integrity-challenge': 'nonce1', 'x-integrity-token': 'TOKEN(sha({"b":1}nonce1))' });
+  });
+
   it('Android: missing project number or native failures send no headers', async () => {
     expect(await createIntegrityClient(env({ platform: 'android', cloudProjectNumber: '' })).headersFor('{}', transport())).toEqual({});
     const native = { ...nativeMock(), requestIntegrityCheckAsync: jest.fn(async () => Promise.reject(new Error('play down'))) };

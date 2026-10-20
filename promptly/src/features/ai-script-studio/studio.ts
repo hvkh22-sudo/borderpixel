@@ -122,6 +122,25 @@ export function currentText(h: VersionHistory): string {
   return h.versions[h.current]?.text ?? '';
 }
 
+/** First line break, or the end of the first sentence (Latin punctuation needs following whitespace; CJK does not). */
+const OPENING_END = /\r?\n|[.!?…]+["'”’)\]]*(?=\s)|[。！？]+/;
+
+/**
+ * Replace the opening (first line or first sentence) with the chosen hook. When the whole script is a
+ * single opening, the hook is prepended instead so no creator text is lost.
+ */
+export function applyHook(body: string, hook: string): string {
+  const text = body.trimStart();
+  if (!text.trim()) return hook;
+  const m = OPENING_END.exec(text);
+  if (m) {
+    const end = m[0].includes('\n') ? m.index : m.index + m[0].length;
+    const rest = text.slice(end);
+    if (rest.trim()) return `${hook}${rest}`;
+  }
+  return `${hook}\n\n${text}`;
+}
+
 /** Simple word-level diff for the compare view (LCS on words). */
 export type DiffPart = { kind: 'same' | 'added' | 'removed'; text: string };
 

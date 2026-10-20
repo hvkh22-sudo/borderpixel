@@ -159,6 +159,20 @@ describe('import merge', () => {
     ]);
   });
 
+  it('restores a script that was deleted after the backup was taken', async () => {
+    const { repos, a } = await seeded();
+    const file = serializeBackup(await collectBackup(repos), 5);
+    await repos.scripts.update(a.id, { body: 'edited after backup' });
+    await repos.scripts.remove(a.id);
+    expect(await repos.scripts.get(a.id)).toBeNull();
+    const r = await importBackup(repos, file, fresh());
+    expect(r.scriptsAdded).toBe(1);
+    const back = await repos.scripts.get(a.id);
+    expect(back).toMatchObject({ title: 'Hook one', body: 'Stop scrolling — שלום', favorite: true });
+    expect((await repos.scripts.list()).length).toBe(2);
+    expect((await repos.scripts.listVersions(a.id)).map((v) => v.body)).toEqual(['older draft']);
+  });
+
   it('writes nothing when the file is invalid', async () => {
     const { repos } = await seeded();
     const before = await collectBackup(repos);

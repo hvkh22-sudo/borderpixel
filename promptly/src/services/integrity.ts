@@ -118,14 +118,24 @@ export function createIntegrityClient(env: IntegrityEnv) {
     }
     if (env.platform === 'android') {
       if (!/^\d+$/.test(env.cloudProjectNumber)) return {};
-      androidReady ??= native.prepareIntegrityTokenProviderAsync(env.cloudProjectNumber).catch((e: unknown) => {
-        androidReady = null; // retry preparation on the next request
-        throw e;
-      });
-      await androidReady;
+      const prepare = () =>
+        (androidReady ??= native.prepareIntegrityTokenProviderAsync(env.cloudProjectNumber).catch((e: unknown) => {
+          androidReady = null; // retry preparation on the next request
+          throw e;
+        }));
+      await prepare();
       const challenge = await transport.challenge();
       if (!challenge) return {};
-      const token = await native.requestIntegrityCheckAsync(await env.sha256Hex(body + challenge));
+      const requestHash = await env.sha256Hex(body + challenge);
+      let token: string;
+      try {
+        token = await native.requestIntegrityCheckAsync(requestHash);
+      } catch {
+        // The provider prepared earlier this session may have expired: prepare a fresh one and retry once.
+        androidReady = null;
+        await prepare();
+        token = await native.requestIntegrityCheckAsync(requestHash);
+      }
       return { 'x-integrity-platform': 'android', 'x-integrity-challenge': challenge, 'x-integrity-token': token };
     }
     return {};

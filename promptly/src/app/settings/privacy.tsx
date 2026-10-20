@@ -16,6 +16,7 @@ import { getRepositories } from '../../services/db';
 import { deleteRecordingFile } from '../../services/files';
 import { useSettings } from '../../state/settings';
 import { BackupError, backupFileName, collectBackup, importBackup, serializeBackup } from '../../storage/backup';
+import { USAGE_KEY_PREFIX } from '../../storage/repositories';
 import { pickBackupText } from '../../services/backupImport';
 import { randomUUID } from 'expo-crypto';
 import { useSpeakingRate } from '../../state/speakingRate';
@@ -69,7 +70,8 @@ export default function Privacy() {
           for (const s of await repos.scripts.list()) await repos.scripts.remove(s.id);
           await repos.scripts.purgeDeleted(Number.MAX_SAFE_INTEGER);
           await repos.folders.clearAll();
-          await repos.kv.clearAll();
+          // Free-tier usage counters survive, otherwise deleting data would reset the free Voice Follow trial.
+          await repos.kv.clearAllExcept([USAGE_KEY_PREFIX]);
           useSettings.getState().reset();
           useSpeakingRate.getState().reset();
           Alert.alert(t('privacy.deleted'));

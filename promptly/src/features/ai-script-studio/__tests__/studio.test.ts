@@ -1,5 +1,6 @@
 import {
   MAX_VERSIONS,
+  applyHook,
   createHistory,
   currentText,
   diffWords,
@@ -60,5 +61,21 @@ describe('diffWords', () => {
     expect(d.filter((p) => p.kind === 'removed').map((p) => p.text.trim())).toEqual(['quick']);
     expect(d.filter((p) => p.kind === 'added').map((p) => p.text.trim()).join(' ')).toContain('slow');
     expect(d.map((p) => (p.kind === 'removed' ? '' : p.text)).join('')).toBe('the slow brown fox jumps');
+  });
+});
+
+describe('applyHook', () => {
+  it('replaces only the opening line or sentence', () => {
+    expect(applyHook('Old opening.\n\nBody here.', 'New hook!')).toBe('New hook!\n\nBody here.');
+    expect(applyHook('First line\nsecond line', 'Hook')).toBe('Hook\nsecond line');
+    expect(applyHook('First sentence. Second sentence.', 'Hook!')).toBe('Hook! Second sentence.');
+    expect(applyHook('Wow?! Then more.', 'Hook.')).toBe('Hook. Then more.');
+    expect(applyHook('大家好。今天我们聊聊', '注意！')).toBe('注意！今天我们聊聊');
+  });
+
+  it('prepends when the script is a single unbroken opening, and uses the hook for an empty script', () => {
+    expect(applyHook('Just one line without an end', 'Hook')).toBe('Hook\n\nJust one line without an end');
+    expect(applyHook('Only one sentence.', 'Hook')).toBe('Hook\n\nOnly one sentence.');
+    expect(applyHook('   ', 'Hook')).toBe('Hook');
   });
 });
