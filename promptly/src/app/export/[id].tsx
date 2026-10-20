@@ -13,7 +13,7 @@ import { toSrt } from '../../features/captions/captions';
 import { CAPTION_POSITION_Y, CAPTION_STYLES } from '../../features/captions/captionStyles';
 import { t } from '../../localization/i18n';
 import { track } from '../../services/analytics';
-import { flags } from '../../services/config';
+import { support } from '../../services/deviceSupport';
 import { getRepositories } from '../../services/db';
 import { exportsDir, recordingFile } from '../../services/files';
 import { PromptlyMedia, type Job } from '../../services/nativeMedia';
@@ -30,7 +30,7 @@ export default function ExportScreen() {
   const [burnIn, setBurnIn] = useState(false);
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
   const jobRef = useRef<Job<string> | null>(null);
-  const burnInAvailable = flags.burnIn && PromptlyMedia.isAvailable();
+  const burnInAvailable = support.burnIn().ok;
 
   useEffect(() => {
     void getRepositories().then((r) => r.recordings.get(id).then((x) => {

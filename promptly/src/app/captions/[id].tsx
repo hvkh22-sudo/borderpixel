@@ -29,7 +29,7 @@ import { CAPTION_STYLES, type CaptionPosition, type CaptionStyleId } from '../..
 import { checkFeature } from '../../features/monetization/entitlements';
 import { formatClock, t } from '../../localization/i18n';
 import { track } from '../../services/analytics';
-import { flags } from '../../services/config';
+import { support } from '../../services/deviceSupport';
 import { getRepositories } from '../../services/db';
 import { recordingFile } from '../../services/files';
 import { ensureSpeechPermission } from '../../services/speechEngine';
@@ -128,10 +128,14 @@ export default function CaptionsEditor() {
 
   const active = cueAt(cues, time.currentTime * 1000);
 
-  if (!flags.captions) {
+  const capSupport = support.captions();
+  if (!capSupport.ok) {
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
         <Text center>{t('captions.errors.unsupported_device')}</Text>
+        <Text center muted>
+          {t(`support.${capSupport.reason}`)}
+        </Text>
       </View>
     );
   }

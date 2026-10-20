@@ -20,7 +20,7 @@
     "android": {
       "package": "app.promptly.placeholder",
       "adaptiveIcon": {
-        "backgroundColor": "#090A0F",
+        "backgroundColor": "#6D5EF5",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"

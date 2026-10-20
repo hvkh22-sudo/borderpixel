@@ -361,6 +361,12 @@ export const en = {
     contact: 'Contact support',
     contactUnavailable: 'Support contact will be available at launch.',
   },
+  support: {
+    flag_off: 'This feature is turned off in this build.',
+    no_recognizer: 'Speech recognition isn’t available on this device or language.',
+    os_too_old: 'This feature needs Android 13 or newer.',
+    native_module_missing: 'This feature isn’t included in this build yet.',
+  },
   errors: {
     generic: 'Something went wrong.',
     notFound: 'This item no longer exists.',

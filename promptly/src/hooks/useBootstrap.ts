@@ -11,8 +11,10 @@ import { setLanguage } from '../localization/i18n';
 import { setAnalyticsEnabled, track } from '../services/analytics';
 import { getRepositories } from '../services/db';
 import { cleanExports, findOrphanRecordings } from '../services/files';
+import { PromptlyMedia } from '../services/nativeMedia';
 import { fetchCustomerInfo, subscribeCustomerInfo } from '../services/purchases';
 import { useAccess } from '../state/access';
+import { useSession } from '../state/session';
 import { persistableSettings, useSettings, type SettingsState } from '../state/settings';
 
 const SETTINGS_KEY = 'settings.v1';
@@ -48,9 +50,20 @@ export function useBootstrap(): { ready: boolean; recovered: number } {
         // Recordings written but never registered (app killed while finalizing).
         const orphans = findOrphanRecordings(await repos.recordings.knownFileNames());
         for (const f of orphans) {
-          await repos.recordings.add({ scriptId: null, fileName: f.name, durationMs: 0, width: null, height: null, status: 'recovered' });
+          // Best effort: a file cut off mid-write may not be readable; register it anyway
+          // so the user decides what to do with it.
+          const info = PromptlyMedia.isAvailable() ? await PromptlyMedia.getVideoInfo(f.uri).catch(() => null) : null;
+          await repos.recordings.add({
+            scriptId: null,
+            fileName: f.name,
+            durationMs: Math.round(info?.durationMs ?? 0),
+            width: info?.width ?? null,
+            height: info?.height ?? null,
+            status: 'recovered',
+          });
         }
         setRecovered(orphans.length);
+        useSession.getState().setRecoveredTakes(orphans.length);
         cleanExports(24 * 60 * 60 * 1000);
       } catch (e) {
         if (__DEV__) console.warn('bootstrap storage failed', e);

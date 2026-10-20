@@ -23,8 +23,8 @@ npx expo prebuild          # generates ios/ and android/ (git-ignored)
 npx expo run:ios --device  # or: npx expo run:android --device
 npx expo start --dev-client
 ```
-Cloud builds: `npx eas-cli@latest build --profile development --platform ios|android`
-(requires an Expo account and, for iOS devices, an Apple Developer account).
+Cloud builds (no Mac needed): profiles in `eas.json`; step-by-step in
+`docs/testing/device-poc-runbook.md`.
 
 ## Checks
 ```bash

@@ -15,9 +15,8 @@ import { MAX_WPM, MIN_WPM, WPM_STEP } from '../../features/teleprompter/scrollMo
 import { Teleprompter } from '../../features/teleprompter/Teleprompter';
 import { estimateSpeakingSeconds } from '../../features/voice-follow/text';
 import { formatDuration, t } from '../../localization/i18n';
-import { flags } from '../../services/config';
 import { getRepositories } from '../../services/db';
-import { getSpeechCapabilities } from '../../services/speechEngine';
+import { support } from '../../services/deviceSupport';
 import { useAccess } from '../../state/access';
 import { useSettings, type ScrollMode } from '../../state/settings';
 import type { Script } from '../../storage/repositories';
@@ -31,14 +30,14 @@ export default function Prepare() {
   const { setPrompter, setCamera } = useSettings.getState();
   const access = useAccess((s) => s.access);
   const usage = useAccess((s) => s.usage);
-  const speech = getSpeechCapabilities();
+  const vfSupport = support.voiceFollow();
 
   useEffect(() => {
     void getRepositories().then((r) => r.scripts.get(id).then(setScript));
   }, [id]);
 
   const voiceGate = checkFeature('voiceFollow', access, usage);
-  const voiceSupported = flags.voiceFollow && speech.available;
+  const voiceSupported = vfSupport.ok;
 
   const chooseMode = (mode: ScrollMode) => {
     if (mode === 'voice' && !voiceGate.allowed) {
@@ -79,7 +78,7 @@ export default function Prepare() {
           </Text>
           {!voiceSupported ? (
             <Text variant="caption" muted>
-              {t('prepare.voiceUnavailable')}
+              {vfSupport.ok ? '' : `${t('prepare.voiceUnavailable')} ${t(`support.${vfSupport.reason}`)}`}
             </Text>
           ) : voiceGate.allowed && voiceGate.reason === 'trial' ? (
             <Text variant="caption" muted>

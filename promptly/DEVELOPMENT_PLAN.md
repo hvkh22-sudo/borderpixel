@@ -1,6 +1,6 @@
 # Development plan
 
-Last updated: 2026-10-20 (session 1).
+Last updated: 2026-10-20 (session 2).
 
 ## Milestones
 | Phase | Scope | Status |
@@ -16,13 +16,20 @@ Last updated: 2026-10-20 (session 1).
 | 8 Beta | TestFlight / Play internal testing | ⬜ needs accounts + approval |
 | 9 Launch prep | Store assets, policy, review notes | 🟡 drafts in docs/launch |
 
+## Session 2 (done)
+- Explicit platform support gate (Android 13+ for Voice Follow/captions; native module presence).
+- `eas.json` build profiles + `docs/testing/device-poc-runbook.md` (cloud builds, no Mac needed).
+- Recovered takes: duration via native module, Home notice.
+- Original app icon generated from code (`scripts/generate-icons.py`).
+- AI model comparison harness `server/eval` (dry run only; real run needs approval, ≤ $1.46).
+
 ## Next actions (in order)
-1. **Build dev clients** (EAS or a Mac/Android workstation) and run the PoC checklist in
+1. **Build dev clients** with EAS (`docs/testing/device-poc-runbook.md`) and run the PoC checklist in
    `docs/testing/test-plan.md` §1 on at least one iPhone and one Pixel/Samsung (REC-01..05, VF-01..04).
 2. Fix native compile errors in `modules/promptly-media` (never compiled yet).
 3. Verify overlay absence in the exported file on both platforms (REC-02) — release blocker.
 4. Measure Voice Follow latency/accuracy with the scripted protocol; set thresholds from baseline.
-5. Founder decisions: name, prices, AI model, enabling AI spend, analytics provider.
+5. Founder decisions: name, prices, AI model (run `server/eval` after approval), enabling AI spend, analytics provider.
 6. Configure RevenueCat + store products; sandbox purchase test matrix (PUR-*).
 7. Add device attestation to the AI proxy before free-tier AI goes live.
 

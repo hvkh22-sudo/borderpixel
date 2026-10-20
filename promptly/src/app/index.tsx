@@ -14,6 +14,7 @@ import { useFocusData } from '../hooks/useAsyncData';
 import { formatClock, formatDuration, t } from '../localization/i18n';
 import { track } from '../services/analytics';
 import { getRepositories } from '../services/db';
+import { useSession } from '../state/session';
 import { useSettings } from '../state/settings';
 import { useTheme } from '../theme/ThemeProvider';
 import { radius, spacing } from '../theme/tokens';
@@ -21,6 +22,7 @@ import { radius, spacing } from '../theme/tokens';
 export default function Home() {
   const { colors } = useTheme();
   const onboardingDone = useSettings((s) => s.onboardingDone);
+  const recoveredTakes = useSession((s) => s.recoveredTakes);
   const { data } = useFocusData(async () => {
     const repos = await getRepositories();
     const [scripts, takes] = await Promise.all([repos.scripts.list({ sort: 'recent' }), repos.recordings.list()]);
@@ -70,6 +72,24 @@ export default function Home() {
           </View>
           <Ionicons name="arrow-forward" size={24} color="#fff" />
         </Pressable>
+
+        {recoveredTakes > 0 ? (
+          <Card
+            onPress={() => {
+              useSession.getState().dismissRecovered();
+              router.push('/takes');
+            }}
+            accessibilityLabel={t('home.recovered', { n: recoveredTakes })}
+          >
+            <View style={styles.takeRow}>
+              <Ionicons name="medkit-outline" size={22} color={colors.warning} />
+              <Text variant="callout" style={styles.flex} accessibilityLiveRegion="polite">
+                {t('home.recovered', { n: recoveredTakes })}
+              </Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            </View>
+          </Card>
+        ) : null}
 
         {empty ? (
           <EmptyState
