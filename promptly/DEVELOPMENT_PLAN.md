@@ -29,9 +29,8 @@ Last updated: 2026-10-20 (session 2).
 2. Fix native compile errors in `modules/promptly-media` (never compiled yet).
 3. Verify overlay absence in the exported file on both platforms (REC-02) — release blocker.
 4. Measure Voice Follow latency/accuracy with the scripted protocol; set thresholds from baseline.
-5. **Founder approved (2026-10-20) running `server/eval` (≤ $1.46)** — blocked only on `ANTHROPIC_API_KEY`
-   being set in the cloud environment; then `cd server && npx tsx eval/run.ts --confirm-spend` and
-   report the model recommendation. Other founder decisions: name, prices, AI model, enabling AI spend, analytics provider.
+5. **Founder decision (2026-10-20): API key and model eval are deferred to the END** — continue all
+   work without a key; connect the key and run `server/eval` (approved, ≤ $1.46) as a final step. Other founder decisions: name, prices, AI model, enabling AI spend, analytics provider.
 6. Configure RevenueCat + store products; sandbox purchase test matrix (PUR-*).
 7. Add device attestation to the AI proxy before free-tier AI goes live.
 

@@ -39,5 +39,5 @@ sending private content to a new processor, material scope changes, publishing/s
 production credentials, legal representations, destructive git operations.
 
 ## Communication
-Talk to the founder in Hebrew; code, comments and docs in English. Separate Implemented / Tested /
+Talk to the founder **only in Hebrew** (explicit request); code, comments and docs in English. Separate Implemented / Tested /
 Not tested / Blocked / Planned in every report.

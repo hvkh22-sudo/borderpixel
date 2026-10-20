@@ -6,7 +6,8 @@ Legend: ✅ verified · 🟡 implemented, not verified on device · ⬜ not star
 | Check | Result |
 |---|---|
 | TypeScript typecheck (app) | ✅ `npm run typecheck` clean |
-| Unit tests (app) | ✅ 79 tests / 10 suites (aligner, controller, scroll model, captions, entitlements, recording machine, studio, storage on real SQLite, i18n, platform support) |
+| Unit tests (app) | ✅ 94 tests / 12 suites (aligner, controller, scroll model, captions, entitlements, recording machine, studio, storage on real SQLite, i18n, platform support) |
+| Screen render tests (Node, mocked native modules, real SQLite) | ✅ Home, Library, Editor (autosave), Prepare (incl. Teleprompter + Voice Follow trial), Paywall, Settings, Studio (history restore), Takes, Subscription, Captions (generate → script correction → edit → save; no-speech; Pro gate) |
 | JS bundle iOS / Android (`expo export`) | ✅ both bundle (Hermes bytecode) |
 | `expo prebuild` (config plugins, permissions) | ✅ generates projects; Info.plist + manifest permissions verified by inspection |
 | Server typecheck + tests | ✅ 18 tests (incl. eval metrics) (quotas, budget cap, refunds, IP limit, entitlement mapping, validation, prompt wrapping) |
