@@ -43,9 +43,9 @@ Merged into `claude/youthful-volta-vdsr0x`, each with tests (375+ app tests, 50+
   iOS simulator build (unsigned). First time the native code is compiled; results tracked in QUALITY_CHECKLIST.md
 
 ## Next actions (in order)
-1. **Build dev clients** with EAS (`docs/testing/device-poc-runbook.md`) and run the PoC checklist in
-   `docs/testing/test-plan.md` §1 on at least one iPhone and one Pixel/Samsung (REC-01..05, VF-01..04).
-2. Fix native compile errors in `modules/promptly-media` (never compiled yet).
+1. **Android now:** sideload the CI test APK (`docs/testing/founder-checklist-he.md` §0) and run the
+   founder checklist (REC-01..05, VF-01..04). **iOS:** needs a signed build (EAS + `EXPO_TOKEN`, or TestFlight).
+2. ✅ Native code compiles on both platforms in CI (2026-10-21); emulator Maestro run added (`android-e2e`).
 3. Verify overlay absence in the exported file on both platforms (REC-02) — release blocker.
 4. Measure Voice Follow latency/accuracy with the scripted protocol; set thresholds from baseline.
 5. **Founder decision (2026-10-20): API key and model eval are deferred to the END** — continue all
@@ -54,7 +54,7 @@ Merged into `claude/youthful-volta-vdsr0x`, each with tests (375+ app tests, 50+
 7. Add device attestation to the AI proxy before free-tier AI goes live.
 
 ## Blockers
-- No macOS/Xcode and no Android SDK download in this environment → no native builds, no device tests.
+- No macOS/Xcode and no Android SDK in this container → native builds run in GitHub Actions instead; device tests need the founder's phones.
 - Store/developer accounts, RevenueCat project, Anthropic key: founder-owned.
 
 ## Candidate P1 work suggested by research (needs founder prioritization)

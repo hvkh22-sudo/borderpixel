@@ -66,7 +66,7 @@ jobs:
       - name: Assemble standalone test APK
         working-directory: promptly/android
         run: |
-          ./gradlew :app:assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a > gradle.log 2>&1 \
+          ./gradlew :app:assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,x86_64 > gradle.log 2>&1 \
             || { grep -n -E '^e: |^w: .*promptly|error:|What went wrong' -A3 gradle.log | head -200; tail -n 60 gradle.log; exit 1; }
           tail -n 20 gradle.log
       - uses: actions/upload-artifact@v4
@@ -74,6 +74,51 @@ jobs:
         with:
           name: promptly-android-test-apk
           path: promptly/android/app/build/outputs/apk/release/*.apk
+          retention-days: 7
+
+  # Runs the test APK on an Android emulator with the Maestro flows in .maestro/.
+  # Emulator ≠ phone: the camera is a virtual scene and on-device speech may be missing, so camera
+  # flows are reported but do not fail the job.
+  android-e2e:
+    needs: android
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: promptly-android-test-apk
+          path: apk
+      - name: Enable KVM
+        working-directory: .
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - name: Install Maestro
+        working-directory: .
+        run: |
+          curl -fsSL https://get.maestro.mobile.dev | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+      - name: Run flows on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          working-directory: promptly
+          script: |
+            adb install -r ../apk/*.apk
+            mkdir -p e2e && adb logcat -c
+            (adb logcat -v time > e2e/logcat.txt &) ; maestro test .maestro/ --exclude-tags camera,hebrew --format junit --output e2e/report.xml --test-output-dir e2e/out ; echo $? > e2e/core-exit ; maestro test .maestro/ --include-tags camera --exclude-tags hebrew --test-output-dir e2e/out-camera || echo "camera flows failed (non-gating)" ; adb exec-out screencap -p > e2e/last.png ; exit $(cat e2e/core-exit)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: promptly-android-e2e
+          path: |
+            promptly/e2e
+            promptly/screenshots
           retention-days: 7
 
   ios:
