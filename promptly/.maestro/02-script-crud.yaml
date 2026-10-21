@@ -25,6 +25,8 @@ tags:
     optional: true
 
 # --- Rename via the title field ---
+# The caret lands where the tap lands, so erasing may keep part of the auto title:
+# assertions below match the new name as a substring.
 - tapOn:
     id: editor-title
 - eraseText:
@@ -34,7 +36,7 @@ tags:
     optional: true
 - takeScreenshot: e2e/out/screenshot-02-after-rename
 - assertVisible:
-    text: "Maestro CRUD"
+    text: ".*Maestro CRUD.*"
 # Autosave runs 0.6 s after the last keystroke.
 - extendedWaitUntil:
     visible:
@@ -62,7 +64,7 @@ tags:
     timeout: 5000
 - assertVisible:
     id: library-script-item
-    text: "Maestro CRUD"
+    text: ".*Maestro CRUD.*"
 - takeScreenshot: screenshots/02-3-search
 
 # --- Folder: create from the chip row ---
@@ -100,7 +102,7 @@ tags:
     timeout: 5000
 - assertVisible:
     id: library-script-item
-    text: "Maestro CRUD"
+    text: ".*Maestro CRUD.*"
 - takeScreenshot: screenshots/02-5-moved-into-folder
 - tapOn:
     id: folder-chip-all
@@ -124,7 +126,7 @@ tags:
     timeout: 5000
 - assertVisible:
     id: library-script-item
-    text: "Maestro CRUD"
+    text: ".*Maestro CRUD.*"
 - takeScreenshot: screenshots/02-7-restored
 
 # --- Clean up: delete the script for good, then the folder ---

@@ -10,6 +10,10 @@ tags:
 - tapOn:
     id: home-settings
 - takeScreenshot: screenshots/06-1-settings
+- scrollUntilVisible:
+    element:
+      id: settings-subscription
+    direction: DOWN
 - tapOn:
     id: settings-subscription
 - extendedWaitUntil:

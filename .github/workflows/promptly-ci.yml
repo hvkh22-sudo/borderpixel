@@ -61,6 +61,15 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - run: npm ci
       - run: npx expo prebuild --platform android --no-install --clean
+      # Pre-install the NDK the React Native template pins, with retries: Gradle's on-demand
+      # download fails now and then on hosted runners.
+      - name: Install NDK
+        working-directory: promptly/android
+        run: |
+          NDK=$(grep -h -o -E 'ndkVersion *= *"[0-9.]+"' build.gradle app/build.gradle ../node_modules/react-native/gradle/libs.versions.toml 2>/dev/null | head -n1 | grep -o -E '[0-9][0-9.]+')
+          NDK=${NDK:-27.1.12297006}
+          echo "NDK $NDK"
+          for i in 1 2 3; do yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;$NDK" >/dev/null && break; sleep 20; done
       # Release variant: JS bundle embedded, signed with the template's debug keystore, so it can be
       # sideloaded for internal testing without a dev server. Not a store build.
       - name: Assemble standalone test APK
