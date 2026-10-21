@@ -9,6 +9,7 @@ import { getLocales } from 'expo-localization';
 import { useEffect, useState } from 'react';
 
 import { deriveAccess } from '../features/monetization/entitlements';
+import { loadFirstRun } from '../features/onboarding/firstRun';
 import { recoverOrphanRecordings } from '../features/recording/orphanRecovery';
 import { setLanguage } from '../localization/i18n';
 import { syncLayoutDirection } from '../localization/layoutDirection';
@@ -20,6 +21,7 @@ import { cleanExports, findOrphanRecordings } from '../services/files';
 import { PromptlyMedia } from '../services/nativeMedia';
 import { fetchCustomerInfo, subscribeCustomerInfo } from '../services/purchases';
 import { useAccess } from '../state/access';
+import { useFirstRun } from '../state/firstRun';
 import { useSession } from '../state/session';
 import { persistableSettings, useSettings, type SettingsState } from '../state/settings';
 import { SPEAKING_RATE_KEY, useSpeakingRate } from '../state/speakingRate';
@@ -46,11 +48,12 @@ export function useBootstrap(): { ready: boolean; recovered: number } {
         repos = await getRepositories();
         const r = repos;
         // Independent reads: one round of async SQLite hops instead of three in a row.
-        const [saved, vfUsed, speakingRate, overrides] = await Promise.all([
+        const [saved, vfUsed, speakingRate, overrides, firstRun] = await Promise.all([
           r.kv.get<Partial<SettingsState>>(SETTINGS_KEY, {}),
           r.kv.get(USAGE_VF_KEY, 0),
           r.kv.get<unknown>(SPEAKING_RATE_KEY, null),
           r.kv.get<unknown>(OVERRIDES_KEY, null),
+          loadFirstRun(r.kv),
         ]);
         // Device test overrides (diagnostics screen) apply before the first recording.
         useDiagnosticsOverrides.getState().hydrate(overrides);
@@ -61,6 +64,7 @@ export function useBootstrap(): { ready: boolean; recovered: number } {
         setAnalyticsEnabled(useSettings.getState().analyticsEnabled);
         useAccess.getState().setUsage({ voiceFollowSessionsUsed: vfUsed });
         useSpeakingRate.getState().hydrate(speakingRate);
+        useFirstRun.getState().hydrate(firstRun);
 
         // Persist settings on change (debounced).
         let timer: ReturnType<typeof setTimeout> | null = null;

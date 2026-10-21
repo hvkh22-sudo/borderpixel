@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { decorative } from '../../components/a11y';
 import { Button } from '../../components/Button';
+import { InlineTip } from '../../components/InlineTip';
 import { ListRow } from '../../components/ListRow';
 import { ProBadge } from '../../components/ProBadge';
 import { Screen } from '../../components/Screen';
@@ -13,6 +14,7 @@ import { Segmented } from '../../components/Segmented';
 import { Stepper } from '../../components/Stepper';
 import { Text } from '../../components/Text';
 import { checkFeature } from '../../features/monetization/entitlements';
+import { shouldShowSetupTip } from '../../features/onboarding/firstRun';
 import { MicCheckSheet, VERDICT_SHORT } from '../../features/recording/MicCheckSheet';
 import type { MicVerdict } from '../../features/recording/micCheck';
 import { activePreset, applyPreset, getPreset, RECORDING_PRESETS, type PresetId } from '../../features/recording/presets';
@@ -21,10 +23,12 @@ import { MAX_WPM, MIN_WPM, WPM_STEP } from '../../features/teleprompter/scrollMo
 import { Teleprompter } from '../../features/teleprompter/Teleprompter';
 import { estimateSpeakingSeconds } from '../../features/voice-follow/text';
 import { formatDuration, t } from '../../localization/i18n';
+import { track } from '../../services/analytics';
 import { getRepositories } from '../../services/db';
 import { support } from '../../services/deviceSupport';
 import { whenMicReleased } from '../../services/micCheck';
 import { useAccess } from '../../state/access';
+import { useFirstRun } from '../../state/firstRun';
 import { useSettings, type ScrollMode } from '../../state/settings';
 import { useLearnedWpm, useSpeakingRate } from '../../state/speakingRate';
 import type { Script } from '../../storage/repositories';
@@ -50,6 +54,24 @@ export default function Prepare() {
   useEffect(() => {
     void getRepositories().then((r) => r.scripts.get(id).then(setScript));
   }, [id]);
+
+  // First visit before any take: a one-time inline hint, and Timed (the most reliable mode) as the
+  // starting point. The hint is marked seen as soon as it shows, so it never returns.
+  // Decided once per visit (flags are hydrated before the first screen renders).
+  const [setupTip, setSetupTip] = useState(() => {
+    const fr = useFirstRun.getState();
+    return fr.hydrated && shouldShowSetupTip(fr.flags);
+  });
+  const [setupTipShownOnMount] = useState(setupTip);
+  useEffect(() => {
+    if (!setupTipShownOnMount) return;
+    useFirstRun.getState().dismiss('setupTipSeen');
+    if (useSettings.getState().prompter.mode !== 'timed') useSettings.getState().setPrompter({ mode: 'timed' });
+  }, [setupTipShownOnMount]);
+  const dismissSetupTip = () => {
+    setSetupTip(false);
+    track({ name: 'first_run_step', step: 'setup_tip_dismissed' });
+  };
 
   const voiceGate = checkFeature('voiceFollow', access, usage);
   const voiceSupported = vfSupport.ok;
@@ -87,6 +109,19 @@ export default function Prepare() {
           <Teleprompter script={script.body} settings={{ ...prompter, mode }} mode="manual" playing={false} followCharOffset={null} />
         ) : null}
       </View>
+
+      {setupTip ? (
+        <InlineTip testID="setup-tip" icon="eye-outline" message={t('firstRun.setupTip')} onDismiss={dismissSetupTip}>
+          <Text variant="caption" muted>
+            {t('firstRun.setupTimed')}
+          </Text>
+          {voiceSupported && voiceGate.allowed && voiceGate.reason === 'trial' ? (
+            <Text variant="caption" muted>
+              {t('firstRun.setupVoiceTrial')}
+            </Text>
+          ) : null}
+        </InlineTip>
+      ) : null}
 
       <Section
         title={t('presets.title')}

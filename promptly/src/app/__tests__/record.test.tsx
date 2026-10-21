@@ -10,9 +10,11 @@ import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { AppState, Linking, Platform } from 'react-native';
 
 import { FREE_ACCESS, LIMITS } from '../../features/monetization/entitlements';
+import { INITIAL_FIRST_RUN } from '../../features/onboarding/firstRun';
 import { USAGE_VF_KEY } from '../../hooks/useBootstrap';
 import { setAnalyticsSink, type AnalyticsEvent } from '../../services/analytics';
 import { useAccess } from '../../state/access';
+import { useFirstRun } from '../../state/firstRun';
 import { useSettings } from '../../state/settings';
 import { useSpeakingRate } from '../../state/speakingRate';
 import { createRepos, renderScreen } from './testUtils';
@@ -677,5 +679,29 @@ describe('Record: Bluetooth remote', () => {
     await openRecord();
     expect(mockMedia.keyListeners.size).toBe(0);
     expect(mockMedia.setRemoteKeysEnabled).not.toHaveBeenCalled();
+  });
+});
+
+describe('Record: first-take tip', () => {
+  afterEach(() => useFirstRun.getState().reset());
+
+  it('shows a 3 s non-blocking hint on the first take without changing the take', async () => {
+    useFirstRun.getState().hydrate(INITIAL_FIRST_RUN);
+    await openRecord();
+    const tip = screen.getByTestId('record-first-take-tip');
+    expect(tip.props.style).toMatchObject({ pointerEvents: 'none', position: 'absolute' });
+    expect(screen.getByText('Look at the lens, read the highlighted line')).toBeTruthy();
+    // Controls stay usable while the hint is up.
+    await startTake();
+    await advance(3000);
+    expect(screen.queryByTestId('record-first-take-tip')).toBeNull();
+    await stopTakeAndSave();
+    expect(events.map((e) => e.name)).toEqual(['recording_started', 'recording_completed']);
+  });
+
+  it('is not shown once the first take exists', async () => {
+    useFirstRun.getState().hydrate({ ...INITIAL_FIRST_RUN, firstScriptCreated: true, firstTakeRecorded: true });
+    await openRecord();
+    expect(screen.queryByTestId('record-first-take-tip')).toBeNull();
   });
 });

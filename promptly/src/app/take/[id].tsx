@@ -5,16 +5,19 @@ import { useEffect, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
 import { Button } from '../../components/Button';
+import { InlineTip } from '../../components/InlineTip';
 import { Screen } from '../../components/Screen';
 import { Text } from '../../components/Text';
 import { CaptionPreview } from '../../features/captions/CaptionPreview';
 import { activeWordIndex, cueAt } from '../../features/captions/captions';
 import { checkFeature } from '../../features/monetization/entitlements';
+import { takeTip } from '../../features/onboarding/firstRun';
 import { useFocusData } from '../../hooks/useAsyncData';
 import { formatClock, t } from '../../localization/i18n';
 import { getRepositories } from '../../services/db';
 import { deleteRecordingFile, recordingFile } from '../../services/files';
 import { useAccess } from '../../state/access';
+import { useFirstRun } from '../../state/firstRun';
 import { useSettings } from '../../state/settings';
 import { radius, spacing } from '../../theme/tokens';
 
@@ -37,6 +40,15 @@ export default function Take() {
   useEffect(() => {
     if (exists) player.play();
   }, [exists, player]);
+
+  // A saved take on screen is the activation milestone; the hint then points at captions, then Export.
+  const firstRunHydrated = useFirstRun((s) => s.hydrated);
+  const firstRunFlags = useFirstRun((s) => s.flags);
+  const hasRec = !!rec;
+  useEffect(() => {
+    if (hasRec && firstRunHydrated) useFirstRun.getState().complete('firstTakeRecorded');
+  }, [hasRec, firstRunHydrated]);
+  const tip = firstRunHydrated && rec && exists ? takeTip(firstRunFlags, !!rec.cues?.length) : null;
 
   if (!rec) return <Screen>{null}</Screen>;
 
@@ -95,6 +107,14 @@ export default function Take() {
         <Text variant="callout" muted center accessibilityLiveRegion="polite">
           {t(notice === 'storage_full' ? 'record.savedStorageFull' : 'record.savedInterrupted')}
         </Text>
+      ) : null}
+      {tip ? (
+        <InlineTip
+          testID="take-tip"
+          icon={tip === 'captions' ? 'text-outline' : 'share-outline'}
+          message={t(tip === 'captions' ? 'firstRun.takeTipCaptions' : 'firstRun.takeTipExport')}
+          onDismiss={() => useFirstRun.getState().dismiss('takeTipDismissed', 'take_tip_dismissed')}
+        />
       ) : null}
       <Text muted center>
         {t('preview.duration', { d: formatClock(rec.durationMs) })} · {new Date(rec.createdAt).toLocaleString()}

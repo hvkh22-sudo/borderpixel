@@ -11,6 +11,7 @@ import { deriveTitle } from '../storage/repositories';
 import { t } from '../localization/i18n';
 import { track } from '../services/analytics';
 import { getRepositories } from '../services/db';
+import { useFirstRun } from '../state/firstRun';
 import { useTheme } from '../theme/ThemeProvider';
 import { radius, spacing } from '../theme/tokens';
 
@@ -22,6 +23,7 @@ export default function Create() {
     const repos = await getRepositories();
     const s = await repos.scripts.create({ title: deriveTitle(body, t('common.untitled')), body });
     track({ name: 'script_created', source });
+    useFirstRun.getState().complete('firstScriptCreated');
     router.replace(`/scripts/${s.id}`);
   };
 

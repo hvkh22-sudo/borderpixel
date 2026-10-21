@@ -22,6 +22,7 @@ import { getRepositories } from '../../services/db';
 import { exportsDir, recordingFile } from '../../services/files';
 import { PromptlyMedia, type Job } from '../../services/nativeMedia';
 import { useAccess } from '../../state/access';
+import { useFirstRun } from '../../state/firstRun';
 import { useSettings } from '../../state/settings';
 import type { Recording } from '../../storage/repositories';
 import { useTheme } from '../../theme/ThemeProvider';
@@ -95,6 +96,7 @@ export default function ExportScreen() {
         await Sharing.shareAsync(uri, { mimeType: 'video/mp4', UTI: 'public.mpeg-4' });
       }
       track({ name: 'export_completed', captions: burnIn && hasCaptions, kind: 'video' });
+      useFirstRun.getState().complete('firstExport');
     } catch (e) {
       if (cancelledRef.current || isCancelled(e)) {
         setStatus({ kind: 'idle' });
@@ -112,6 +114,7 @@ export default function ExportScreen() {
       await f.write(toSrt(rec.cues));
       await Sharing.shareAsync(f.uri, { mimeType: 'application/x-subrip', UTI: 'public.plain-text' });
       track({ name: 'export_completed', captions: true, kind: 'srt' });
+      useFirstRun.getState().complete('firstExport');
     } catch (e) {
       logDiagnostic('export', 'srt', e);
       setStatus({ kind: 'error', message: t('export.failed') });
