@@ -4,7 +4,8 @@
 # Usage: print-failure-shots.sh <maestro output dir>
 DIR="$1"
 CONVERT=$(command -v magick || command -v convert || true)
-find "$DIR" -name '*.png' | grep -E 'screenshot-❌|❌|last\.png|launch\.png' | head -n 6 | while read -r f; do
+# Maestro names its automatic failure screenshots "screenshot-<status>-<time>-(<flow>).png".
+find "$DIR" -name '*.png' \( -path '*screenshot-*' -o -name 'last.png' -o -name 'launch.png' \) | head -n 8 | while read -r f; do
   if [ -n "$CONVERT" ]; then
     "$CONVERT" "$f" -resize 360x -quality 60 /tmp/shot.jpg
   elif command -v sips >/dev/null 2>&1; then

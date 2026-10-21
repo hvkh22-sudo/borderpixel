@@ -32,6 +32,7 @@ tags:
 - inputText: "Maestro CRUD"
 - hideKeyboard:
     optional: true
+- takeScreenshot: e2e/out/screenshot-02-after-rename
 - assertVisible:
     text: "Maestro CRUD"
 # Autosave runs 0.6 s after the last keystroke.
