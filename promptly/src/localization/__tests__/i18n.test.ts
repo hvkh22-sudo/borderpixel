@@ -69,7 +69,7 @@ describe('i18n', () => {
       expect({ path, placeholders: placeholders(heValue as string) }).toEqual({ path, placeholders: placeholders(enValue) });
       // Untranslated copies slip through types; only brand/platform names and empty strings may match.
       if (enValue === heValue && enValue !== '') {
-        expect(['common.pro', 'editor.aiImprove', 'studio.toolHints.platform', 'paywall.title', 'subscription.pro', 'captions.style.bold', 'presets.vertical', 'presets.youtube']
+        expect(['common.pro', 'editor.aiImprove', 'studio.toolHints.platform', 'paywall.title', 'subscription.pro', 'captions.style.bold', 'presets.vertical', 'presets.youtube', 'studio.title', 'diagnostics.aiStudio']
           .concat(Object.keys(en.platform).map((k) => `platform.${k}`))).toContain(path);
       }
     }
