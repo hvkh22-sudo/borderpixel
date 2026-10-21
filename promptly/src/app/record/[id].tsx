@@ -116,7 +116,11 @@ export default function RecordScreen() {
       useAccess.getState().setUsage({ voiceFollowSessionsUsed: await repos.kv.increment(USAGE_VF_KEY) });
     },
     onTakeCompleted: (durationMs) => track({ name: 'recording_completed', mode, durationSec: Math.round(durationMs / 1000) }),
-    onFailure: (code) => track({ name: 'recording_failed', code }),
+    onFailure: (code) => {
+      // A failed take must not leave the timed prompter scrolling over an idle camera.
+      setPlaying(false);
+      track({ name: 'recording_failed', code });
+    },
     onTakeSaved: (take) => onTakeSaved(take),
   });
   const dispatch = session.dispatch;
