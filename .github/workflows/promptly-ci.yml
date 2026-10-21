@@ -153,13 +153,37 @@ jobs:
       - name: Resolve Swift packages
         working-directory: promptly/ios
         run: xcodebuild -resolvePackageDependencies -workspace Promptly.xcworkspace -scheme Promptly 2>&1 | tail -n 60
+      # Release config: JS bundle embedded, so the simulator run below needs no dev server.
       - name: Build for simulator (unsigned)
         working-directory: promptly/ios
         run: |
-          xcodebuild -workspace Promptly.xcworkspace -scheme Promptly -configuration Debug \
-            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+          xcodebuild -workspace Promptly.xcworkspace -scheme Promptly -configuration Release \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO build > build.log 2>&1 \
             || { grep -n -E 'error:|fatal|Could not resolve' -A12 build.log | head -250;
                  grep -n 'Build ExpoModulesJSI' -A40 build.log | grep -v '^[0-9]*-    export' | head -120;
                  tail -n 40 build.log; exit 1; }
           tail -n 20 build.log
+      # Simulator ≠ iPhone: no camera and simulated audio, so camera flows are skipped here.
+      - name: Run flows on iOS Simulator
+        run: |
+          curl -fsSL https://get.maestro.mobile.dev | bash
+          export PATH="$HOME/.maestro/bin:$PATH"
+          UDID=$(xcrun simctl list devices available -j | python3 -c "import json,sys;d=json.load(sys.stdin)['devices'];print(next(x['udid'] for k,v in sorted(d.items(),reverse=True) if 'iOS' in k for x in v if x['name'].startswith('iPhone')))")
+          xcrun simctl boot "$UDID" && xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" ios/build/Build/Products/Release-iphonesimulator/Promptly.app
+          mkdir -p e2e-ios
+          xcrun simctl launch "$UDID" app.promptly.placeholder ; sleep 20
+          echo "--- smoke: app process" ; xcrun simctl spawn "$UDID" launchctl list | grep -i promptly || echo "NOT RUNNING"
+          xcrun simctl io "$UDID" screenshot e2e-ios/launch.png
+          maestro --device "$UDID" test .maestro/ --exclude-tags camera,hebrew --test-output-dir e2e-ios/out ; CODE=$?
+          xcrun simctl spawn "$UDID" log show --last 10m --predicate 'process == "Promptly"' --style compact 2>/dev/null | grep -i -E 'error|fault|exception|crash' | tail -n 80 || true
+          exit $CODE
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: promptly-ios-e2e
+          path: |
+            promptly/e2e-ios
+            promptly/screenshots
+          retention-days: 7
