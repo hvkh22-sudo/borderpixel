@@ -8,7 +8,7 @@ import UIKit
 // (iOS 13.4+) to JS. It is a plain UIView: it does not adopt UIKeyInput, so becoming first
 // responder never shows the software keyboard. Unhandled presses go to `super` (responder chain).
 //
-// NOTE: not compiled in CI. Written against UIKit APIs (UIPress.key, UIKeyboardHIDUsage).
+// NOTE: compiled in CI; not yet run on a device. Written against UIKit APIs (UIPress.key, UIKeyboardHIDUsage).
 
 final class RemoteKeyResponderView: UIView {
   /// Called on the main thread with (key name, isRepeat).

@@ -12,7 +12,7 @@ package expo.modules.promptlymedia
 // Autolinking registers this class because the file name ends in `Package.kt` and it imports
 // expo.modules.core.interfaces.Package (expo-modules-autolinking android resolver).
 //
-// NOTE: not compiled in CI.
+// NOTE: compiled in CI (.github/workflows/promptly-ci.yml); not yet run on a device.
 
 import android.content.Context
 import android.view.KeyEvent
