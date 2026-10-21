@@ -31,6 +31,12 @@ struct CaptionStyleRecord: Record {
   @Field var positionY: Double = 0.7
 }
 
+struct AudioSegmentRecord: Record {
+  @Field var uri: String = ""
+  /// Start of the segment relative to the video start; negative = audio began before the video.
+  @Field var offsetMs: Double = 0
+}
+
 public final class PromptlyMediaModule: Module {
   private var sessions: [String: AVAssetExportSession] = [:]
   private let lock = NSLock()
@@ -88,8 +94,11 @@ public final class PromptlyMediaModule: Module {
       throw Exception(name: "Unsupported", description: "extractAudioToWav is Android-only")
     }
 
-    AsyncFunction("muxAudio") { (_: String, _: String, _: [[String: Any]], _: String) async throws -> String in
-      throw Exception(name: "Unsupported", description: "muxAudio is Android-only (iOS records audio with video)")
+    AsyncFunction("muxAudio") {
+      (jobId: String, videoUri: String, segments: [AudioSegmentRecord], outputUri: String) async throws -> String in
+      // iOS Voice Follow "separate" strategy (DECISIONS D4): the camera recorded video only and the
+      // recognizer persisted the microphone audio as WAV segments.
+      return try await self.mux(jobId: jobId, video: try Self.url(videoUri), segments: segments, output: try Self.url(outputUri))
     }
 
     Function("cancel") { (jobId: String) in
@@ -165,7 +174,83 @@ public final class PromptlyMediaModule: Module {
     session.outputURL = output
     session.outputFileType = .mp4
     session.shouldOptimizeForNetworkUse = true
+    return try await runExport(jobId: jobId, session: session, output: output)
+  }
 
+  /// Video track of `video` plus the WAV segments placed on its timeline, exported as .mp4 (AAC audio).
+  private func mux(jobId: String, video: URL, segments: [AudioSegmentRecord], output: URL) async throws -> String {
+    let asset = AVURLAsset(url: video)
+    guard let srcVideo = try await asset.loadTracks(withMediaType: .video).first else {
+      throw Exception(name: "NoVideoTrack", description: "The file has no video track")
+    }
+    let duration = try await asset.load(.duration)
+    let transform = try await srcVideo.load(.preferredTransform)
+
+    let composition = AVMutableComposition()
+    guard let videoTrack = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else {
+      throw Exception(name: "CompositionFailed", description: "Could not create video track")
+    }
+    try videoTrack.insertTimeRange(CMTimeRange(start: .zero, duration: duration), of: srcVideo, at: .zero)
+    // No video composition is used, so the export keeps the track's orientation metadata.
+    videoTrack.preferredTransform = transform
+
+    var placedAudio = false
+    if !segments.isEmpty {
+      guard let audioTrack = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else {
+        throw Exception(name: "CompositionFailed", description: "Could not create audio track")
+      }
+      // One audio track, segments in time order, never overlapping (same rule as the Android
+      // implementation): `cursor` is where the audio placed so far ends on the video timeline.
+      var cursor = CMTime.zero
+      for seg in segments.sorted(by: { $0.offsetMs < $1.offsetMs }) {
+        let audioAsset = AVURLAsset(url: try Self.url(seg.uri))
+        // An unreadable segment fails the whole mux: the caller then keeps every WAV for a retry
+        // instead of deleting audio that never made it into the video.
+        guard let srcAudio = try await audioAsset.loadTracks(withMediaType: .audio).first else {
+          throw Exception(name: "NoAudioTrack", description: "An audio segment has no audio track")
+        }
+        let audioDuration = try await audioAsset.load(.duration)
+        let offset = CMTime(seconds: seg.offsetMs / 1000, preferredTimescale: 48_000)
+        // Positive offset: insert at that time. Negative offset (audio started before the video) or
+        // overlap with the previous segment: trim the head of this WAV so it starts at `at`.
+        let at = CMTimeMaximum(offset, cursor)
+        let skip = CMTimeSubtract(at, offset)
+        // Audio past the end of the video is dropped.
+        let end = CMTimeMinimum(CMTimeAdd(offset, audioDuration), duration)
+        guard CMTimeCompare(end, at) > 0 else { continue }
+        if CMTimeCompare(at, cursor) > 0 {
+          // Gap between segments (recognizer restart): silence.
+          audioTrack.insertEmptyTimeRange(CMTimeRange(start: cursor, end: at))
+        }
+        try audioTrack.insertTimeRange(CMTimeRange(start: skip, duration: CMTimeSubtract(end, at)), of: srcAudio, at: at)
+        cursor = end
+        placedAudio = true
+      }
+      if !placedAudio { composition.removeTrack(audioTrack) }
+    }
+
+    try? FileManager.default.createDirectory(at: output.deletingLastPathComponent(), withIntermediateDirectories: true)
+    if FileManager.default.fileExists(atPath: output.path) {
+      try FileManager.default.removeItem(at: output)
+    }
+    // Preset choice: the recognizer writes LPCM (float32) WAV and the MP4 container cannot carry
+    // LPCM, so AVAssetExportPresetPassthrough cannot produce an .mp4 once audio is added (the
+    // export fails); AVAssetExportPresetAppleM4A would drop the video. HighestQuality is the stock
+    // preset that encodes the audio to AAC inside an .mp4. Its cost is a high-bitrate re-encode of
+    // the video (export time + slight generation loss); device test VF-01b measures it. With no
+    // audio placed there is nothing to encode, so the video is copied as-is with Passthrough.
+    let preset = placedAudio ? AVAssetExportPresetHighestQuality : AVAssetExportPresetPassthrough
+    guard let session = AVAssetExportSession(asset: composition, presetName: preset) else {
+      throw Exception(name: "ExportUnavailable", description: "Export session could not be created")
+    }
+    session.outputURL = output
+    session.outputFileType = .mp4
+    session.shouldOptimizeForNetworkUse = true
+    return try await runExport(jobId: jobId, session: session, output: output)
+  }
+
+  /// Runs an export with onProgress events and cancel(jobId) support; returns the output URL string.
+  private func runExport(jobId: String, session: AVAssetExportSession, output: URL) async throws -> String {
     // NSLock.lock() is unavailable from async contexts; withLock is not.
     lock.withLock { sessions[jobId] = session }
     defer { lock.withLock { sessions[jobId] = nil } }

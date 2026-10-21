@@ -29,6 +29,19 @@ F3 free + monthly + annual + lifetime · F4 iOS + Android from day one · F5 foc
   (`continuous`, `recordingOptions.persist`); WAV segments muxed into the video with Media3.
   Avoids Android's concurrent-capture silencing. Android ≤12: Voice Follow unavailable (Timed/Manual).
 - Rejected: a second independent mic capture next to the camera recorder (destabilizes recording).
+- Note (2026-10-21, before the first device test): the **iOS separate-audio option** is implemented as
+  the first, cheap fallback — the Android design on iOS. `config.iosVoiceFollowAudio`
+  (`EXPO_PUBLIC_IOS_VF_AUDIO`, default `shared`) selects it, overridable per device from the hidden
+  diagnostics screen; the record flow uses `separateAudio = voice && (android || (ios && strategy ===
+  'separate'))` (`src/features/platform/audioStrategy.ts`; without the promptly-media module iOS stays
+  on `shared` so a take is never silent). The camera then records video only, expo-speech-recognition
+  owns the mic with `persist: true` (44.1/48 kHz float32 WAV), and `finalizeTake` muxes with Swift
+  `PromptlyMedia.muxAudio` (AVMutableComposition + AVAssetExportSession). Preset:
+  `AVAssetExportPresetHighestQuality` → .mp4 with AAC, because MP4 cannot carry LPCM (Passthrough
+  fails) and AppleM4A drops video; cost is a video re-encode (time + slight generation loss).
+  If export time is too high on device, replace with AVAssetReader/Writer (video passthrough + AAC).
+  The buffer-sharing Swift module above remains the long-term fallback. Never compiled; untested on
+  a device (VF-01 / VF-01b).
 
 ### D5 — Alignment algorithm: local fuzzy alignment over a sliding window
 - Smith–Waterman on the last 8 spoken words vs. ~120 script words around the cursor, fuzzy word match

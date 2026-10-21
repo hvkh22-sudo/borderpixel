@@ -1,5 +1,6 @@
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
+import { useState } from 'react';
 import { StyleSheet } from 'react-native';
 
 import { ListRow } from '../../components/ListRow';
@@ -7,6 +8,7 @@ import { Screen } from '../../components/Screen';
 import { Section } from '../../components/Section';
 import { Segmented } from '../../components/Segmented';
 import { Text } from '../../components/Text';
+import { createTapUnlock } from '../../features/diagnostics/tapUnlock';
 import { t } from '../../localization/i18n';
 import { PromptlyMedia } from '../../services/nativeMedia';
 import { DEFAULT_PROMPTER, useSettings, type Appearance } from '../../state/settings';
@@ -22,6 +24,7 @@ export default function Settings() {
   const remoteEnabled = useSettings((s) => s.remoteEnabled);
   const remoteRecordToggle = useSettings((s) => s.remoteRecordToggle);
   const set = useSettings.getState().set;
+  const [tapUnlock] = useState(() => createTapUnlock());
 
   return (
     <Screen>
@@ -67,7 +70,8 @@ export default function Settings() {
         <ListRow testID="settings-help" icon="help-circle-outline" title={t('settings.help')} onPress={() => router.push('/settings/help')} />
         <ListRow testID="settings-reset-prompter" icon="refresh-outline" title={t('settings.resetPrompter')} onPress={() => useSettings.getState().setPrompter(DEFAULT_PROMPTER)} />
       </Section>
-      <Text variant="caption" muted center>
+      {/* Hidden entry to the diagnostics screen for device testing: tap 5 times. */}
+      <Text testID="settings-version" variant="caption" muted center onPress={() => tapUnlock(Date.now()) && router.push('/settings/diagnostics')}>
         {t('settings.version', { v: Constants.expoConfig?.version ?? '—' })}
       </Text>
     </Screen>

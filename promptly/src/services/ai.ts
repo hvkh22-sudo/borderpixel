@@ -5,6 +5,7 @@
  */
 import { StudioRequest, StudioResponse, validateStudioRequest } from '../features/ai-script-studio/studio';
 import { config, flags } from './config';
+import { integrityHeadersEnabled } from './diagnosticsOverrides';
 import { integrity, type IntegrityTransport } from './integrity';
 import { appUserId } from './purchases';
 
@@ -69,7 +70,8 @@ export async function runStudio(req: StudioRequest, signal?: AbortSignal): Promi
 
   // The exact body string is what the integrity assertion / request hash covers.
   const body = JSON.stringify(req);
-  const integrityHeaders = await integrity.headersFor(body, integrityTransport(userId));
+  // Diagnostics can switch integrity headers off to test the server's report/enforce modes.
+  const integrityHeaders = integrityHeadersEnabled() ? await integrity.headersFor(body, integrityTransport(userId)) : {};
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);

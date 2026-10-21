@@ -10,6 +10,7 @@ const mockRecordings: { id: string; fileName: string; status: string }[] = [];
 const mockRepoFail = { add: false };
 const mockMux = jest.fn<Promise<string>, [string, { uri: string; offsetMs: number }[], string]>();
 const mockMuxAvailable = { value: true };
+const mockLog = jest.fn();
 
 jest.mock('expo-crypto', () => ({ randomUUID: () => 'uuid1' }));
 jest.mock('expo-file-system', () => {
@@ -73,6 +74,7 @@ jest.mock('../../../services/db', () => ({
     },
   }),
 }));
+jest.mock('../../../services/diagnosticsLog', () => ({ logDiagnostic: (...a: unknown[]) => mockLog(...a) }));
 jest.mock('../../../services/nativeMedia', () => ({
   PromptlyMedia: {
     isAvailable: () => mockMuxAvailable.value,
@@ -99,6 +101,7 @@ beforeEach(() => {
   mockRepoFail.add = false;
   mockMuxAvailable.value = true;
   mockMux.mockReset();
+  mockLog.mockReset();
 });
 
 afterEach(() => jest.restoreAllMocks());
@@ -202,6 +205,55 @@ describe('finalizeTake', () => {
       const r = await finalizeTake({ ...base, separateAudio: [wav], expectSeparateAudio: true });
       expect(r.audioMergeFailed).toBe(true);
       expect(mockFs.has(`${REC}/take_1_audio_0.wav`)).toBe(true);
+    });
+  });
+
+  describe('iOS separate audio (iosVoiceFollowAudio = separate)', () => {
+    const iosWav = { uri: 'file:///cache/speech/recording_A.wav', startedAt: 800 };
+    beforeEach(() => {
+      jest.replaceProperty(Platform, 'OS', 'ios');
+      mockFs.set(`${REC}/take_1.mp4`, 100);
+      mockFs.set(iosWav.uri, 50);
+    });
+
+    it('muxes the recognizer WAV (negative offset when audio started first) and cleans up', async () => {
+      mockMux.mockImplementation(async (v, segs, out) => {
+        expect(v).toBe(`${REC}/take_1.mp4`);
+        expect(out).toBe('file:///cache/scratch/take_1_av.mp4');
+        // Audio began 200 ms before the recorder reported start: native trims the WAV head.
+        expect(segs).toEqual([{ uri: iosWav.uri, offsetMs: -200 }]);
+        mockFs.set(out, 150);
+        return out;
+      });
+      const r = await finalizeTake({ ...base, separateAudio: [iosWav], expectSeparateAudio: true });
+      expect(r.audioMergeFailed).toBe(false);
+      expect(mockRecordings[0]?.fileName).toBe('take_1_av.mp4');
+      expect(mockFs.has(`${REC}/take_1.mp4`)).toBe(false);
+      expect(mockFs.has(iosWav.uri)).toBe(false);
+      expect(mockLog).not.toHaveBeenCalled();
+    });
+
+    it('on mux failure keeps the video-only take and the WAV, and logs a code', async () => {
+      mockMux.mockRejectedValue(new Error('ExportFailed: /var/mobile/x.wav unreadable'));
+      const r = await finalizeTake({ ...base, separateAudio: [iosWav], expectSeparateAudio: true });
+      expect(r.audioMergeFailed).toBe(true);
+      expect(mockRecordings[0]?.fileName).toBe('take_1.mp4');
+      expect(mockFs.get(`${REC}/take_1_audio_0.wav`)).toBe(50);
+      expect(mockLog).toHaveBeenCalledWith('mux', 'mux_failed_ios', expect.any(Error));
+    });
+
+    it('logs when a separate-audio take produced no audio segments', async () => {
+      const r = await finalizeTake({ ...base, separateAudio: [], expectSeparateAudio: true });
+      expect(r.audioMergeFailed).toBe(true);
+      expect(mockMux).not.toHaveBeenCalled();
+      expect(mockLog).toHaveBeenCalledWith('mux', 'no_audio_segments');
+    });
+
+    it('shared strategy (camera audio): nothing to mux', async () => {
+      const r = await finalizeTake(base);
+      expect(r.audioMergeFailed).toBe(false);
+      expect(mockMux).not.toHaveBeenCalled();
+      expect(mockRecordings[0]?.fileName).toBe('take_1.mp4');
     });
   });
 });

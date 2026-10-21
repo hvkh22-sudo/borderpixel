@@ -1,8 +1,8 @@
 /**
  * Turns a finished recorder file into a saved take. Order matters for
  * safety: the raw file is first in permanent storage (the recorder writes
- * there directly; files from elsewhere are copied in), then (Android Voice
- * Follow) muxed with the separately captured audio into a scratch file that
+ * there directly; files from elsewhere are copied in), then (Voice Follow with
+ * separate audio: Android, or iOS with the 'separate' strategy) muxed with the separately captured audio into a scratch file that
  * is moved into place only when complete; the video-only original is kept
  * until the muxed file is in place. No failure path deletes the only copy of
  * the video or the speaker's audio.
@@ -12,6 +12,7 @@ import { File } from 'expo-file-system';
 import { Platform } from 'react-native';
 
 import { getRepositories } from '../../services/db';
+import { logDiagnostic } from '../../services/diagnosticsLog';
 import { adoptRecording, recordingFile, recordingNameIfInside, scratchFile, toFileUri } from '../../services/files';
 import { PromptlyMedia } from '../../services/nativeMedia';
 import type { RecordingStatusRow } from '../../storage/repositories';
@@ -24,10 +25,10 @@ export interface FinalizeInput {
   durationMs: number;
   /** Epoch ms when the recorder reported start (for audio alignment). */
   recordingStartedAt: number;
-  /** Android Voice Follow: audio captured by the recognizer. */
+  /** Voice Follow with separate audio (Android; iOS 'separate'): audio captured by the recognizer. */
   separateAudio: PersistedAudio[];
   /**
-   * The camera recorded video only (Android Voice Follow). With no audio
+   * The camera recorded video only (Voice Follow with separate audio). With no audio
    * segments the take is still saved, but flagged so the user is told.
    */
   expectSeparateAudio?: boolean;
@@ -64,7 +65,9 @@ async function finalizeNamed(input: FinalizeInput, id: string, inPlace: string |
   let fileName = rawName;
   let audioMergeFailed = Boolean(input.expectSeparateAudio) && input.separateAudio.length === 0;
 
-  if (Platform.OS === 'android' && input.separateAudio.length > 0) {
+  if (input.expectSeparateAudio && input.separateAudio.length === 0) logDiagnostic('mux', 'no_audio_segments');
+  // Android Voice Follow, and iOS with the 'separate' audio strategy (DECISIONS D4).
+  if (input.separateAudio.length > 0) {
     if (PromptlyMedia.isAvailable()) {
       const muxedName = `${base}_av.mp4`;
       try {
@@ -85,10 +88,12 @@ async function finalizeNamed(input: FinalizeInput, id: string, inPlace: string |
         // Only now is the muxed take safe; the video-only original and the WAVs can go.
         raw.delete();
         for (const a of input.separateAudio) deleteQuietly(new File(toFileUri(a.uri)));
-      } catch {
+      } catch (e) {
+        logDiagnostic('mux', `mux_failed_${Platform.OS}`, e);
         audioMergeFailed = true;
       }
     } else {
+      logDiagnostic('mux', 'media_module_missing');
       audioMergeFailed = true;
     }
   }

@@ -75,9 +75,11 @@ export interface PromptlyMediaNativeModule {
   /** Android: decode the audio track to mono 16-bit PCM WAV. */
   extractAudioToWav(inputUri: string, outputUri: string, sampleRate: number): Promise<WavResult>;
   /**
-   * Combine a video-only file with audio recorded separately (Android Voice
-   * Follow). Segments are placed at `offsetMs` relative to the video start;
-   * gaps are filled with silence.
+   * Combine a video-only file with audio recorded separately (Voice Follow:
+   * always on Android, iOS with the 'separate' audio strategy). Segments are
+   * placed at `offsetMs` relative to the video start (negative = the head of the
+   * WAV is trimmed); overlaps are trimmed, gaps are filled with silence. Output
+   * is .mp4 with AAC audio. With no segments the video is exported as-is.
    */
   muxAudio(jobId: string, videoUri: string, segments: AudioSegment[], outputUri: string): Promise<string>;
   cancel(jobId: string): void;

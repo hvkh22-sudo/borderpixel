@@ -8,6 +8,7 @@ import { randomUUID } from 'expo-crypto';
 import { useEffect, useLayoutEffect, useState, useSyncExternalStore } from 'react';
 import type { CameraVideoOutput } from 'react-native-vision-camera';
 
+import { logDiagnostic } from '../../services/diagnosticsLog';
 import { availableBytes, fileSizeAt, recordingPathFor } from '../../services/files';
 import { finalizeTake } from './finalizeTake';
 import type { RecordingState } from './recordingMachine';
@@ -27,8 +28,16 @@ function productionDeps(videoOutput: CameraVideoOutput, callbacks: RecordingSess
     availableBytes,
     fileSize: fileSizeAt,
     now: Date.now,
-    log: __DEV__ ? (m, e) => console.warn(`[recording] ${m}`, e ?? '') : undefined,
+    log: (m, e) => {
+      // Fixed messages from RecordingSession plus the error's message (paths stripped).
+      logDiagnostic('recording', m, e);
+      if (__DEV__) console.warn(`[recording] ${m}`, e ?? '');
+    },
     ...callbacks,
+    onFailure: (code) => {
+      logDiagnostic('recording', code);
+      callbacks.onFailure?.(code);
+    },
   };
 }
 

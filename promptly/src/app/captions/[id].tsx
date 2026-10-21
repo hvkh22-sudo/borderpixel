@@ -35,6 +35,7 @@ import { formatClock, t } from '../../localization/i18n';
 import { contentDirectionStyle, flipInRtl } from '../../localization/layoutDirection';
 import { track } from '../../services/analytics';
 import { support } from '../../services/deviceSupport';
+import { logDiagnostic } from '../../services/diagnosticsLog';
 import { getRepositories } from '../../services/db';
 import { recordingFile } from '../../services/files';
 import { ensureSpeechPermission } from '../../services/speechEngine';
@@ -131,6 +132,7 @@ export default function CaptionsEditor() {
       track({ name: 'captions_generated', words: words.length, durationSec: Math.round((Date.now() - started) / 1000) });
     } catch (e) {
       const code = e instanceof TranscriptionError ? e.code : 'failed';
+      logDiagnostic('transcription', code, e);
       setErrorKey(`captions.errors.${code}`);
       setPhase('error');
       track({ name: 'captions_failed', code });

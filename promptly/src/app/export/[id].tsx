@@ -17,6 +17,7 @@ import { useAnnounce } from '../../hooks/useAnnounce';
 import { t } from '../../localization/i18n';
 import { track } from '../../services/analytics';
 import { support } from '../../services/deviceSupport';
+import { logDiagnostic } from '../../services/diagnosticsLog';
 import { getRepositories } from '../../services/db';
 import { exportsDir, recordingFile } from '../../services/files';
 import { PromptlyMedia, type Job } from '../../services/nativeMedia';
@@ -99,6 +100,7 @@ export default function ExportScreen() {
         setStatus({ kind: 'idle' });
         return;
       }
+      logDiagnostic('export', burnIn && hasCaptions ? `video_burn_in_${action}` : `video_${action}`, e);
       setStatus({ kind: 'error', message: t('export.failed') });
     }
   };
@@ -110,7 +112,8 @@ export default function ExportScreen() {
       await f.write(toSrt(rec.cues));
       await Sharing.shareAsync(f.uri, { mimeType: 'application/x-subrip', UTI: 'public.plain-text' });
       track({ name: 'export_completed', captions: true, kind: 'srt' });
-    } catch {
+    } catch (e) {
+      logDiagnostic('export', 'srt', e);
       setStatus({ kind: 'error', message: t('export.failed') });
     }
   };

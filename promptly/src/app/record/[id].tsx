@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useKeepAwake } from 'expo-keep-awake';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, AppState, Linking, Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Alert, AppState, Linking, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Camera,
@@ -22,6 +22,7 @@ import { Button } from '../../components/Button';
 import { IconButton } from '../../components/IconButton';
 import { Text } from '../../components/Text';
 import { checkFeature } from '../../features/monetization/entitlements';
+import { usesSeparateAudio } from '../../features/platform/audioStrategy';
 import { targetResolution } from '../../features/recording/presets';
 import { isBusy, remainingRecordSeconds } from '../../features/recording/recordingMachine';
 import type { SavedTake, TakeOptions } from '../../features/recording/recordingSession';
@@ -36,7 +37,10 @@ import { useAnnounce } from '../../hooks/useAnnounce';
 import { USAGE_VF_KEY } from '../../hooks/useBootstrap';
 import { formatClock, t } from '../../localization/i18n';
 import { track } from '../../services/analytics';
+import { config } from '../../services/config';
 import { getRepositories } from '../../services/db';
+import { deviceFacts } from '../../services/deviceSupport';
+import { useDiagnosticsOverrides } from '../../services/diagnosticsOverrides';
 import { availableBytes } from '../../services/files';
 import { PromptlyMedia } from '../../services/nativeMedia';
 import { useAccess } from '../../state/access';
@@ -68,9 +72,15 @@ export default function RecordScreen() {
 
   const mode: ScrollMode = modeParam ?? prompter.mode;
   const voice = mode === 'voice';
-  // Android: the recognizer owns the microphone; camera records video only and
-  // audio is muxed afterwards (docs/architecture/technical-feasibility.md).
-  const separateAudio = voice && Platform.OS === 'android';
+  // Android (and iOS with the 'separate' strategy): the recognizer owns the microphone; the camera
+  // records video only and audio is muxed afterwards (DECISIONS D4, docs/architecture/technical-feasibility.md).
+  const iosVfAudio = useDiagnosticsOverrides((s) => s.iosVoiceFollowAudio) ?? config.iosVoiceFollowAudio;
+  const separateAudio = usesSeparateAudio({
+    voiceFollow: voice,
+    os: deviceFacts().os,
+    iosStrategy: iosVfAudio,
+    mediaModuleAvailable: PromptlyMedia.isAvailable(),
+  });
 
   const camPerm = useCameraPermission();
   const micPerm = useMicrophonePermission();

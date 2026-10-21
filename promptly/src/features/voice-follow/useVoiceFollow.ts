@@ -1,11 +1,12 @@
 /**
  * React binding for Voice Follow: owns one SpeechEngine + controller pair per
  * script, exposes a throttled snapshot for rendering and collects persisted
- * audio segments (Android) for muxing after the take.
+ * audio segments (separate-audio takes) for muxing after the take.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { track } from '../../services/analytics';
+import { logDiagnostic } from '../../services/diagnosticsLog';
 import { ExpoSpeechEngine, contextualStringsFor, ensureSpeechPermission, getSpeechCapabilities } from '../../services/speechEngine';
 import { PersistedAudio, VoiceFollowController, VoiceFollowSnapshot } from './voiceFollowController';
 
@@ -42,8 +43,9 @@ export function useVoiceFollow(script: string): VoiceFollowApi {
     });
     const subs = [
       engine.onResult((e) => controller.handleResult(e, Date.now())),
-      engine.onError((code) => {
+      engine.onError((code, message) => {
         controller.handleError(code);
+        logDiagnostic('speech', code, message);
         track({ name: 'voice_follow_failed', code });
       }),
       engine.onEnd(() => controller.handleSessionEnd()),

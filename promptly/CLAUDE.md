@@ -19,7 +19,8 @@ Also follow `AGENTS.md` (Expo conventions).
 - Native media (burn-in, Android audio extract + mux): local module `modules/promptly-media`.
 - AI: `server/` Cloudflare Worker proxy (Anthropic SDK). No provider key in the app, ever.
 - Android Voice Follow: camera records video only, recognizer owns the mic and persists audio,
-  `finalizeTake` muxes. iOS: camera records audio, recognizer shares the audio session.
+  `finalizeTake` muxes. iOS: camera records audio, recognizer shares the audio session (`shared`,
+  default); `separate` (EXPO_PUBLIC_IOS_VF_AUDIO or Diagnostics override) = the Android path (D4).
 
 ## Rules
 - Run before committing: `npm run typecheck && npm test` (root) and `cd server && npm run typecheck && npm test`.

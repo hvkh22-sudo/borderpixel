@@ -14,6 +14,8 @@ import { setLanguage } from '../localization/i18n';
 import { syncLayoutDirection } from '../localization/layoutDirection';
 import { setAnalyticsEnabled, track } from '../services/analytics';
 import { getRepositories } from '../services/db';
+import { diagnosticsLog } from '../services/diagnosticsLog';
+import { OVERRIDES_KEY, useDiagnosticsOverrides } from '../services/diagnosticsOverrides';
 import { cleanExports, findOrphanRecordings } from '../services/files';
 import { PromptlyMedia } from '../services/nativeMedia';
 import { fetchCustomerInfo, subscribeCustomerInfo } from '../services/purchases';
@@ -44,11 +46,14 @@ export function useBootstrap(): { ready: boolean; recovered: number } {
         repos = await getRepositories();
         const r = repos;
         // Independent reads: one round of async SQLite hops instead of three in a row.
-        const [saved, vfUsed, speakingRate] = await Promise.all([
+        const [saved, vfUsed, speakingRate, overrides] = await Promise.all([
           r.kv.get<Partial<SettingsState>>(SETTINGS_KEY, {}),
           r.kv.get(USAGE_VF_KEY, 0),
           r.kv.get<unknown>(SPEAKING_RATE_KEY, null),
+          r.kv.get<unknown>(OVERRIDES_KEY, null),
         ]);
+        // Device test overrides (diagnostics screen) apply before the first recording.
+        useDiagnosticsOverrides.getState().hydrate(overrides);
         useSettings.getState().hydrate({
           speechLocale: locale?.languageTag ?? 'en-US',
           ...saved,
@@ -69,6 +74,8 @@ export function useBootstrap(): { ready: boolean; recovered: number } {
       }
       if (alive) setReady(true);
       track({ name: 'app_open' });
+      // Earlier launches' failures for the diagnostics screen (never blocks start-up).
+      void diagnosticsLog.load();
       // Purchases (SDK configure + network/cache) overlap orphan recovery
       // instead of running after it; neither blocks the first screen.
       const customerInfo = fetchCustomerInfo().then(
