@@ -13,7 +13,11 @@ import { setAnalyticsEnabled } from '../../services/analytics';
 import { shareScriptsBackup } from '../../services/backupExport';
 import { config } from '../../services/config';
 import { getRepositories } from '../../services/db';
+import { diagnosticsLog } from '../../services/diagnosticsLog';
+import { useDiagnosticsOverrides } from '../../services/diagnosticsOverrides';
 import { deleteRecordingFile } from '../../services/files';
+import { INITIAL_FIRST_RUN } from '../../features/onboarding/firstRun';
+import { useFirstRun } from '../../state/firstRun';
 import { useSettings } from '../../state/settings';
 import { BackupError, backupFileName, collectBackup, importBackup, serializeBackup } from '../../storage/backup';
 import { USAGE_KEY_PREFIX } from '../../storage/repositories';
@@ -74,6 +78,11 @@ export default function Privacy() {
           await repos.kv.clearAllExcept([USAGE_KEY_PREFIX]);
           useSettings.getState().reset();
           useSpeakingRate.getState().reset();
+          // In-memory copies of the KV rows just deleted: otherwise this session keeps using them
+          // and writes them (or only their later changes) back.
+          useFirstRun.getState().hydrate(INITIAL_FIRST_RUN);
+          useDiagnosticsOverrides.getState().hydrate(null);
+          await diagnosticsLog.clear();
           Alert.alert(t('privacy.deleted'));
           router.replace('/');
         },

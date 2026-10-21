@@ -71,7 +71,8 @@ export async function runStudio(req: StudioRequest, signal?: AbortSignal): Promi
   // The exact body string is what the integrity assertion / request hash covers.
   const body = JSON.stringify(req);
   // Diagnostics can switch integrity headers off to test the server's report/enforce modes.
-  const integrityHeaders = integrityHeadersEnabled() ? await integrity.headersFor(body, integrityTransport(userId)) : {};
+  const sendIntegrity = integrityHeadersEnabled();
+  const integrityHeaders = sendIntegrity ? await integrity.headersFor(body, integrityTransport(userId)) : {};
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -96,8 +97,9 @@ export async function runStudio(req: StudioRequest, signal?: AbortSignal): Promi
     case 400:
       throw new AiError('invalid_request', err.error);
     case 403:
-      // Server could not verify this install: re-attest from scratch on the next attempt.
-      if (err.error === 'integrity_required') await integrity.reset();
+      // Server could not verify this install: re-attest from scratch on the next attempt. Not when
+      // the diagnostics override withheld the headers: the stored key is fine and must be kept.
+      if (err.error === 'integrity_required' && sendIntegrity) await integrity.reset();
       throw new AiError('unauthorized');
     case 401:
       throw new AiError('unauthorized');

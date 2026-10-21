@@ -131,6 +131,37 @@ describe('Delete all my data', () => {
     expect(await mockRepos.kv.get('settings', null)).toBeNull();
     expect(await mockRepos.scripts.list()).toEqual([]);
   });
+
+  it('resets the in-memory first-run flags, test overrides and error log with their KV rows', async () => {
+    jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const { useFirstRun } = require('../../state/firstRun');
+    const { INITIAL_FIRST_RUN, completeMilestone } = require('../../features/onboarding/firstRun');
+    const { useDiagnosticsOverrides, DEFAULT_OVERRIDES } = require('../../services/diagnosticsOverrides');
+    const { diagnosticsLog } = require('../../services/diagnosticsLog');
+    useFirstRun.getState().hydrate({ ...completeMilestone(INITIAL_FIRST_RUN, 'firstExport'), checklistHidden: true });
+    await useDiagnosticsOverrides.getState().set({ iosVoiceFollowAudio: 'separate', integrityHeaders: false });
+    diagnosticsLog.record('mux', 'mux_failed_ios');
+    await waitFor(async () => expect(await mockRepos.kv.get('diagnostics.log.v1', [])).toHaveLength(1));
+
+    const Privacy = require('../settings/privacy').default;
+    await renderScreen(<Privacy />);
+    await fireEvent.press(screen.getByLabelText('Delete all my data'));
+    const buttons = (Alert.alert as jest.Mock).mock.calls[0][2] as { style?: string; onPress?: () => Promise<void> }[];
+    await act(async () => buttons.find((b) => b.style === 'destructive')!.onPress!());
+
+    // Memory matches the now-empty storage: guidance starts over, overrides are back to defaults.
+    expect(useFirstRun.getState().flags).toEqual(INITIAL_FIRST_RUN);
+    expect(useFirstRun.getState().hydrated).toBe(true);
+    const o = useDiagnosticsOverrides.getState();
+    expect({ iosVoiceFollowAudio: o.iosVoiceFollowAudio, burnIn: o.burnIn, integrityHeaders: o.integrityHeaders }).toEqual(DEFAULT_OVERRIDES);
+    expect(diagnosticsLog.entries()).toEqual([]);
+    // A later change does not resurrect the deleted rows.
+    useFirstRun.getState().complete('firstScriptCreated');
+    await waitFor(async () => expect(await mockRepos.kv.get('firstRun.firstScriptCreated', false)).toBe(true));
+    expect(await mockRepos.kv.get('firstRun.firstExport', null)).toBeNull();
+    expect(await mockRepos.kv.get('diagnostics.overrides.v1', null)).toBeNull();
+    expect(await mockRepos.kv.get('diagnostics.log.v1', [])).toEqual([]);
+  });
 });
 
 describe('Paywall', () => {
