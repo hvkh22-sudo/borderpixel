@@ -38,6 +38,11 @@ appId: app.promptly.placeholder
     text: "Continue"
     optional: true
 
+# A system app-not-responding dialog (seen on slow emulators) can cover the app: keep waiting.
+- tapOn:
+    text: "Wait"
+    optional: true
+
 - extendedWaitUntil:
     visible:
       id: "(onboarding-start|home-create)"
