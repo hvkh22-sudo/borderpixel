@@ -15,6 +15,8 @@ Legend: ✅ verified · 🟡 implemented, not verified on device · ⬜ not star
 | Native iOS build (Xcode) | ⬜ not possible here |
 | Native Android build (Gradle) | ⬜ not possible here (Google Maven blocked) |
 | `modules/promptly-media` Swift/Kotlin + whole app native build | ✅ **compiles** in CI (`.github/workflows/promptly-ci.yml`, 2026-10-21): Android `assembleDebug` (Kotlin fixes: Media3 list types, Paint.style shadowing) and iOS simulator build on Xcode 26, unsigned. Compiling ≠ running: nothing executed on a device yet |
+| Runs on Android emulator (CI `android-e2e`, API 34 x86_64, release APK) | 🟡 | 2026-10-21: app launches without crash; onboarding renders; Maestro 01 first-run ✅, 06 paywall ✅; Timed record flow reached the take/export screen using the emulator's virtual camera (proves the camera → take → export path runs, **not** video/audio quality or sync). 02 script CRUD failed on a flow issue (caret position when renaming) — flow fixed, re-run pending. Emulator ≠ phone |
+| Runs on iOS Simulator (CI `ios`, Release build, unsigned) | 🟡 | 2026-10-21: app launches; Maestro 01 first-run ✅; 02 and 06 failed on flow issues (rename caret, Subscription row off-screen) — flows fixed, re-run pending. No camera on the simulator: recording untested on iOS |
 | Lint (`npm run lint`, eslint-config-expo) | ✅ clean |
 
 ## Features
