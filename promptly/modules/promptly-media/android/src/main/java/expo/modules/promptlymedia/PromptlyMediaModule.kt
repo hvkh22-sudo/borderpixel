@@ -112,6 +112,14 @@ class PromptlyMediaModule : Module() {
 
     OnDestroy {
       RemoteKeys.emitter = null
+      // JS reload / teardown: stop running exports (they would keep encoding for a dead runtime).
+      mainHandler.post {
+        exports.values.forEach {
+          it.transformer.cancel()
+          it.outFile.delete()
+        }
+        exports.clear()
+      }
     }
 
     AsyncFunction("getVideoInfo") { uri: String ->
@@ -147,24 +155,32 @@ class PromptlyMediaModule : Module() {
     AsyncFunction("muxAudio") { jobId: String, videoUri: String, segments: List<AudioSegmentRecord>, outputUri: String, promise: Promise ->
       val video = EditedMediaItem.Builder(MediaItem.fromUri(videoUri)).setRemoveAudio(true).build()
       val audioSeq = EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_AUDIO))
+      // Same placement rule as iOS: audio past the end of the video is dropped (otherwise the
+      // longer audio sequence would extend the output past the last video frame), and a segment
+      // entirely covered by earlier audio is skipped (a clip starting at/after its own end is invalid).
+      // Durations that cannot be read are 0 = unknown: the segment is then placed untrimmed.
+      val videoMs = mediaDurationMs(videoUri)
       var cursorMs = 0.0
+      var placedAudio = 0
       for (seg in segments.sortedBy { it.offsetMs }) {
-        val itemBuilder = MediaItem.Builder().setUri(seg.uri)
-        if (seg.offsetMs < cursorMs) {
-          // Overlap / audio started before the video: drop the leading part.
-          itemBuilder.setClippingConfiguration(
-            MediaItem.ClippingConfiguration.Builder().setStartPositionMs((cursorMs - seg.offsetMs).toLong()).build(),
-          )
-        } else if (seg.offsetMs > cursorMs) {
-          audioSeq.addGap(((seg.offsetMs - cursorMs) * 1000).toLong())
-          cursorMs = seg.offsetMs
-        }
-        audioSeq.addItem(EditedMediaItem.Builder(itemBuilder.build()).setRemoveVideo(true).build())
-        cursorMs = max(cursorMs, seg.offsetMs + wavDurationMs(seg.uri))
+        val segMs = mediaDurationMs(seg.uri)
+        val startMs = max(cursorMs, seg.offsetMs)
+        val segEndMs = if (segMs > 0) seg.offsetMs + segMs else Double.POSITIVE_INFINITY
+        val endMs = if (videoMs > 0) min(segEndMs, videoMs) else segEndMs
+        if (endMs <= startMs) continue
+        if (startMs > cursorMs) audioSeq.addGap(((startMs - cursorMs) * 1000).toLong())
+        val clip = MediaItem.ClippingConfiguration.Builder()
+        // Overlap / audio started before the video: drop the leading part.
+        if (startMs > seg.offsetMs) clip.setStartPositionMs((startMs - seg.offsetMs).toLong())
+        if (segMs > 0 && endMs < segEndMs) clip.setEndPositionMs((endMs - seg.offsetMs).toLong())
+        val item = MediaItem.Builder().setUri(seg.uri).setClippingConfiguration(clip.build()).build()
+        audioSeq.addItem(EditedMediaItem.Builder(item).setRemoveVideo(true).build())
+        placedAudio++
+        cursorMs = if (segMs > 0) endMs else startMs
       }
       val videoSeq = EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_VIDEO)).addItem(video).build()
       // A sequence must contain at least one item.
-      val composition = if (segments.isEmpty()) {
+      val composition = if (placedAudio == 0) {
         Composition.Builder(videoSeq).build()
       } else {
         Composition.Builder(videoSeq, audioSeq.build()).build()
@@ -215,6 +231,7 @@ class PromptlyMediaModule : Module() {
       start(transformer, outFile.absolutePath)
     } catch (e: RuntimeException) {
       exports.remove(jobId)
+      outFile.delete()
       promise.reject(CodedException("ExportFailed", e.message ?: "Export failed to start", e))
       return
     }
@@ -231,7 +248,8 @@ class PromptlyMediaModule : Module() {
     mainHandler.post(poll)
   }
 
-  private fun wavDurationMs(uri: String): Double {
+  /** Container duration in ms (any media file), or 0 when it cannot be read. */
+  private fun mediaDurationMs(uri: String): Double {
     val r = MediaMetadataRetriever()
     return try {
       r.setDataSource(context, Uri.parse(uri))
@@ -259,7 +277,12 @@ class PromptlyMediaModule : Module() {
   /** Decodes the first audio track to mono 16-bit PCM WAV at [targetRate]. */
   private fun extractWav(inputUri: String, outputUri: String, targetRate: Int): Map<String, Any> {
     val extractor = MediaExtractor()
-    extractor.setDataSource(context, Uri.parse(inputUri), null)
+    try {
+      extractor.setDataSource(context, Uri.parse(inputUri), null)
+    } catch (e: Exception) {
+      extractor.release()
+      throw e
+    }
     val trackIndex = (0 until extractor.trackCount).firstOrNull {
       extractor.getTrackFormat(it).getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true
     } ?: run {
@@ -274,6 +297,7 @@ class PromptlyMediaModule : Module() {
     var decoder: MediaCodec? = null
     var decoderStarted = false
     var raf: RandomAccessFile? = null
+    var complete = false
     try {
       val codec = MediaCodec.createDecoderByType(format.getString(MediaFormat.KEY_MIME)!!)
       decoder = codec
@@ -337,8 +361,11 @@ class PromptlyMediaModule : Module() {
         }
       }
       writeWavHeader(file, dataBytes, targetRate)
+      complete = true
     } finally {
       try { raf?.close() } catch (e: java.io.IOException) {}
+      // A half-written WAV (wrong header sizes) must not be left behind for a later read.
+      if (!complete) outFile.delete()
       if (decoderStarted) try { decoder?.stop() } catch (e: IllegalStateException) {}
       decoder?.release()
       extractor.release()

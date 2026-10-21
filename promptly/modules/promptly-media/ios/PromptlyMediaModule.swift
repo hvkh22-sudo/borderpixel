@@ -39,6 +39,8 @@ struct AudioSegmentRecord: Record {
 
 public final class PromptlyMediaModule: Module {
   private var sessions: [String: AVAssetExportSession] = [:]
+  /// Jobs cancelled before their export session existed (asset loading is async); guarded by `lock`.
+  private var cancelledJobs = Set<String>()
   private let lock = NSLock()
   /// Hardware remote keys (main thread only); see RemoteKeyResponder.swift.
   private var remoteKeys: RemoteKeyController?
@@ -63,6 +65,9 @@ public final class PromptlyMediaModule: Module {
     OnDestroy {
       let controller = self.remoteKeys
       DispatchQueue.main.async { controller?.setEnabled(false) }
+      // JS reload / teardown: stop running exports instead of encoding for a dead runtime.
+      let running = self.lock.withLock { Array(self.sessions.values) }
+      running.forEach { $0.cancelExport() }
     }
 
     AsyncFunction("getVideoInfo") { (uri: String) async throws -> [String: Any] in
@@ -79,7 +84,8 @@ public final class PromptlyMediaModule: Module {
         "width": abs(display.width),
         "height": abs(display.height),
         "durationMs": CMTimeGetSeconds(duration) * 1000,
-        "rotation": Int(angle.rounded()),
+        // atan2 yields -180...180; report 0/90/180/270 like Android.
+        "rotation": (Int(angle.rounded()) + 360) % 360,
         "hasAudio": !audioTracks.isEmpty,
       ]
     }
@@ -102,7 +108,12 @@ public final class PromptlyMediaModule: Module {
     }
 
     Function("cancel") { (jobId: String) in
-      let session = self.lock.withLock { self.sessions[jobId] }
+      let session = self.lock.withLock { () -> AVAssetExportSession? in
+        if let s = self.sessions[jobId] { return s }
+        // Still loading the asset: runExport checks this before starting.
+        self.cancelledJobs.insert(jobId)
+        return nil
+      }
       session?.cancelExport()
     }
   }
@@ -252,7 +263,14 @@ public final class PromptlyMediaModule: Module {
   /// Runs an export with onProgress events and cancel(jobId) support; returns the output URL string.
   private func runExport(jobId: String, session: AVAssetExportSession, output: URL) async throws -> String {
     // NSLock.lock() is unavailable from async contexts; withLock is not.
-    lock.withLock { sessions[jobId] = session }
+    let cancelledEarly = lock.withLock { () -> Bool in
+      if cancelledJobs.remove(jobId) != nil { return true }
+      sessions[jobId] = session
+      return false
+    }
+    if cancelledEarly {
+      throw Exception(name: "Cancelled", description: "Export cancelled")
+    }
     defer { lock.withLock { sessions[jobId] = nil } }
 
     let box = ExportSessionBox(session: session)
