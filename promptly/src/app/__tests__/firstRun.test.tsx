@@ -79,7 +79,8 @@ describe('Home first-video checklist', () => {
     await fireEvent.press(screen.getByLabelText('Record your first take'));
     expect(mockPush).toHaveBeenCalledWith(`/prepare/${s.id}`);
     await waitFor(async () => expect((await persisted()).firstScriptCreated).toBe(true));
-    expect(firstRunSteps()).toEqual(['script_created']);
+    // Caught up from the library, not done now: marked without analytics.
+    expect(firstRunSteps()).toEqual([]);
   });
 
   it('celebrates the first take and points at Export, then disappears after the first export', async () => {
@@ -97,7 +98,19 @@ describe('Home first-video checklist', () => {
     await renderScreen(<Home />);
     await screen.findByText('Launch');
     expect(screen.queryByTestId('first-run-checklist')).toBeNull();
-    expect(firstRunSteps()).toEqual(['script_created', 'take_recorded', 'exported']);
+    expect(firstRunSteps()).toEqual(['exported']);
+  });
+
+  it('reconcile marks pre-existing scripts and takes silently; only real-time completions are tracked', async () => {
+    const s = await mockRepos.scripts.create({ title: 'Launch', body: 'We are live.' });
+    await addTake(s.id);
+    const Home = require('../index').default;
+    await renderScreen(<Home />);
+    await screen.findByText('Your first take is ready');
+    await waitFor(async () => expect(await persisted()).toMatchObject({ firstScriptCreated: true, firstTakeRecorded: true }));
+    expect(firstRunSteps()).toEqual([]);
+    useFirstRun.getState().complete('firstExport');
+    expect(firstRunSteps()).toEqual(['exported']);
   });
 
   it('Hide removes the checklist for good', async () => {

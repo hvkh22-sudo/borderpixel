@@ -102,9 +102,32 @@ export async function adoptRecording(sourcePath: string, fileName: string): Prom
   return dest;
 }
 
+/**
+ * True when `name` is a kept separate-audio sidecar of the take stored as `takeFileName`
+ * (`X.mp4` -> `X_audio_0.wav`, written by finalizeTake when the mux fails). Exact match on
+ * the take's stem, so another take's files never match.
+ */
+export function isAudioSidecarOf(takeFileName: string, name: string): boolean {
+  const stem = takeFileName.replace(/\.(mov|mp4)$/i, '');
+  if (stem === takeFileName || !name.startsWith(`${stem}_audio_`)) return false;
+  return /^\d+\.wav$/i.test(name.slice(stem.length + '_audio_'.length));
+}
+
+/**
+ * User-initiated delete of a take: the video, then its kept audio sidecars. The video goes
+ * first (and throws on failure) so a failed delete never strips the audio of a surviving take.
+ */
 export function deleteRecordingFile(fileName: string): void {
   const f = recordingFile(fileName);
   if (f.exists) f.delete();
+  for (const entry of recordingsDir().list()) {
+    if (!(entry instanceof File) || !isAudioSidecarOf(fileName, entry.name)) continue;
+    try {
+      entry.delete();
+    } catch {
+      // A leftover sidecar is harmless: orphan recovery only registers videos.
+    }
+  }
 }
 
 /**

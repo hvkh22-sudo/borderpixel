@@ -31,7 +31,7 @@ interface FirstRunStore {
   hydrate(flags: FirstRunFlags): void;
   /** Marks a milestone (and earlier ones); tracks each newly reached step once. */
   complete(milestone: FirstRunMilestone): void;
-  /** Counts scripts/takes that exist already (created elsewhere or before this feature). */
+  /** Counts scripts/takes that exist already (created elsewhere or before this feature). Never tracked. */
   reconcile(library: { scripts: number; takes: number }): void;
   /** Hides a piece of guidance for good. `step` is tracked when the user dismissed it. */
   dismiss(flag: Dismissal, step?: FirstRunStep): void;
@@ -47,11 +47,13 @@ function persist(prev: FirstRunFlags, next: FirstRunFlags): void {
 }
 
 export const useFirstRun = create<FirstRunStore>((set, get) => {
-  const apply = (next: FirstRunFlags) => {
+  /** `trackSteps: false` marks milestones silently (reconcile catches up on past work, not a step taken now). */
+  const apply = (next: FirstRunFlags, trackSteps = true) => {
     const prev = get().flags;
     if (next === prev) return;
     set({ flags: next });
     persist(prev, next);
+    if (!trackSteps) return;
     for (const m of newlyReached(prev, next)) track({ name: 'first_run_step', step: MILESTONE_STEP[m] });
   };
   return {
@@ -62,7 +64,7 @@ export const useFirstRun = create<FirstRunStore>((set, get) => {
       if (get().flags[milestone]) return;
       apply(completeMilestone(get().flags, milestone));
     },
-    reconcile: (library) => apply(reconcileWithLibrary(get().flags, library)),
+    reconcile: (library) => apply(reconcileWithLibrary(get().flags, library), false),
     dismiss: (flag, step) => {
       if (get().flags[flag]) return;
       apply({ ...get().flags, [flag]: true });
