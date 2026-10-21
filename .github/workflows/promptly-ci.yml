@@ -111,6 +111,9 @@ jobs:
           script: |
             adb install -r ../apk/*.apk
             mkdir -p e2e && adb logcat -c
+            adb shell monkey -p app.promptly.placeholder -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1 ; sleep 25 ; echo "--- smoke: process" ; adb shell pidof app.promptly.placeholder || echo "NOT RUNNING"
+            echo "--- smoke: on-screen text" ; adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1 ; adb shell cat /sdcard/ui.xml | grep -o -E '(text|resource-id)="[^"]+"' | head -60
+            echo "--- smoke: crashes / JS errors" ; adb logcat -d -v brief | grep -E 'FATAL|AndroidRuntime|ReactNativeJS|ReactNative|SoLoader|Expo|promptly|Unable|Exception' | grep -v -E 'GoogleApiManager|Finsky' | tail -n 150
             (adb logcat -v time > e2e/logcat.txt &) ; maestro test .maestro/ --exclude-tags camera,hebrew --format junit --output e2e/report.xml --test-output-dir e2e/out ; echo $? > e2e/core-exit ; maestro test .maestro/ --include-tags camera --exclude-tags hebrew --test-output-dir e2e/out-camera || echo "camera flows failed (non-gating)" ; adb exec-out screencap -p > e2e/last.png ; exit $(cat e2e/core-exit)
       - uses: actions/upload-artifact@v4
         if: always()
