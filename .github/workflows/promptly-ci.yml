@@ -6,7 +6,7 @@ name: promptly-ci
 on:
   push:
     branches: [claude/youthful-volta-vdsr0x]
-    paths: ['promptly/**', '.github/workflows/promptly-ci.yml']
+    paths: ['promptly/**', '.github/workflows/promptly-ci.yml', '.github/scripts/**']
   workflow_dispatch:
 
 concurrency:
@@ -118,7 +118,7 @@ jobs:
             adb shell monkey -p app.promptly.placeholder -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1 ; sleep 25 ; echo "--- smoke: process" ; adb shell pidof app.promptly.placeholder || echo "NOT RUNNING"
             echo "--- smoke: on-screen text" ; adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1 ; adb shell cat /sdcard/ui.xml | grep -o -E '(text|resource-id)="[^"]+"' | head -60 ; adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 2>&1 ; sleep 3 ; echo "--- smoke: after dismissing system dialogs" ; adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1 ; adb shell cat /sdcard/ui.xml | grep -o -E '(text|resource-id)="[^"]+"' | head -40
             echo "--- smoke: crashes / JS errors" ; adb logcat -d -v brief | grep -E 'FATAL|AndroidRuntime|ReactNativeJS|ReactNative|SoLoader|Expo|promptly|Unable|Exception' | grep -v -E 'GoogleApiManager|Finsky' | tail -n 150
-            (adb logcat -v time > e2e/logcat.txt &) ; maestro test .maestro/ --exclude-tags camera,hebrew --format junit --output e2e/report.xml --test-output-dir e2e/out ; echo $? > e2e/core-exit ; maestro test .maestro/ --include-tags camera --exclude-tags hebrew --test-output-dir e2e/out-camera || echo "camera flows failed (non-gating)" ; adb exec-out screencap -p > e2e/last.png ; exit $(cat e2e/core-exit)
+            (adb logcat -v time > e2e/logcat.txt &) ; maestro test .maestro/ --exclude-tags camera,hebrew --format junit --output e2e/report.xml --test-output-dir e2e/out ; echo $? > e2e/core-exit ; for f in 03-record-timed 04-captions 05-export; do maestro test .maestro/$f.yaml --test-output-dir e2e/out-camera || echo "camera flow $f failed (non-gating)"; done ; adb exec-out screencap -p > e2e/last.png ; sh ../.github/scripts/print-failure-shots.sh e2e ; exit $(cat e2e/core-exit)
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -177,6 +177,7 @@ jobs:
           echo "--- smoke: app process" ; xcrun simctl spawn "$UDID" launchctl list | grep -i promptly || echo "NOT RUNNING"
           xcrun simctl io "$UDID" screenshot e2e-ios/launch.png
           maestro --device "$UDID" test .maestro/ --exclude-tags camera,hebrew --test-output-dir e2e-ios/out ; CODE=$?
+          sh ../.github/scripts/print-failure-shots.sh e2e-ios
           xcrun simctl spawn "$UDID" log show --last 10m --predicate 'process == "Promptly"' --style compact 2>/dev/null | grep -i -E 'error|fault|exception|crash' | tail -n 80 || true
           exit $CODE
       - uses: actions/upload-artifact@v4

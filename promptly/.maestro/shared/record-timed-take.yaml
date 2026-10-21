@@ -3,6 +3,11 @@
 # Pauses use an optional wait on the id "maestro-wait-never-present", which never exists.
 appId: app.promptly.placeholder
 ---
+# The first-visit setup tip can push the mode selector below the fold.
+- scrollUntilVisible:
+    element:
+      id: mode-timed
+    direction: DOWN
 - tapOn:
     id: mode-timed
 - scrollUntilVisible:

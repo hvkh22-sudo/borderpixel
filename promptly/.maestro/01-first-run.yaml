@@ -31,8 +31,11 @@ tags:
     visible:
       id: prepare-start
     timeout: 15000
-- assertVisible:
-    id: mode-timed
+# The first-visit setup tip can push the mode selector below the fold.
+- scrollUntilVisible:
+    element:
+      id: mode-timed
+    direction: DOWN
 - assertVisible:
     id: mode-manual
 - takeScreenshot: screenshots/01-3-setup
