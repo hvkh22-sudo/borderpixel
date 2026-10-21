@@ -1,0 +1,45 @@
+{
+  "_note": "Copy for the 6 planned store screenshots (docs/launch/store-listing-draft.md). Honest copy only: no ratings, awards, user counts or unverified claims. 'file' is looked up in the --input folder; missing files are skipped with a warning.",
+  "claims_to_verify_before_upload": [
+    "02 'Scrolls as you speak': confirm Voice Follow on the real devices (device tests).",
+    "05 'stay on your phone': true for scripts and videos; AI Studio sends the prompt to the server, so keep the wording about scripts and videos only.",
+    "04 AI Script Studio: only use this shot if AI is enabled in the shipped build (AI_ENABLED needs founder approval); otherwise drop it.",
+    "06 'no watermark': true by design; re-check an exported file before upload."
+  ],
+  "tagline": {
+    "en": "Teleprompter that follows you",
+    "he": "טלפרומפטר שעוקב אחריכם"
+  },
+  "shots": [
+    {
+      "file": "01-camera-prompter.png",
+      "en": { "headline": "Your script, right under the camera", "subline": "Read naturally while you record. The text stays out of your video." },
+      "he": { "headline": "התסריט שלכם, ממש מתחת למצלמה", "subline": "קוראים בטבעיות בזמן ההקלטה. הטקסט לא נכנס לסרטון." }
+    },
+    {
+      "file": "02-voice-follow.png",
+      "en": { "headline": "Scrolls as you speak", "subline": "Voice Follow moves the script with your voice. Manual and timed modes too." },
+      "he": { "headline": "התסריט זז כשאתם מדברים", "subline": "מעקב קולי מזיז את התסריט לפי הקול שלכם. יש גם גלילה ידנית ומתוזמנת." }
+    },
+    {
+      "file": "03-captions.png",
+      "en": { "headline": "Captions matched to your script", "subline": "Edit, style and export them as video or SRT." },
+      "he": { "headline": "כתוביות שתואמות לתסריט", "subline": "עורכים, מעצבים ומייצאים כסרטון או כקובץ SRT." }
+    },
+    {
+      "file": "04-ai-studio.png",
+      "en": { "headline": "Draft a script with AI", "subline": "Start from an idea in AI Script Studio, then make it yours." },
+      "he": { "headline": "כותבים תסריט עם AI", "subline": "מתחילים מרעיון בסטודיו תסריטים AI, וממשיכים בעצמכם." }
+    },
+    {
+      "file": "05-library.png",
+      "en": { "headline": "All your scripts in one place", "subline": "No account needed. Your scripts and videos stay on your phone." },
+      "he": { "headline": "כל התסריטים במקום אחד", "subline": "אין צורך בחשבון. התסריטים והסרטונים נשארים בטלפון." }
+    },
+    {
+      "file": "06-export.png",
+      "en": { "headline": "Export without a watermark", "subline": "Save to Photos or share. Free, no watermark." },
+      "he": { "headline": "ייצוא בלי סימן מים", "subline": "שומרים לתמונות או משתפים. בחינם, בלי סימן מים." }
+    }
+  ]
+}

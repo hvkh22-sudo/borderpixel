@@ -56,3 +56,7 @@ server/eval/results/
 
 # Maestro screenshots
 /screenshots/
+
+# Store marketing images rendered by scripts/store-screenshots/frame.py
+/store-assets/out/
+__pycache__/
