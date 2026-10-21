@@ -25,12 +25,14 @@ import android.text.style.ForegroundColorSpan
 import androidx.annotation.OptIn
 import androidx.core.os.bundleOf
 import androidx.media3.common.C
+import androidx.media3.common.Effect
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.BitmapOverlay
 import androidx.media3.effect.OverlayEffect
 import androidx.media3.effect.StaticOverlaySettings
+import androidx.media3.effect.TextureOverlay
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.EditedMediaItemSequence
@@ -137,7 +139,7 @@ class PromptlyMediaModule : Module() {
     AsyncFunction("burnInCaptions") { jobId: String, inputUri: String, outputUri: String, cues: List<CueRecord>, style: CaptionStyleRecord, promise: Promise ->
       val width = videoDisplayWidth(inputUri)
       val overlay = CaptionOverlay(cues.sortedBy { it.startMs }, style, width)
-      val effects = Effects(ImmutableList.of(), ImmutableList.of(OverlayEffect(ImmutableList.of(overlay))))
+      val effects = Effects(ImmutableList.of(), ImmutableList.of<Effect>(OverlayEffect(ImmutableList.of<TextureOverlay>(overlay))))
       val item = EditedMediaItem.Builder(MediaItem.fromUri(inputUri)).setEffects(effects).build()
       runTransformer(jobId, outputUri, promise) { t, path -> t.start(item, path) }
     }.runOnQueue(Queues.MAIN)
@@ -442,14 +444,16 @@ private class CaptionOverlay(
   private fun render(raw: String, highlightWord: Int): Bitmap {
     val text = if (style.uppercase) raw.uppercase() else raw
     val fontSize = (videoWidth * style.fontSizeRatio).toFloat()
+    // Inside apply, `style` would resolve to Paint.style; capture the caption style first.
+    val captionStyle = style
     val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
       textSize = fontSize
       typeface = if (android.os.Build.VERSION.SDK_INT >= 28) {
-        Typeface.create(Typeface.DEFAULT, style.fontWeight.toIntOrNull() ?: 700, false)
+        Typeface.create(Typeface.DEFAULT, captionStyle.fontWeight.toIntOrNull() ?: 700, false)
       } else {
         Typeface.DEFAULT_BOLD
       }
-      color = parseColor(style.textColor) ?: Color.WHITE
+      color = parseColor(captionStyle.textColor) ?: Color.WHITE
     }
     val maxWidth = (videoWidth * 0.86f).toInt()
     val layout = StaticLayout.Builder.obtain(text, 0, text.length, paint, maxWidth)

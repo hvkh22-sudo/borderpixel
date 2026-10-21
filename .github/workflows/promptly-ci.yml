@@ -72,10 +72,17 @@ jobs:
           retention-days: 7
 
   ios:
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+      # Expo SDK 58 Swift packages need Swift tools 6.2 (Xcode 26+): pick the newest installed Xcode.
+      - name: Select Xcode
+        working-directory: .
+        run: |
+          XC=$(ls -d /Applications/Xcode_*.app | sort -V | tail -n 1)
+          sudo xcode-select -s "$XC"
+          xcodebuild -version
       - uses: actions/setup-node@v4
         with:
           node-version: 22
