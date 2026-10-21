@@ -11,7 +11,7 @@ on:
 
 concurrency:
   group: promptly-ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -58,17 +58,19 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - run: npm ci
       - run: npx expo prebuild --platform android --no-install --clean
-      - name: Assemble debug APK
+      # Release variant: JS bundle embedded, signed with the template's debug keystore, so it can be
+      # sideloaded for internal testing without a dev server. Not a store build.
+      - name: Assemble standalone test APK
         working-directory: promptly/android
         run: |
-          ./gradlew :app:assembleDebug --no-daemon -PreactNativeArchitectures=arm64-v8a > gradle.log 2>&1 \
+          ./gradlew :app:assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a > gradle.log 2>&1 \
             || { grep -n -E '^e: |^w: .*promptly|error:|What went wrong' -A3 gradle.log | head -200; tail -n 60 gradle.log; exit 1; }
           tail -n 20 gradle.log
       - uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: promptly-android-debug-apk
-          path: promptly/android/app/build/outputs/apk/debug/*.apk
+          name: promptly-android-test-apk
+          path: promptly/android/app/build/outputs/apk/release/*.apk
           retention-days: 7
 
   ios:
