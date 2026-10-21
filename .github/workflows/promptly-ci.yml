@@ -60,7 +60,10 @@ jobs:
       - run: npx expo prebuild --platform android --no-install --clean
       - name: Assemble debug APK
         working-directory: promptly/android
-        run: ./gradlew :app:assembleDebug --no-daemon --stacktrace -PreactNativeArchitectures=arm64-v8a
+        run: |
+          ./gradlew :app:assembleDebug --no-daemon -PreactNativeArchitectures=arm64-v8a > gradle.log 2>&1 \
+            || { grep -n -E '^e: |^w: .*promptly|error:|What went wrong' -A3 gradle.log | head -200; tail -n 60 gradle.log; exit 1; }
+          tail -n 20 gradle.log
       - uses: actions/upload-artifact@v4
         if: success()
         with:
@@ -83,11 +86,16 @@ jobs:
       - name: Pod install
         working-directory: promptly/ios
         run: pod install
+      - name: Resolve Swift packages
+        working-directory: promptly/ios
+        run: xcodebuild -resolvePackageDependencies -workspace Promptly.xcworkspace -scheme Promptly 2>&1 | tail -n 60
       - name: Build for simulator (unsigned)
         working-directory: promptly/ios
         run: |
           xcodebuild -workspace Promptly.xcworkspace -scheme Promptly -configuration Debug \
             -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
             CODE_SIGNING_ALLOWED=NO build > build.log 2>&1 \
-            || { grep -n -E 'error:|fatal' build.log | head -150; tail -n 80 build.log; exit 1; }
+            || { grep -n -E 'error:|fatal|Could not resolve' -A12 build.log | head -250;
+                 grep -n 'Build ExpoModulesJSI' -A40 build.log | grep -v '^[0-9]*-    export' | head -120;
+                 tail -n 40 build.log; exit 1; }
           tail -n 20 build.log
