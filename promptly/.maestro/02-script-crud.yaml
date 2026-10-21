@@ -73,8 +73,8 @@ tags:
 - tapOn:
     id: name-form-input
 - inputText: "Maestro Folder"
-- tapOn:
-    id: name-form-submit
+# The keyboard can cover the sheet's buttons; the field submits on Enter.
+- pressKey: Enter
 - extendedWaitUntil:
     visible:
       id: folder-chip
@@ -85,8 +85,18 @@ tags:
 
 # --- Move the script into the folder (search still filters to one script) ---
 # Long-press opens the script actions (the "…" button is nested and not reachable on iOS).
+- hideKeyboard:
+    optional: true
 - longPressOn:
     id: library-script-item
+# The first press can be eaten by dismissing the keyboard: try once more if the sheet is not up.
+- runFlow:
+    when:
+      notVisible:
+        id: script-action-move
+    commands:
+      - longPressOn:
+          id: library-script-item
 - tapOn:
     id: script-action-move
 - tapOn:
