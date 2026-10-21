@@ -18,9 +18,11 @@ function safe<T>(fn: () => T, fallback: T): T {
 }
 
 export function deviceFacts(): DeviceFacts {
-  if (cached) return cached;
+  // The platform can only differ between calls in tests; re-probe when it does.
+  const os: DeviceFacts['os'] = Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'other';
+  if (cached && cached.os === os) return cached;
   cached = {
-    os: Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'other',
+    os,
     androidApiLevel: Platform.OS === 'android' ? Number(Platform.Version) : 0,
     recognitionAvailable: safe(() => ExpoSpeechRecognitionModule.isRecognitionAvailable(), false),
     recognizerCanPersistAudio: safe(() => ExpoSpeechRecognitionModule.supportsRecording(), false),
