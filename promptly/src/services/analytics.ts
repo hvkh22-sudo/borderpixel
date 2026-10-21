@@ -11,9 +11,19 @@ import type { RecordingErrorCode } from '../features/recording/recordingMachine'
 import type { SpeechErrorCode } from '../features/voice-follow/voiceFollowController';
 import type { TranscriptionErrorCode } from './transcription';
 
+/** First-take guidance progress (milestones and dismissals; enums only, never content). */
+export type FirstRunStep =
+  | 'script_created'
+  | 'take_recorded'
+  | 'exported'
+  | 'checklist_hidden'
+  | 'setup_tip_dismissed'
+  | 'take_tip_dismissed';
+
 export type AnalyticsEvent =
   | { name: 'app_open' }
   | { name: 'onboarding_completed' }
+  | { name: 'first_run_step'; step: FirstRunStep }
   | { name: 'script_created'; source: 'blank' | 'paste' | 'ai' | 'sample' }
   | { name: 'recording_started'; mode: 'manual' | 'timed' | 'voice' }
   | { name: 'recording_completed'; mode: 'manual' | 'timed' | 'voice'; durationSec: number }

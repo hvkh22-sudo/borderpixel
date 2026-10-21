@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Redirect, router } from 'expo-router';
+import { useEffect } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -9,6 +10,8 @@ import { Card } from '../components/Card';
 import { EmptyState } from '../components/EmptyState';
 import { IconButton } from '../components/IconButton';
 import { Text } from '../components/Text';
+import { checklistView, type ChecklistStep } from '../features/onboarding/firstRun';
+import { FirstRunChecklist } from '../features/onboarding/FirstRunChecklist';
 import { SAMPLE_SCRIPT } from '../features/scripts/sample';
 import { estimateSpeakingSeconds } from '../features/voice-follow/text';
 import { useFocusData } from '../hooks/useAsyncData';
@@ -16,6 +19,7 @@ import { formatClock, formatDuration, t } from '../localization/i18n';
 import { flipInRtl } from '../localization/layoutDirection';
 import { track } from '../services/analytics';
 import { getRepositories } from '../services/db';
+import { useFirstRun } from '../state/firstRun';
 import { useSession } from '../state/session';
 import { useSettings } from '../state/settings';
 import { useDurationWpm } from '../state/speakingRate';
@@ -32,6 +36,14 @@ export default function Home() {
     const [scripts, takes] = await Promise.all([repos.scripts.list({ sort: 'recent' }), repos.recordings.list()]);
     return { scripts: scripts.slice(0, 3), takes: takes.slice(0, 3) };
   });
+  const firstRunHydrated = useFirstRun((s) => s.hydrated);
+  const firstRunFlags = useFirstRun((s) => s.flags);
+  const checklist = firstRunHydrated ? checklistView(firstRunFlags) : null;
+  const scriptCount = data?.scripts.length ?? 0;
+  const takeCount = data?.takes.length ?? 0;
+  useEffect(() => {
+    if (data && firstRunHydrated) useFirstRun.getState().reconcile({ scripts: scriptCount, takes: takeCount });
+  }, [data, firstRunHydrated, scriptCount, takeCount]);
 
   if (!onboardingDone) return <Redirect href="/onboarding" />;
 
@@ -39,7 +51,17 @@ export default function Home() {
     const repos = await getRepositories();
     const s = await repos.scripts.create(SAMPLE_SCRIPT);
     track({ name: 'script_created', source: 'sample' });
+    useFirstRun.getState().complete('firstScriptCreated');
     router.push(`/prepare/${s.id}`);
+  };
+
+  const checklistAction = (step: ChecklistStep) => {
+    const script = data?.scripts[0];
+    const take = data?.takes[0];
+    if (step === 'record' && script) return router.push(`/prepare/${script.id}`);
+    if (step === 'export' && take) return router.push(`/take/${take.id}`);
+    if (step === 'export') return router.push('/takes');
+    router.push('/create');
   };
 
   const empty = data && data.scripts.length === 0 && data.takes.length === 0;
@@ -78,6 +100,14 @@ export default function Home() {
           </View>
           <Ionicons {...decorative} name="arrow-forward" size={24} color="#fff" style={flipInRtl()} />
         </Pressable>
+
+        {checklist ? (
+          <FirstRunChecklist
+            view={checklist}
+            onAction={checklistAction}
+            onHide={() => useFirstRun.getState().dismiss('checklistHidden', 'checklist_hidden')}
+          />
+        ) : null}
 
         {recoveredTakes > 0 ? (
           <Card

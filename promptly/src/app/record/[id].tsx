@@ -22,6 +22,7 @@ import { Button } from '../../components/Button';
 import { IconButton } from '../../components/IconButton';
 import { Text } from '../../components/Text';
 import { checkFeature } from '../../features/monetization/entitlements';
+import { FirstTakeTip } from '../../features/onboarding/FirstTakeTip';
 import { targetResolution } from '../../features/recording/presets';
 import { isBusy, remainingRecordSeconds } from '../../features/recording/recordingMachine';
 import type { SavedTake, TakeOptions } from '../../features/recording/recordingSession';
@@ -440,6 +441,7 @@ export default function RecordScreen() {
                 }}
               />
             ) : null}
+            {script != null ? <FirstTakeTip /> : null}
           </View>
 
           {noticeMessage ? (
