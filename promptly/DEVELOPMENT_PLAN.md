@@ -1,6 +1,6 @@
 # Development plan
 
-Last updated: 2026-10-20 (session 2).
+Last updated: 2026-10-21 (night session, continued).
 
 ## Milestones
 | Phase | Scope | Status |
@@ -36,7 +36,11 @@ Merged into `claude/youthful-volta-vdsr0x`, each with tests (375+ app tests, 50+
 - AI proxy device integrity (App Attest / Play Integrity, mode `report`)
 - Maestro E2E flows (Android device + iOS simulator), Hebrew founder checklist
 - iOS permission prompts localized (en/he); landing page (en/he) at apps/promptly/
-- Two bug reviews; 9 + (in progress) fixes; two native-module reviews (still never compiled)
+- Three bug reviews (9 + 10 + 2 fixes); two native-module reviews
+- iOS 'separate' audio fallback for Voice Follow + Diagnostics screen (overrides, local log)
+- First-take guidance (Home checklist, setup/record/take tips); Hebrew copy polish + glossary in he.ts
+- GitHub Actions CI (`.github/workflows/promptly-ci.yml`): JS checks + Android `assembleDebug` +
+  iOS simulator build (unsigned). First time the native code is compiled; results tracked in QUALITY_CHECKLIST.md
 
 ## Next actions (in order)
 1. **Build dev clients** with EAS (`docs/testing/device-poc-runbook.md`) and run the PoC checklist in
