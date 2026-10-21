@@ -38,6 +38,42 @@ npx expo start --dev-client     # phone and computer on the same network, or use
 
 Record results in `device-matrix.md` (device, OS, pass/fail, notes, screen recording link).
 
+## 4a. Diagnostics screen (attach to every failure report)
+Open it either way:
+- **Settings → tap the “Version …” line at the bottom 5 times quickly** (within ~1.5 s per tap), or
+- deep link `promptly://settings/diagnostics` (e.g. `npx uri-scheme open promptly://settings/diagnostics --ios`
+  / `--android`, or paste it into Safari / Chrome on the phone).
+
+It shows app version/build, OS, recognizer facts (available, on-device, can save audio), whether the
+native media module is in the build, Android API level, each feature's support decision with its
+reason, the speech languages the recognizer reports, flags (build vs. effective), whether purchases
+and the AI server address are configured, and the last 30 failures (recording, speech, captions
+transcription, export, audio merge — codes and short messages only).
+
+**Copy report** puts a plain-text report on the clipboard (no scripts, transcripts, file names or
+ids). Paste it into the message to Claude together with the failing test id.
+
+Test settings on that screen (per device, kept across launches, “Reset test settings” undoes them):
+- **iOS Voice Follow audio**: Default (build value, `EXPO_PUBLIC_IOS_VF_AUDIO`, default `shared`) /
+  Shared / Separate.
+- **Burn-in captions**: Default / On / Off (overrides `EXPO_PUBLIC_FLAG_BURN_IN`).
+- **Send integrity headers**: off sends AI requests without App Attest / Play Integrity headers, to
+  check the server's `INTEGRITY_MODE` handling.
+
+### If VF-01 fails on iOS (silent/broken audio or recording stops while Voice Follow runs)
+1. Note the symptom, then Diagnostics → **Copy report** (the recent errors usually show it).
+2. Diagnostics → iOS Voice Follow audio → **Separate**. The *Voice Follow audio* row must now read
+   “Recorded separately, merged after the take”. If it says the native media module is needed,
+   the build lacks `promptly-media` and the fallback cannot run.
+3. Record the VF-01 take again. The camera now records video only, the recognizer owns the mic and
+   saves WAV, and the take is merged (AVFoundation, AAC in .mp4) while “Finalizing…” shows —
+   this re-encodes the video, so expect a few seconds per minute of video (measure it: **VF-01b**).
+4. Check: the take has full audio, clap-test sync (REC-03) is within ±1 frame of the video, and
+   the take screen shows no “audio issue” notice. If the merge failed, the video is kept and the
+   WAVs are saved next to it (`*_audio_N.wav`); the report shows `mux mux_failed_ios — …`.
+5. Report both results. If *Separate* passes and *Shared* fails, the next build sets
+   `EXPO_PUBLIC_IOS_VF_AUDIO=separate` in `eas.json` (DECISIONS D4).
+
 ## 5. Automated flows (Maestro)
 `promptly/.maestro/` holds Maestro flows for the core journeys (first run, scripts, Timed
 recording, captions, export, paywall, Hebrew). With Metro running (`npx expo start --dev-client`),

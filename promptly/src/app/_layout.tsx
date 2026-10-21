@@ -47,6 +47,7 @@ function Navigator() {
         <Stack.Screen name="settings/subscription" options={{ title: t('subscription.title') }} />
         <Stack.Screen name="settings/privacy" options={{ title: t('privacy.title') }} />
         <Stack.Screen name="settings/help" options={{ title: t('help.title') }} />
+        <Stack.Screen name="settings/diagnostics" options={{ title: t('diagnostics.title') }} />
       </Stack>
     </>
   );

@@ -4,6 +4,8 @@
  */
 import { Platform } from 'react-native';
 
+import { parseIosVoiceFollowAudio, type IosVoiceFollowAudio } from '../features/platform/audioStrategy';
+
 const SITE = process.env.EXPO_PUBLIC_SITE_URL || 'https://hvkh22-sudo.github.io/borderpixel/apps/promptly';
 
 export const config = {
@@ -20,6 +22,12 @@ export const config = {
   privacyUrl: process.env.EXPO_PUBLIC_PRIVACY_URL || `${SITE}/privacy/`,
   termsUrl: process.env.EXPO_PUBLIC_TERMS_URL || `${SITE}/terms/`,
   supportUrl: process.env.EXPO_PUBLIC_SUPPORT_URL || `${SITE}/support/`,
+  /**
+   * iOS Voice Follow microphone strategy (DECISIONS D4): 'shared' (camera records audio, recognizer
+   * shares the session) or 'separate' (camera video-only, recognizer audio muxed after the take).
+   * Build default; the diagnostics screen can override it per device.
+   */
+  iosVoiceFollowAudio: (parseIosVoiceFollowAudio(process.env.EXPO_PUBLIC_IOS_VF_AUDIO) ?? 'shared') as IosVoiceFollowAudio,
 };
 
 /**

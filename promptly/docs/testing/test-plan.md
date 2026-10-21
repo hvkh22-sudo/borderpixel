@@ -20,6 +20,7 @@
 | REC-11 | TikTok / Reels / Shorts preset | Saved file is 9:16 portrait ~1080×1920 at ~30 fps; tilting the phone mid-take does not flip the file orientation; reading line sits near the lens; new captions default to the lower safe position |
 | REC-12 | Talking head 60 fps preset | Device with 60 fps format records ~60 fps (check metadata); device without it falls back to 30 fps with no error. Android: confirm CameraX picks a 16:9 size for the landscape target (sensor-coordinate handling of `targetResolution`) |
 | VF-01 | VF + recording coexist (iOS) | Recording has full-quality audio AND prompter follows speech |
+| VF-01b | iOS separate-audio fallback (Diagnostics → iOS Voice Follow audio → Separate) | Prompter follows; take has full audio after “Finalizing…”; clap-test sync within ±1 frame; note merge time per minute of video |
 | VF-02 | VF + recording (Android 13/14/15/16) | Video-only + persisted WAV muxed; audio continuous across recognizer restarts |
 | VF-03 | Latency | Word spoken → line moves: median measured and recorded (target to set from baseline) |
 | VF-04 | Behaviors | Pause holds; repeat no back-jump; skip paragraph recovers; tap-to-resync works |
