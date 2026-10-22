@@ -64,8 +64,13 @@ tags:
 - inputText:
     text: "שלום, זה טקסט בדיקה בעברית."
     optional: true
-- hideKeyboard:
-    optional: true
+# iOS only: on Android hideKeyboard presses Back when no keyboard is up.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - hideKeyboard:
+          optional: true
 - takeScreenshot: screenshots/07-5-editor-he
 - runFlow: shared/go-back.yaml
 
@@ -76,6 +81,10 @@ tags:
 - tapOn:
     id: home-settings
 - takeScreenshot: screenshots/07-6-settings-he
+- scrollUntilVisible:
+    element:
+      id: settings-subscription
+    direction: DOWN
 - tapOn:
     id: settings-subscription
 - tapOn:

@@ -126,8 +126,9 @@ jobs:
             adb shell settings put global hide_error_dialogs 1 ; sleep 30 ; adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 2>&1 ; adb shell input keyevent KEYCODE_HOME
             adb shell monkey -p app.promptly.placeholder -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1 ; sleep 25 ; echo "--- smoke: process" ; adb shell pidof app.promptly.placeholder || echo "NOT RUNNING"
             echo "--- smoke: on-screen text" ; adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1 ; adb shell cat /sdcard/ui.xml | grep -o -E '(text|resource-id)="[^"]+"' | head -60 ; adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 2>&1 ; sleep 3 ; echo "--- smoke: after dismissing system dialogs" ; adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1 ; adb shell cat /sdcard/ui.xml | grep -o -E '(text|resource-id)="[^"]+"' | head -40
+            echo "--- cold start (am start -W, emulator: relative numbers only)" ; for i in 1 2 3; do adb shell am force-stop app.promptly.placeholder ; sleep 2 ; adb shell am start -W -n app.promptly.placeholder/.MainActivity | grep -E 'TotalTime|WaitTime' ; sleep 5 ; done
             echo "--- smoke: crashes / JS errors" ; adb logcat -d -v brief | grep -E 'FATAL|AndroidRuntime|ReactNativeJS|ReactNative|SoLoader|Expo|promptly|Unable|Exception' | grep -v -E 'GoogleApiManager|Finsky' | tail -n 150
-            (adb logcat -v time > e2e/logcat.txt &) ; maestro test .maestro/ --exclude-tags camera,hebrew --format junit --output e2e/report.xml --test-output-dir e2e/out ; echo $? > e2e/core-exit ; for f in 03-record-timed 04-captions 05-export; do maestro test .maestro/$f.yaml --test-output-dir e2e/out-camera || echo "camera flow $f failed (non-gating)"; done ; adb exec-out screencap -p > e2e/last.png ; sh ../.github/scripts/print-failure-shots.sh e2e ; exit $(cat e2e/core-exit)
+            (adb logcat -v time > e2e/logcat.txt &) ; maestro test .maestro/ --exclude-tags camera,hebrew --format junit --output e2e/report.xml --test-output-dir e2e/out ; echo $? > e2e/core-exit ; for f in 03-record-timed 04-captions 05-export; do maestro test .maestro/$f.yaml --test-output-dir e2e/out-camera || echo "camera flow $f failed (non-gating)"; done ; adb exec-out screencap -p > e2e/last.png ; sh ../.github/scripts/hebrew-android.sh ; sh ../.github/scripts/print-failure-shots.sh e2e ; exit $(cat e2e/core-exit)
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -186,6 +187,12 @@ jobs:
           echo "--- smoke: app process" ; xcrun simctl spawn "$UDID" launchctl list | grep -i promptly || echo "NOT RUNNING"
           xcrun simctl io "$UDID" screenshot e2e-ios/launch.png
           maestro --device "$UDID" test .maestro/ --exclude-tags camera,hebrew --test-output-dir e2e-ios/out ; CODE=$?
+          echo "--- Hebrew / RTL (07)"
+          xcrun simctl spawn "$UDID" defaults write NSGlobalDomain AppleLanguages -array he en
+          xcrun simctl spawn "$UDID" defaults write NSGlobalDomain AppleLocale he_IL
+          xcrun simctl shutdown "$UDID" && xcrun simctl boot "$UDID" && xcrun simctl bootstatus "$UDID" -b >/dev/null
+          maestro --device "$UDID" test .maestro/07-hebrew-rtl.yaml --test-output-dir e2e-ios/out-he || echo "Hebrew flow failed (non-gating)"
+          mkdir -p e2e-ios/he && for f in screenshots/07-*.png; do [ -f "$f" ] && cp "$f" "e2e-ios/he/screenshot-$(basename "$f")"; done
           sh ../.github/scripts/print-failure-shots.sh e2e-ios
           xcrun simctl spawn "$UDID" log show --last 10m --predicate 'process == "Promptly"' --style compact 2>/dev/null | grep -i -E 'error|fault|exception|crash' | tail -n 80 || true
           exit $CODE
