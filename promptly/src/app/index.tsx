@@ -12,10 +12,10 @@ import { IconButton } from '../components/IconButton';
 import { Text } from '../components/Text';
 import { checklistView, type ChecklistStep } from '../features/onboarding/firstRun';
 import { FirstRunChecklist } from '../features/onboarding/FirstRunChecklist';
-import { SAMPLE_SCRIPT } from '../features/scripts/sample';
+import { sampleScriptFor } from '../features/scripts/sample';
 import { estimateSpeakingSeconds } from '../features/voice-follow/text';
 import { useFocusData } from '../hooks/useAsyncData';
-import { formatClock, formatDuration, t } from '../localization/i18n';
+import { currentLanguage, formatClock, formatDuration, t } from '../localization/i18n';
 import { flipInRtl } from '../localization/layoutDirection';
 import { track } from '../services/analytics';
 import { getRepositories } from '../services/db';
@@ -49,7 +49,7 @@ export default function Home() {
 
   const trySample = async () => {
     const repos = await getRepositories();
-    const s = await repos.scripts.create(SAMPLE_SCRIPT);
+    const s = await repos.scripts.create(sampleScriptFor(currentLanguage()));
     track({ name: 'script_created', source: 'sample' });
     useFirstRun.getState().complete('firstScriptCreated');
     router.push(`/prepare/${s.id}`);

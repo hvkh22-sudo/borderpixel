@@ -18,6 +18,8 @@ appId: app.promptly.placeholder
           commands:
             - tapOn:
                 text: "Back"
+      # The back swipe starts at the leading edge: left in English, right in Hebrew (RTL).
+      # Only one of the two swipes can go back, so trying both is safe.
       - runFlow:
           when:
             notVisible:
@@ -26,4 +28,8 @@ appId: app.promptly.placeholder
             - swipe:
                 start: 1%, 50%
                 end: 80%, 50%
+                duration: 400
+            - swipe:
+                start: 99%, 50%
+                end: 20%, 50%
                 duration: 400
