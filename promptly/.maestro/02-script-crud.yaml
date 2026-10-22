@@ -85,8 +85,13 @@ tags:
 
 # --- Move the script into the folder (search still filters to one script) ---
 # Long-press opens the script actions (the "…" button is nested and not reachable on iOS).
-- hideKeyboard:
-    optional: true
+# iOS only: on Android hideKeyboard presses Back when no keyboard is up, which leaves the library.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - hideKeyboard:
+          optional: true
 - longPressOn:
     id: library-script-item
 # The first press can be eaten by dismissing the keyboard: try once more if the sheet is not up.
