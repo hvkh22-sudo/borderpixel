@@ -192,6 +192,9 @@ jobs:
           xcrun simctl spawn "$UDID" defaults write NSGlobalDomain AppleLanguages -array he en
           xcrun simctl spawn "$UDID" defaults write NSGlobalDomain AppleLocale he_IL
           xcrun simctl shutdown "$UDID" && xcrun simctl boot "$UDID" && xcrun simctl bootstatus "$UDID" -b >/dev/null
+          # After a reboot the XCTest driver can take longer than Maestro's default to come up.
+          export MAESTRO_DRIVER_STARTUP_TIMEOUT=240000
+          sleep 30
           mkdir -p e2e-ios/he
           xcrun simctl spawn "$UDID" defaults read NSGlobalDomain AppleLanguages || true
           maestro --device "$UDID" test .maestro/07-hebrew-rtl.yaml --test-output-dir e2e-ios/out-he \
