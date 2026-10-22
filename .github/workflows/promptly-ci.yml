@@ -6,7 +6,8 @@ name: promptly-ci
 on:
   push:
     branches: [claude/youthful-volta-vdsr0x]
-    paths: ['promptly/**', '.github/workflows/promptly-ci.yml', '.github/scripts/**']
+    # Docs-only changes do not need native builds.
+    paths: ['promptly/**', '!promptly/**/*.md', '!promptly/docs/**', '.github/workflows/promptly-ci.yml', '.github/scripts/**']
   workflow_dispatch:
 
 concurrency:
