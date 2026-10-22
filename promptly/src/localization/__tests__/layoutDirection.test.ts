@@ -1,5 +1,5 @@
 import { setLanguage } from '../i18n';
-import { syncLayoutDirection, type DirectionManager } from '../layoutDirection';
+import { contentDirectionStyle, syncLayoutDirection, type DirectionManager } from '../layoutDirection';
 
 function manager(isRTL: boolean): DirectionManager & { allowRTL: jest.Mock; forceRTL: jest.Mock } {
   return { isRTL, allowRTL: jest.fn(), forceRTL: jest.fn() };
@@ -31,5 +31,20 @@ describe('syncLayoutDirection', () => {
     expect(syncLayoutDirection(m)).toBe(true);
     expect(m.allowRTL).toHaveBeenCalledWith(false);
     expect(m.forceRTL).toHaveBeenCalledWith(false);
+  });
+});
+
+describe('contentDirectionStyle', () => {
+  it('aligns to the physical edge on Android (TextInput does not swap in RTL)', () => {
+    expect(contentDirectionStyle('שלום עולם', true, 'android')).toEqual({ writingDirection: 'rtl', textAlign: 'right' });
+    expect(contentDirectionStyle('Hello', true, 'android')).toEqual({ writingDirection: 'ltr', textAlign: 'left' });
+    expect(contentDirectionStyle('שלום עולם', false, 'android').textAlign).toBe('right');
+    expect(contentDirectionStyle('', true, 'android')).toEqual({ writingDirection: 'rtl', textAlign: 'right' });
+  });
+
+  it('keeps the <Text> swap rule on iOS', () => {
+    expect(contentDirectionStyle('שלום עולם', true, 'ios').textAlign).toBe('left');
+    expect(contentDirectionStyle('Hello', true, 'ios').textAlign).toBe('right');
+    expect(contentDirectionStyle('שלום עולם', false, 'ios').textAlign).toBe('right');
   });
 });

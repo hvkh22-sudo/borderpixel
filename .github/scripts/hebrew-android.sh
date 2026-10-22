@@ -15,5 +15,5 @@ if ! maestro test .maestro/07-hebrew-rtl.yaml --test-output-dir e2e/out-he; then
   adb shell cat /sdcard/ui.xml | grep -o -E 'text="[^"]+"' | head -40
   adb exec-out screencap -p > e2e/he/screenshot-he-failure.png
 fi
-for f in screenshots/07-*.png; do [ -f "$f" ] && cp "$f" "e2e/he/screenshot-$(basename "$f")"; done
+find e2e/out-he screenshots -name '07-*.png' 2>/dev/null | while read -r f; do cp "$f" "e2e/he/screenshot-$(basename "$f")"; done
 exit 0

@@ -25,12 +25,7 @@ tags:
     id: home-try-sample
 - takeScreenshot: screenshots/01-2-home-empty
 
-- tapOn:
-    id: home-try-sample
-- extendedWaitUntil:
-    visible:
-      id: prepare-start
-    timeout: 15000
+- runFlow: shared/open-sample.yaml
 # The first-visit setup tip can push the mode selector below the fold.
 - scrollUntilVisible:
     element:

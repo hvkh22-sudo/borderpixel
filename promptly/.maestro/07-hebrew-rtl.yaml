@@ -36,12 +36,7 @@ tags:
 - takeScreenshot: screenshots/07-2-home-he
 
 # Setup screen in Hebrew (from the sample script).
-- tapOn:
-    id: home-try-sample
-- extendedWaitUntil:
-    visible:
-      id: prepare-start
-    timeout: 15000
+- runFlow: shared/open-sample.yaml
 - takeScreenshot: screenshots/07-3-setup-he
 - runFlow: shared/go-back.yaml
 
@@ -64,13 +59,9 @@ tags:
 - inputText:
     text: "שלום, זה טקסט בדיקה בעברית."
     optional: true
-# iOS only: on Android hideKeyboard presses Back when no keyboard is up.
-- runFlow:
-    when:
-      platform: iOS
-    commands:
-      - hideKeyboard:
-          optional: true
+# The keyboard is up after typing here, so hideKeyboard is safe on Android too.
+- hideKeyboard:
+    optional: true
 - takeScreenshot: screenshots/07-5-editor-he
 - runFlow: shared/go-back.yaml
 

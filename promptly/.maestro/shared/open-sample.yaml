@@ -1,0 +1,27 @@
+# Home → "Try a sample script" → Setup screen.
+# The first-take checklist appears after start-up and can shift the button while it is being
+# tapped (seen on the iOS Simulator), so tap again if Setup did not open.
+appId: app.promptly.placeholder
+---
+- extendedWaitUntil:
+    visible:
+      id: home-try-sample
+    timeout: 15000
+- tapOn:
+    id: home-try-sample
+- extendedWaitUntil:
+    visible:
+      id: prepare-start
+    timeout: 8000
+    optional: true
+- runFlow:
+    when:
+      notVisible:
+        id: prepare-start
+    commands:
+      - tapOn:
+          id: home-try-sample
+- extendedWaitUntil:
+    visible:
+      id: prepare-start
+    timeout: 15000
