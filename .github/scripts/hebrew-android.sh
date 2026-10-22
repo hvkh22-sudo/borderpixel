@@ -8,7 +8,12 @@ sleep 20 ; adb wait-for-device
 until [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1" ]; do sleep 3; done
 sleep 10 ; adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 2>&1
 echo "system locale: $(adb shell getprop persist.sys.locale)"
-maestro test .maestro/07-hebrew-rtl.yaml --test-output-dir e2e/out-he || echo "Hebrew flow failed (non-gating)"
 mkdir -p e2e/he
+if ! maestro test .maestro/07-hebrew-rtl.yaml --test-output-dir e2e/out-he; then
+  echo "Hebrew flow failed (non-gating); screen at failure:"
+  adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+  adb shell cat /sdcard/ui.xml | grep -o -E 'text="[^"]+"' | head -40
+  adb exec-out screencap -p > e2e/he/screenshot-he-failure.png
+fi
 for f in screenshots/07-*.png; do [ -f "$f" ] && cp "$f" "e2e/he/screenshot-$(basename "$f")"; done
 exit 0
