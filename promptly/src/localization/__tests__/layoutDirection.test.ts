@@ -35,16 +35,15 @@ describe('syncLayoutDirection', () => {
 });
 
 describe('contentDirectionStyle', () => {
-  it('aligns to the physical edge on Android (TextInput does not swap in RTL)', () => {
-    expect(contentDirectionStyle('שלום עולם', true, 'android')).toEqual({ writingDirection: 'rtl', textAlign: 'right' });
-    expect(contentDirectionStyle('Hello', true, 'android')).toEqual({ writingDirection: 'ltr', textAlign: 'left' });
-    expect(contentDirectionStyle('שלום עולם', false, 'android').textAlign).toBe('right');
-    expect(contentDirectionStyle('', true, 'android')).toEqual({ writingDirection: 'rtl', textAlign: 'right' });
+  it('aligns inputs to the physical edge of the text direction (TextInput does not swap in RTL)', () => {
+    expect(contentDirectionStyle('שלום עולם', true)).toEqual({ writingDirection: 'rtl', textAlign: 'right' });
+    expect(contentDirectionStyle('Hello', true)).toEqual({ writingDirection: 'ltr', textAlign: 'left' });
+    expect(contentDirectionStyle('שלום עולם', false)).toEqual({ writingDirection: 'rtl', textAlign: 'right' });
+    expect(contentDirectionStyle('Hello', false)).toEqual({ writingDirection: 'ltr', textAlign: 'left' });
   });
 
-  it('keeps the <Text> swap rule on iOS', () => {
-    expect(contentDirectionStyle('שלום עולם', true, 'ios').textAlign).toBe('left');
-    expect(contentDirectionStyle('Hello', true, 'ios').textAlign).toBe('right');
-    expect(contentDirectionStyle('שלום עולם', false, 'ios').textAlign).toBe('right');
+  it('empty text follows the UI direction so the placeholder reads right', () => {
+    expect(contentDirectionStyle('', true)).toEqual({ writingDirection: 'rtl', textAlign: 'right' });
+    expect(contentDirectionStyle('', false)).toEqual({ writingDirection: 'ltr', textAlign: 'left' });
   });
 });

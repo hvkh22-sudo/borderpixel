@@ -9,9 +9,9 @@
  * I18nManager changes only apply after the app restarts; we do not force a
  * reload at start-up, so a mismatch is corrected on the next launch.
  */
-import { I18nManager, Platform } from 'react-native';
+import { I18nManager } from 'react-native';
 
-import { detectDirection, scriptTextAlign } from '../features/teleprompter/textDirection';
+import { detectDirection } from '../features/teleprompter/textDirection';
 import { isRtl } from './i18n';
 
 export interface DirectionManager {
@@ -43,16 +43,14 @@ export function flipInRtl(): { transform: { scaleX: number }[] } | undefined {
  * Style for user content (scripts, captions) in text inputs: direction follows
  * the content itself; empty text follows the UI so the placeholder reads right.
  *
- * Android's TextInput does not swap 'left'/'right' in an RTL layout the way <Text> does
- * (seen on the emulator in Hebrew: RTL script text sat on the left edge), so there the
- * alignment is the physical edge. iOS keeps the <Text> rule (scriptTextAlign).
+ * TextInput does not swap 'left'/'right' in an RTL layout the way <Text> does (seen in Hebrew
+ * on both the Android emulator and the iOS Simulator: RTL script text sat on the left edge),
+ * so for inputs the alignment is the physical edge.
  */
 export function contentDirectionStyle(
   text: string,
   layoutRtl: boolean = I18nManager.isRTL,
-  os: string = Platform.OS,
-): { writingDirection: 'rtl' | 'ltr'; textAlign: 'left' | 'right' | 'center' } {
+): { writingDirection: 'rtl' | 'ltr'; textAlign: 'left' | 'right' } {
   const direction = detectDirection(text, layoutRtl ? 'rtl' : 'ltr');
-  const textAlign = os === 'android' ? (direction === 'rtl' ? 'right' : 'left') : scriptTextAlign('left', direction, layoutRtl);
-  return { writingDirection: direction, textAlign };
+  return { writingDirection: direction, textAlign: direction === 'rtl' ? 'right' : 'left' };
 }

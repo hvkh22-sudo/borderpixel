@@ -71,6 +71,19 @@ tags:
     timeout: 10000
 - tapOn:
     id: home-settings
+# Right after going back the tap can land mid-transition (iOS): tap again if Settings did not open.
+- extendedWaitUntil:
+    notVisible:
+      id: home-settings
+    timeout: 5000
+    optional: true
+- runFlow:
+    when:
+      visible:
+        id: home-settings
+    commands:
+      - tapOn:
+          id: home-settings
 - takeScreenshot: screenshots/07-6-settings-he
 - scrollUntilVisible:
     element:
