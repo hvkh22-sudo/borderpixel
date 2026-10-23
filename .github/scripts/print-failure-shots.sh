@@ -5,7 +5,7 @@
 DIR="$1"
 CONVERT=$(command -v magick || command -v convert || true)
 # Maestro names its automatic failure screenshots "screenshot-<status>-<time>-(<flow>).png".
-find "$DIR" -name '*.png' \( -path '*screenshot-*' -o -name 'last.png' -o -name 'launch.png' \) | sort | head -n 24 | while read -r f; do
+find "$DIR" -name '*.png' \( -path '*screenshot-*' -o -name 'last.png' -o -name 'launch.png' \) | sort | head -n 32 | while read -r f; do
   if [ -n "$CONVERT" ]; then
     "$CONVERT" "$f" -resize 360x -quality 60 /tmp/shot.jpg
   elif command -v sips >/dev/null 2>&1; then

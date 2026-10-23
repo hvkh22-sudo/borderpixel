@@ -192,8 +192,14 @@ jobs:
           xcrun simctl ui "$UDID" appearance dark
           mkdir -p e2e-ios/dark
           maestro --device "$UDID" test -e SHOT=dark .maestro/08-tour.yaml --test-output-dir e2e-ios/out-dark || echo "Dark tour failed (non-gating)"
-          find e2e-ios/out-dark screenshots -name '08-*.png' 2>/dev/null | while read -r f; do cp "$f" "e2e-ios/dark/screenshot-$(basename "$f")"; done
+          find e2e-ios/out-dark screenshots -name '08-dark-*.png' 2>/dev/null | while read -r f; do cp "$f" "e2e-ios/dark/screenshot-$(basename "$f")"; done
           xcrun simctl ui "$UDID" appearance light
+          echo "--- Large text tour (08, accessibility-extra-large)"
+          xcrun simctl ui "$UDID" content_size accessibility-extra-large
+          mkdir -p e2e-ios/bigfont
+          maestro --device "$UDID" test -e SHOT=bigfont .maestro/08-tour.yaml --test-output-dir e2e-ios/out-bigfont || echo "Large text tour failed (non-gating)"
+          find e2e-ios/out-bigfont screenshots -name '08-bigfont-*.png' 2>/dev/null | while read -r f; do cp "$f" "e2e-ios/bigfont/screenshot-$(basename "$f")"; done
+          xcrun simctl ui "$UDID" content_size large
           echo "--- Hebrew / RTL (07)"
           xcrun simctl spawn "$UDID" defaults write NSGlobalDomain AppleLanguages -array he en
           xcrun simctl spawn "$UDID" defaults write NSGlobalDomain AppleLocale he_IL
