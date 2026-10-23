@@ -214,7 +214,9 @@ export default function Editor() {
       <TextInput
         testID="editor-title"
         value={title}
-        onChangeText={(v) => {
+        onChangeText={(raw) => {
+          // Titles are one line of text but may wrap; a pasted newline becomes a space.
+          const v = raw.replace(/\s*\n\s*/g, ' ');
           autoTitle.current = false;
           setTitle(v);
           schedule(v, body);
@@ -224,7 +226,11 @@ export default function Editor() {
         style={[typography.title, { color: colors.text }, contentDirectionStyle(title)]}
         accessibilityLabel={t('editor.titlePlaceholder')}
         editable={loaded}
-        returnKeyType="next"
+        // Wrap long titles instead of scrolling them sideways; Return still ends editing.
+        multiline
+        scrollEnabled={false}
+        submitBehavior="blurAndSubmit"
+        returnKeyType="done"
       />
       {loaded ? (
         <View style={styles.chipRow}>

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, Switch, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Switch, View } from 'react-native';
 
 import { useTheme } from '../theme/ThemeProvider';
 import { spacing, touchTarget } from '../theme/tokens';
@@ -54,6 +54,8 @@ export function ListRow({ title, subtitle, icon, value, onPress, toggle, selecte
           value={toggle.value}
           onValueChange={toggle.onChange}
           trackColor={{ true: colors.primary }}
+          // Android otherwise paints the thumb with the platform accent (teal), off-palette.
+          thumbColor={Platform.OS === 'android' ? '#FFFFFF' : undefined}
           accessibilityLabel={title}
           accessibilityHint={subtitle}
         />
