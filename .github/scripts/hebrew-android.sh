@@ -3,6 +3,9 @@
 # its screenshots under e2e/ so print-failure-shots.sh prints them. Non-gating.
 echo "--- Hebrew / RTL (07)"
 adb root >/dev/null 2>&1 ; sleep 3
+# A font-scale change earlier in the job saves the configuration, including its en-US locale list, to
+# system settings; that list wins over persist.sys.locale on restart, so set both.
+adb shell settings put system system_locales he-IL
 adb shell "setprop persist.sys.locale he-IL; setprop ctl.restart zygote"
 sleep 20 ; adb wait-for-device
 until [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1" ]; do sleep 3; done
