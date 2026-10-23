@@ -1,6 +1,6 @@
 # Development plan
 
-Last updated: 2026-10-21 (night session, continued).
+Last updated: 2026-10-23.
 
 ## Milestones
 | Phase | Scope | Status |
@@ -41,6 +41,16 @@ Merged into `claude/youthful-volta-vdsr0x`, each with tests (375+ app tests, 50+
 - First-take guidance (Home checklist, setup/record/take tips); Hebrew copy polish + glossary in he.ts
 - GitHub Actions CI (`.github/workflows/promptly-ci.yml`): JS checks + Android `assembleDebug` +
   iOS simulator build (unsigned). First time the native code is compiled; results tracked in QUALITY_CHECKLIST.md
+
+## CI + emulator/simulator session (2026-10-21/23)
+- `.github/workflows/promptly-ci.yml`: JS checks; Android release APK (sideloadable test build);
+  Android emulator + iOS Simulator Maestro runs (English 01/02/06 gating; camera 03–05 and Hebrew 07
+  reported); failure screenshots printed into the job log (`.github/scripts/`).
+- Native code compiles on both platforms; 4 Kotlin compile errors and 7 runtime issues fixed.
+- Found and fixed on the emulator/simulator: RTL text in TextInputs sat on the left edge (both OSes);
+  English sample script in a Hebrew UI; Hebrew missing from speech languages; bare "he" locale (iOS).
+- All screens reviewed in Hebrew on both platforms (screenshots); app cold start ≈0.8–0.9 s on the
+  emulator (relative only).
 
 ## Next actions (in order)
 1. **Android now:** sideload the CI test APK (`docs/testing/founder-checklist-he.md` §0) and run the

@@ -17,4 +17,11 @@ describe('speechLocaleOptions', () => {
     expect(new Set(opts).size).toBe(opts.length);
     expect(canonicalSpeechLocale('en-us')).toBe('en-US');
   });
+
+  it('adds the default region to a bare language (iOS reports "he")', () => {
+    expect(canonicalSpeechLocale('he')).toBe('he-IL');
+    expect(canonicalSpeechLocale('en')).toBe('en-US');
+    expect(canonicalSpeechLocale('fr')).toBe('fr');
+    expect(speechLocaleOptions('he', 'he').filter((l) => l.startsWith('he'))).toEqual(['he-IL']);
+  });
 });

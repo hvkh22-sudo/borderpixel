@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react';
 
 import { deriveAccess } from '../features/monetization/entitlements';
 import { loadFirstRun } from '../features/onboarding/firstRun';
+import { canonicalSpeechLocale } from '../features/settings/speechLocales';
 import { recoverOrphanRecordings } from '../features/recording/orphanRecovery';
 import { setLanguage } from '../localization/i18n';
 import { syncLayoutDirection } from '../localization/layoutDirection';
@@ -57,10 +58,8 @@ export function useBootstrap(): { ready: boolean; recovered: number } {
         ]);
         // Device test overrides (diagnostics screen) apply before the first recording.
         useDiagnosticsOverrides.getState().hydrate(overrides);
-        useSettings.getState().hydrate({
-          speechLocale: locale?.languageTag ?? 'en-US',
-          ...saved,
-        });
+        const hydrated = { speechLocale: locale?.languageTag ?? 'en-US', ...saved };
+        useSettings.getState().hydrate({ ...hydrated, speechLocale: canonicalSpeechLocale(hydrated.speechLocale) });
         setAnalyticsEnabled(useSettings.getState().analyticsEnabled);
         useAccess.getState().setUsage({ voiceFollowSessionsUsed: vfUsed });
         useSpeakingRate.getState().hydrate(speakingRate);
