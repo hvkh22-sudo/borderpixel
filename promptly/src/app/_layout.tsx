@@ -34,7 +34,7 @@ function Navigator() {
       >
         <Stack.Screen name="index" options={{ title: '', headerShown: false }} />
         <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
-        <Stack.Screen name="create" options={{ presentation: 'formSheet', title: t('create.title'), sheetAllowedDetents: createDetents }} />
+        <Stack.Screen name="create" options={{ presentation: 'formSheet', headerShown: false, sheetAllowedDetents: createDetents }} />
         <Stack.Screen name="scripts/index" options={{ title: t('library.title') }} />
         <Stack.Screen name="scripts/[id]" options={{ title: '' }} />
         <Stack.Screen name="studio" options={{ presentation: 'modal', title: t('studio.title') }} />

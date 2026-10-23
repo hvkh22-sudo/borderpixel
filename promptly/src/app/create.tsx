@@ -44,6 +44,10 @@ export default function Create() {
 
   return (
     <Screen>
+      {/* Own title instead of the native sheet header, which on iOS overlapped the first option. */}
+      <Text variant="headline" accessibilityRole="header" center>
+        {t('create.title')}
+      </Text>
       {options.map((o) => (
         <Pressable
           key={o.title}
