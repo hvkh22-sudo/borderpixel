@@ -56,6 +56,9 @@ Merged into `claude/youthful-volta-vdsr0x`, each with tests (375+ app tests, 50+
 1. **Android now:** sideload the CI test APK (`docs/testing/founder-checklist-he.md` §0) and run the
    founder checklist (REC-01..05, VF-01..04). **iOS:** needs a signed build (EAS + `EXPO_TOKEN`, or TestFlight).
 2. ✅ Native code compiles on both platforms in CI (2026-10-21); emulator Maestro run added (`android-e2e`).
+   ✅ 2026-10-23: CI screen tours green on emulator + simulator — English core flows, Hebrew/RTL (07),
+   dark mode and large text (08); layout fixes from the screenshots are in. Remaining large-text notes
+   (iOS AX sizes: Create sheet, paywall footer, editor bar over word count) are listed in QUALITY_CHECKLIST.
 3. Verify overlay absence in the exported file on both platforms (REC-02) — release blocker.
 4. Measure Voice Follow latency/accuracy with the scripted protocol; set thresholds from baseline.
 5. **Founder decision (2026-10-20): API key and model eval are deferred to the END** — continue all

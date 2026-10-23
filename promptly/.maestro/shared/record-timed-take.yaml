@@ -10,13 +10,16 @@ appId: app.promptly.placeholder
     direction: DOWN
 - tapOn:
     id: mode-timed
+# 3 s is the default. On the emulator the selected segment's id is sometimes missing from the
+# hierarchy even while it is on screen, so the scroll targets the "Countdown" label and the tap is best-effort.
 - scrollUntilVisible:
     element:
-      id: countdown-3
+      text: "Countdown"
     direction: DOWN
     timeout: 10000
 - tapOn:
     id: countdown-3
+    optional: true
 - tapOn:
     id: prepare-start
 
