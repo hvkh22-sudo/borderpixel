@@ -37,7 +37,15 @@ export function Segmented<T extends string | number>({ options, value, onChange,
             hitSlop={4}
             style={[styles.item, selected && { backgroundColor: colors.primary }]}
           >
-            <Text variant="callout" color={selected ? colors.onPrimary : colors.text} style={styles.label} numberOfLines={2}>
+            {/* A one-word label shrinks rather than breaking mid-word at large text sizes ("Syste/m"). */}
+            <Text
+              variant="callout"
+              color={selected ? colors.onPrimary : colors.text}
+              style={styles.label}
+              numberOfLines={/\s/.test(o.label.trim()) ? 2 : 1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.6}
+            >
               {o.label}
             </Text>
             {o.badge ? (
