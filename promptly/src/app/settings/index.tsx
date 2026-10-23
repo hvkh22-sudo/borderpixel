@@ -9,13 +9,12 @@ import { Section } from '../../components/Section';
 import { Segmented } from '../../components/Segmented';
 import { Text } from '../../components/Text';
 import { createTapUnlock } from '../../features/diagnostics/tapUnlock';
-import { t } from '../../localization/i18n';
+import { canonicalSpeechLocale, speechLocaleOptions } from '../../features/settings/speechLocales';
+import { currentLanguage, t } from '../../localization/i18n';
 import { PromptlyMedia } from '../../services/nativeMedia';
 import { DEFAULT_PROMPTER, useSettings, type Appearance } from '../../state/settings';
 import { useAccess } from '../../state/access';
 import { spacing } from '../../theme/tokens';
-
-const SPEECH_LOCALES = ['en-US', 'en-GB', 'en-AU', 'en-CA', 'en-IN'];
 
 export default function Settings() {
   const appearance = useSettings((s) => s.appearance);
@@ -41,8 +40,8 @@ export default function Settings() {
         />
       </Section>
       <Section title={t('settings.speechLanguage')}>
-        {SPEECH_LOCALES.map((l) => (
-          <ListRow key={l} testID={`settings-speech-${l}`} title={l} selected={l === speechLocale} onPress={() => set({ speechLocale: l })} />
+        {speechLocaleOptions(speechLocale, currentLanguage()).map((l) => (
+          <ListRow key={l} testID={`settings-speech-${l}`} title={l} selected={l === canonicalSpeechLocale(speechLocale)} onPress={() => set({ speechLocale: l })} />
         ))}
       </Section>
       <Section title={t('settings.remote')}>
