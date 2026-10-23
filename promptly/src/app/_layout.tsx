@@ -1,6 +1,6 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, useWindowDimensions, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -11,6 +11,8 @@ import { ThemeProvider, useTheme } from '../theme/ThemeProvider';
 function Navigator() {
   const { colors, dark } = useTheme();
   const { ready } = useBootstrap();
+  // The three Create options don't fit the half-height sheet at large text sizes; open it taller there.
+  const createDetents = useWindowDimensions().fontScale > 1.3 ? [0.9] : [0.55, 0.9];
   if (!ready) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background }}>
@@ -32,7 +34,7 @@ function Navigator() {
       >
         <Stack.Screen name="index" options={{ title: '', headerShown: false }} />
         <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
-        <Stack.Screen name="create" options={{ presentation: 'formSheet', title: t('create.title'), sheetAllowedDetents: [0.55, 0.9] }} />
+        <Stack.Screen name="create" options={{ presentation: 'formSheet', title: t('create.title'), sheetAllowedDetents: createDetents }} />
         <Stack.Screen name="scripts/index" options={{ title: t('library.title') }} />
         <Stack.Screen name="scripts/[id]" options={{ title: '' }} />
         <Stack.Screen name="studio" options={{ presentation: 'modal', title: t('studio.title') }} />
