@@ -209,7 +209,9 @@ jobs:
           sleep 30
           mkdir -p e2e-ios/he
           xcrun simctl spawn "$UDID" defaults read NSGlobalDomain AppleLanguages || true
+          # One retry: the driver start-up after the reboot still times out now and then.
           maestro --device "$UDID" test .maestro/07-hebrew-rtl.yaml --test-output-dir e2e-ios/out-he \
+            || { echo "Hebrew flow: retrying once"; maestro --device "$UDID" test .maestro/07-hebrew-rtl.yaml --test-output-dir e2e-ios/out-he; } \
             || { echo "Hebrew flow failed (non-gating)"; xcrun simctl io "$UDID" screenshot e2e-ios/he/screenshot-he-failure.png; }
           find e2e-ios/out-he screenshots -name '07-*.png' 2>/dev/null | while read -r f; do cp "$f" "e2e-ios/he/screenshot-$(basename "$f")"; done
           sh ../.github/scripts/print-failure-shots.sh e2e-ios
