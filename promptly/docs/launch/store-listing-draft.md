@@ -27,3 +27,31 @@ management in account settings, links to Terms and Privacy (required by both sto
 
 **Preview video concept:** 15 s: paste → record with Voice Follow (split-screen showing final video has
 no text) → captions → share sheet.
+
+---
+
+## Hebrew listing draft (he-IL, App Store + Google Play) — same approvals needed
+
+Terms follow the in-app glossary in `src/localization/he.ts` (תסריט, טייק, הקלטה, מעקב קולי,
+כתוביות, ייצוא, מינוי). Addressing: plural, gender-neutral, as in the app.
+
+**Subtitle (iOS, ≤ 30 chars):** טלפרומפטר שעוקב אחרי הקול שלכם
+**Short description (Play, ≤ 80 chars):** טלפרומפטר מעל המצלמה שעוקב אחרי הדיבור, עם כתוביות ותסריטים בעזרת AI.
+
+**Description**
+קוראים את התסריט בטבעיות תוך כדי הקלטה — Promptly מציגה את המילים ממש מתחת למצלמה, והן אף פעם
+לא נכנסות לסרטון.
+
+• מדביקים תסריט או כותבים אחד בעזרת AI Script Studio
+• גלילה ידנית, בקצב קבוע או במעקב קולי שמתקדם יחד עם הדיבור שלכם
+• הקלטה ב-1080p עם ספירה לאחור, מצב מראה וטקסט מתכוונן
+• כתוביות שנוצרות במכשיר ומותאמות לתסריט — עריכה, עיצוב וייצוא כסרטון או כקובץ SRT
+• בלי חשבון. התסריטים והסרטונים נשארים בטלפון שלכם.
+• הקלטה וייצוא בחינם בלי סימן מים. Pro פותח מעקב קולי ללא הגבלה, סגנונות כתוביות מתקדמים ועוד AI.
+
+Claims to verify before use (Hebrew-specific): Hebrew speech recognition for מעקב קולי and כתוביות
+works on the device and language combinations we state ("נוצרות במכשיר" depends on platform and
+on-device Hebrew support). Native-speaker review of this copy before submission.
+
+**Subscription disclosure (he):** מחיר, תקופה, חידוש אוטומטי, אפשרות ביטול לפחות 24 שעות לפני
+מועד החידוש, ניהול בהגדרות החשבון בחנות, וקישורים לתנאי השימוש ולפרטיות.
