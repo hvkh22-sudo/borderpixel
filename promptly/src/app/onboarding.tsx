@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { decorative } from '../components/a11y';
@@ -28,7 +28,8 @@ export default function Onboarding() {
   };
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: colors.background }]}>
-      <View style={styles.body}>
+      {/* Scrolls so the points never slide under the footer at large Dynamic Type sizes. */}
+      <ScrollView style={styles.flex} contentContainerStyle={styles.body}>
         <View {...decorative} style={[styles.logo, { backgroundColor: colors.primary }]}>
           <Ionicons name="reader-outline" size={34} color="#fff" />
         </View>
@@ -48,7 +49,7 @@ export default function Onboarding() {
             </View>
           ))}
         </View>
-      </View>
+      </ScrollView>
       <View style={styles.footer}>
         <Button testID="onboarding-start" label={t('onboarding.start')} onPress={finish} size="lg" />
         <Text variant="caption" muted center>
@@ -61,10 +62,10 @@ export default function Onboarding() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  body: { flex: 1, padding: spacing.xl, gap: spacing.lg, justifyContent: 'center' },
+  body: { flexGrow: 1, padding: spacing.xl, gap: spacing.lg, justifyContent: 'center' },
   logo: { width: 64, height: 64, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
   points: { gap: spacing.md, marginTop: spacing.md },
   point: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   pointIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  footer: { padding: spacing.xl, gap: spacing.md },
+  footer: { paddingHorizontal: spacing.xl, paddingTop: spacing.md, paddingBottom: spacing.xl, gap: spacing.md },
 });

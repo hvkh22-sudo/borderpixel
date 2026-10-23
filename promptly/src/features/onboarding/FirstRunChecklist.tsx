@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { decorative } from '../../components/a11y';
 import { Button } from '../../components/Button';
@@ -22,6 +22,9 @@ const STEP_ACTION: Record<ChecklistStep, TKey> = {
   export: 'firstRun.actionExport',
 };
 
+/** Above this text scale three side-by-side steps no longer fit, so they stack. */
+const STACK_FONT_SCALE = 1.3;
+
 interface Props {
   view: ChecklistView;
   onAction: (step: ChecklistStep) => void;
@@ -31,6 +34,7 @@ interface Props {
 /** Compact, skippable 3-step card on Home until the first export. One primary action. */
 export function FirstRunChecklist({ view, onAction, onHide }: Props) {
   const { colors } = useTheme();
+  const stacked = useWindowDimensions().fontScale > STACK_FONT_SCALE;
   const title = view.celebrate ? t('firstRun.celebrateTitle') : t('firstRun.checklistTitle');
   // Subtle, one-time celebration: announced when the card switches to it (iOS; live region on Android).
   useAnnounce(view.celebrate ? title : null);
@@ -49,7 +53,7 @@ export function FirstRunChecklist({ view, onAction, onHide }: Props) {
         </View>
         <Button testID="first-run-hide" label={t('firstRun.hide')} variant="ghost" onPress={onHide} accessibilityHint={t('firstRun.hideLabel')} style={styles.hide} />
       </View>
-      <View accessibilityRole="list" accessibilityLabel={t('firstRun.checklistLabel')} style={styles.steps}>
+      <View accessibilityRole="list" accessibilityLabel={t('firstRun.checklistLabel')} style={stacked ? styles.stepsStacked : styles.steps}>
         {CHECKLIST_STEPS.map((step, i) => {
           const done = view.done[step];
           const current = step === view.current;
@@ -62,7 +66,7 @@ export function FirstRunChecklist({ view, onAction, onHide }: Props) {
               accessible
               accessibilityLabel={[t('firstRun.stepOf', { n: i + 1, step: label }), state].filter(Boolean).join(', ')}
               accessibilityState={{ checked: done, selected: current }}
-              style={[styles.step, current && { backgroundColor: colors.primarySoft }]}
+              style={[styles.step, stacked && styles.stepStacked, current && { backgroundColor: colors.primarySoft }]}
             >
               <View
                 {...decorative}
@@ -74,12 +78,13 @@ export function FirstRunChecklist({ view, onAction, onHide }: Props) {
                 {done ? (
                   <Ionicons name="checkmark" size={14} color={colors.onPrimary} />
                 ) : (
-                  <Text variant="caption" color={current ? colors.primaryText : colors.textMuted}>
+                  // The digit sits in a fixed circle; the step label beside it carries the large text.
+                  <Text variant="caption" maxFontSizeMultiplier={1.2} color={current ? colors.primaryText : colors.textMuted}>
                     {i + 1}
                   </Text>
                 )}
               </View>
-              <Text variant="caption" color={current ? colors.text : colors.textMuted} style={[styles.flex, current && styles.currentLabel]} numberOfLines={2}>
+              <Text variant="caption" color={current ? colors.text : colors.textMuted} style={[styles.flex, current && styles.currentLabel]} numberOfLines={stacked ? undefined : 2}>
                 {label}
               </Text>
             </View>
@@ -96,7 +101,10 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   hide: { paddingHorizontal: spacing.md },
   steps: { flexDirection: 'row', gap: spacing.xs },
+  stepsStacked: { gap: spacing.xs },
   step: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.xs, padding: spacing.xs, borderRadius: 10 },
+  // flex: 1 in a column with auto height would collapse the row.
+  stepStacked: { flex: 0 },
   currentLabel: { fontWeight: '700' },
   badge: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
 });
