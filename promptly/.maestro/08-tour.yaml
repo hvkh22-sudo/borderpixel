@@ -1,0 +1,91 @@
+# Screen tour for visual review (dark mode, store screenshot drafts): walks the main screens and
+# takes a screenshot of each. Same path as 07 without the Hebrew check.
+# Env SHOT (required) prefixes the screenshot names, e.g. SHOT=dark.
+# CLEARS APP DATA. Run on its own (excluded from a full run by the "tour" tag):
+#   maestro test -e SHOT=dark .maestro/08-tour.yaml
+appId: app.promptly.placeholder
+tags:
+  - tour
+---
+- runFlow:
+    file: shared/launch.yaml
+    env:
+      CLEAR_STATE: "true"
+
+- extendedWaitUntil:
+    visible:
+      id: onboarding-start
+    timeout: 30000
+- takeScreenshot: screenshots/08-${SHOT}-1-onboarding
+- tapOn:
+    id: onboarding-start
+
+- extendedWaitUntil:
+    visible:
+      id: home-create
+    timeout: 15000
+- takeScreenshot: screenshots/08-${SHOT}-2-home
+
+# Setup screen in Hebrew (from the sample script).
+- runFlow: shared/open-sample.yaml
+- takeScreenshot: screenshots/08-${SHOT}-3-setup
+- runFlow: shared/go-back.yaml
+
+- extendedWaitUntil:
+    visible:
+      id: home-create
+    timeout: 10000
+- tapOn:
+    id: home-create
+- takeScreenshot: screenshots/08-${SHOT}-4-create
+- tapOn:
+    id: create-blank
+- extendedWaitUntil:
+    visible:
+      id: editor-body
+    timeout: 10000
+- tapOn:
+    id: editor-body
+- inputText: "A short script to check the editor in this appearance."
+
+# The keyboard is up after typing here, so hideKeyboard is safe on Android too.
+- hideKeyboard:
+    optional: true
+- takeScreenshot: screenshots/08-${SHOT}-5-editor
+- runFlow: shared/go-back.yaml
+
+- extendedWaitUntil:
+    visible:
+      id: home-settings
+    timeout: 10000
+- tapOn:
+    id: home-settings
+# Right after going back the tap can land mid-transition (iOS): tap again if Settings did not open.
+- extendedWaitUntil:
+    notVisible:
+      id: home-settings
+    timeout: 5000
+    optional: true
+- runFlow:
+    when:
+      visible:
+        id: home-settings
+    commands:
+      - tapOn:
+          id: home-settings
+- takeScreenshot: screenshots/08-${SHOT}-6-settings
+- scrollUntilVisible:
+    element:
+      id: settings-subscription
+    direction: DOWN
+- tapOn:
+    id: settings-subscription
+- tapOn:
+    id: subscription-upgrade
+- extendedWaitUntil:
+    visible:
+      id: paywall-title
+    timeout: 10000
+- takeScreenshot: screenshots/08-${SHOT}-7-paywall
+- tapOn:
+    id: paywall-close

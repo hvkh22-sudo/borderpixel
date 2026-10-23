@@ -8,6 +8,7 @@ flows:
 # skipped in a full run. Run it on its own: maestro test .maestro/07-hebrew-rtl.yaml
 excludeTags:
   - hebrew
+  - tour
 
 executionOrder:
   continueOnFailure: true
