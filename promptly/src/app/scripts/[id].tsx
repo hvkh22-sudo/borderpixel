@@ -18,7 +18,7 @@ import { getRepositories } from '../../services/db';
 import { deriveTitle, type Folder } from '../../storage/repositories';
 import { useDurationWpm } from '../../state/speakingRate';
 import { useTheme } from '../../theme/ThemeProvider';
-import { spacing, typography } from '../../theme/tokens';
+import { MAX_FONT_SCALE, spacing, typography } from '../../theme/tokens';
 
 const AUTOSAVE_MS = 600;
 const UNDO_SNAPSHOT_MS = 1200;
@@ -212,6 +212,7 @@ export default function Editor() {
         }}
       />
       <TextInput
+        maxFontSizeMultiplier={MAX_FONT_SCALE}
         testID="editor-title"
         value={title}
         onChangeText={(raw) => {
@@ -249,6 +250,7 @@ export default function Editor() {
         {t('editor.stats', { words, duration: formatDuration(estimateSpeakingSeconds(body, wpm)) })} · {saveState === 'saved' ? t('editor.saved') : t('editor.saving')}
       </Text>
       <TextInput
+        maxFontSizeMultiplier={MAX_FONT_SCALE}
         testID="editor-body"
         value={body}
         onChangeText={onBody}

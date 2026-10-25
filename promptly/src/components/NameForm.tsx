@@ -4,7 +4,7 @@ import { StyleSheet, TextInput, View } from 'react-native';
 import { contentDirectionStyle } from '../localization/layoutDirection';
 import { FOLDER_NAME_MAX, normalizeFolderName } from '../storage/repositories';
 import { useTheme } from '../theme/ThemeProvider';
-import { radius, spacing } from '../theme/tokens';
+import { MAX_FONT_SCALE, radius, spacing } from '../theme/tokens';
 import { Button } from './Button';
 
 interface Props {
@@ -25,6 +25,7 @@ export function NameForm({ placeholder, submitLabel, cancelLabel, initial = '', 
   return (
     <View style={styles.wrap}>
       <TextInput
+        maxFontSizeMultiplier={MAX_FONT_SCALE}
         testID="name-form-input"
         value={value}
         onChangeText={setValue}

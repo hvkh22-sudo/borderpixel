@@ -29,7 +29,7 @@ import { getRepositories } from '../services/db';
 import { useSettings } from '../state/settings';
 import { deriveTitle, type Script, type ScriptVersionRow } from '../storage/repositories';
 import { useTheme } from '../theme/ThemeProvider';
-import { radius, spacing, touchTarget, typography } from '../theme/tokens';
+import { MAX_FONT_SCALE, radius, spacing, touchTarget, typography } from '../theme/tokens';
 
 const EDIT_TOOLS: StudioTool[] = ['improve', 'shorten', 'conversational', 'hook', 'tone', 'platform'];
 const DURATIONS = [30, 60, 90, 180] as const;
@@ -178,9 +178,9 @@ export default function Studio() {
           </Text>
           {tool === 'generate' ? (
             <>
-              <TextInput value={topic} onChangeText={setTopic} placeholder={t('studio.topic')} placeholderTextColor={colors.textMuted} style={inputStyle} accessibilityLabel={t('studio.topic')} maxLength={300} />
-              <TextInput value={keyPoints} onChangeText={setKeyPoints} placeholder={t('studio.keyPoints')} placeholderTextColor={colors.textMuted} style={[inputStyle, styles.multi]} multiline accessibilityLabel={t('studio.keyPoints')} maxLength={1500} />
-              <TextInput value={audience} onChangeText={setAudience} placeholder={t('studio.audience')} placeholderTextColor={colors.textMuted} style={inputStyle} accessibilityLabel={t('studio.audience')} maxLength={200} />
+              <TextInput maxFontSizeMultiplier={MAX_FONT_SCALE} value={topic} onChangeText={setTopic} placeholder={t('studio.topic')} placeholderTextColor={colors.textMuted} style={inputStyle} accessibilityLabel={t('studio.topic')} maxLength={300} />
+              <TextInput maxFontSizeMultiplier={MAX_FONT_SCALE} value={keyPoints} onChangeText={setKeyPoints} placeholder={t('studio.keyPoints')} placeholderTextColor={colors.textMuted} style={[inputStyle, styles.multi]} multiline accessibilityLabel={t('studio.keyPoints')} maxLength={1500} />
+              <TextInput maxFontSizeMultiplier={MAX_FONT_SCALE} value={audience} onChangeText={setAudience} placeholder={t('studio.audience')} placeholderTextColor={colors.textMuted} style={inputStyle} accessibilityLabel={t('studio.audience')} maxLength={200} />
             </>
           ) : null}
           {tool === 'generate' || tool === 'platform' || tool === 'hook' ? (

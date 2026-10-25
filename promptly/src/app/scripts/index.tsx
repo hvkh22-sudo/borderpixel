@@ -21,7 +21,7 @@ import { useAnnounce } from '../../hooks/useAnnounce';
 import { useDurationWpm } from '../../state/speakingRate';
 import type { FolderWithCount, Script, ScriptSort } from '../../storage/repositories';
 import { useTheme } from '../../theme/ThemeProvider';
-import { radius, spacing } from '../../theme/tokens';
+import { MAX_FONT_SCALE, radius, spacing } from '../../theme/tokens';
 
 type SheetState =
   | { kind: 'script'; script: Script }
@@ -305,6 +305,7 @@ export default function Library() {
         <View style={[styles.search, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Ionicons {...decorative} name="search" size={18} color={colors.textMuted} />
           <TextInput
+            maxFontSizeMultiplier={MAX_FONT_SCALE}
             testID="library-search"
             value={query}
             onChangeText={setQuery}

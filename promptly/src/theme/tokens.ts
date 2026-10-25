@@ -114,3 +114,6 @@ export const motion = {
   base: 220,
   slow: 320,
 };
+
+/** Largest Dynamic Type / font-scale multiplier any app text grows to (Text and TextInput). */
+export const MAX_FONT_SCALE = 1.8;

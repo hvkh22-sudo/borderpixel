@@ -44,7 +44,7 @@ import { useAccess } from '../../state/access';
 import { useSettings } from '../../state/settings';
 import type { Recording } from '../../storage/repositories';
 import { useTheme } from '../../theme/ThemeProvider';
-import { radius, spacing, touchTarget } from '../../theme/tokens';
+import { MAX_FONT_SCALE, radius, spacing, touchTarget } from '../../theme/tokens';
 
 type Phase = 'idle' | 'working' | 'ready' | 'error';
 
@@ -304,6 +304,7 @@ export default function CaptionsEditor() {
               </Text>
             </Pressable>
             <TextInput
+              maxFontSizeMultiplier={MAX_FONT_SCALE}
               value={item.text}
               onChangeText={(v) => setCues((c) => updateCueText(c, item.id, v))}
               style={[styles.cueInput, { color: colors.text }, contentDirectionStyle(item.text)]}
