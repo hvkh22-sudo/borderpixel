@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react';
+import { HeaderHeightContext } from 'expo-router/react-navigation';
+import { useContext, type ReactNode } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 
@@ -16,6 +17,8 @@ interface Props {
 
 export function Screen({ children, scroll = true, edges = ['bottom'], footer, contentStyle, keyboard }: Props) {
   const { colors } = useTheme();
+  // The header grows with the text size, so offset by its measured height rather than a constant.
+  const headerHeight = useContext(HeaderHeightContext) ?? 90;
   const body = scroll ? (
     <ScrollView
       contentContainerStyle={[styles.content, contentStyle]}
@@ -36,7 +39,7 @@ export function Screen({ children, scroll = true, edges = ['bottom'], footer, co
   return (
     <SafeAreaView edges={edges} style={[styles.flex, { backgroundColor: colors.background }]}>
       {keyboard ? (
-        <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={90}>
+        <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={headerHeight}>
           {inner}
         </KeyboardAvoidingView>
       ) : (
