@@ -9,8 +9,7 @@ tags:
 - runFlow: shared/skip-onboarding.yaml
 
 # --- Create by typing (no clipboard needed) ---
-- tapOn:
-    id: home-create
+- runFlow: shared/open-create.yaml
 - takeScreenshot: screenshots/02-1-create-options
 - tapOn:
     id: create-blank

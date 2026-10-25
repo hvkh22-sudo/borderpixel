@@ -187,7 +187,9 @@ jobs:
           xcrun simctl launch "$UDID" app.promptly.placeholder ; sleep 20
           echo "--- smoke: app process" ; xcrun simctl spawn "$UDID" launchctl list | grep -i promptly || echo "NOT RUNNING"
           xcrun simctl io "$UDID" screenshot e2e-ios/launch.png
-          maestro --device "$UDID" test .maestro/ --exclude-tags camera,hebrew,tour --test-output-dir e2e-ios/out ; CODE=$?
+          # Actions runs bash with -e: capture the core result without ending the step, so the tours
+          # and the failure screenshots still run; the step fails at the end with this code.
+          CODE=0 ; maestro --device "$UDID" test .maestro/ --exclude-tags camera,hebrew,tour --test-output-dir e2e-ios/out || CODE=$?
           echo "--- Dark mode tour (08)"
           xcrun simctl ui "$UDID" appearance dark
           mkdir -p e2e-ios/dark

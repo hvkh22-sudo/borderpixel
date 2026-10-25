@@ -2,8 +2,7 @@
 # Ends on the Prepare (setup) screen.
 appId: app.promptly.placeholder
 ---
-- tapOn:
-    id: home-create
+- runFlow: open-create.yaml
 - tapOn:
     id: create-blank
 - extendedWaitUntil:

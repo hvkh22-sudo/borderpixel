@@ -35,8 +35,7 @@ tags:
     visible:
       id: home-create
     timeout: 10000
-- tapOn:
-    id: home-create
+- runFlow: shared/open-create.yaml
 - takeScreenshot: screenshots/08-${SHOT}-4-create
 - tapOn:
     id: create-blank

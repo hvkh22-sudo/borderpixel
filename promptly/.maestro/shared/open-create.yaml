@@ -1,0 +1,22 @@
+# Home → "Create a video" sheet. On a busy simulator the sheet can take a while to present, or the
+# tap lands during start-up and is lost, so wait for the options and tap again if they never came.
+appId: app.promptly.placeholder
+---
+- tapOn:
+    id: home-create
+- extendedWaitUntil:
+    visible:
+      id: create-blank
+    timeout: 8000
+    optional: true
+- runFlow:
+    when:
+      notVisible:
+        id: create-blank
+    commands:
+      - tapOn:
+          id: home-create
+- extendedWaitUntil:
+    visible:
+      id: create-blank
+    timeout: 15000
