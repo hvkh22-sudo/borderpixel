@@ -166,7 +166,7 @@ export default function Paywall() {
           </Text>
         ) : null}
       </ScrollView>
-      <View style={styles.footer}>
+      <View style={[styles.footer, { borderTopColor: colors.border }]}>
         <Button testID="paywall-subscribe" label={t('paywall.subscribe')} size="lg" onPress={buy} loading={busy} disabled={options.length === 0} />
         <Button testID="paywall-restore" label={t('paywall.restore')} variant="ghost" onPress={doRestore} disabled={busy} />
         <Text variant="caption" muted center>
@@ -190,6 +190,7 @@ const styles = StyleSheet.create({
   options: { gap: spacing.md },
   option: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg, borderRadius: radius.lg, borderWidth: 2 },
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.sm },
-  footer: { paddingHorizontal: spacing.xl, paddingBottom: spacing.md, gap: spacing.xs },
+  // Hairline marks where the plans scroll under the fixed purchase area (tall at large text sizes).
+  footer: { paddingHorizontal: spacing.xl, paddingTop: spacing.sm, paddingBottom: spacing.md, gap: spacing.xs, borderTopWidth: StyleSheet.hairlineWidth },
   links: { flexDirection: 'row', justifyContent: 'center' },
 });
