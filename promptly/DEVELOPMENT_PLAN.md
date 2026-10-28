@@ -66,7 +66,24 @@ Merged into `claude/youthful-volta-vdsr0x`, each with tests (375+ app tests, 50+
 6. Configure RevenueCat + store products; sandbox purchase test matrix (PUR-*).
 7. Add device attestation to the AI proxy before free-tier AI goes live.
 
-## Blockers
+## Code review of recording → export (2026-10-28)
+Fixed (unit-tested where JS; native compiled in CI, behaviour **not tested on a device**): Android back
+mid-take saved a silent take; mux reported success with no audio placed and the WAVs were deleted;
+Android mux placed unreadable segments untrimmed (shifting later audio); "saved without sound" was
+shown as a generic message; export double tap / cancel race; recording could start before the script loaded.
+Open (need a device or a design call):
+- Android Voice Follow: a recognizer error (e.g. `network`) or a failed `vf.start()` leaves the rest of
+  the take silent — the camera records video only. Options: keep the recognizer capturing audio after
+  errors, or stop the take and tell the user. Verify behaviour on a device first (VF-03).
+- Recognizer WAVs live in the cache dir until finalize; a crash mid-take loses the link (and the OS may
+  purge them). Fix: `recordingOptions.outputDirectory` under documents with a take-derived name — needs a
+  device check of the path format the library expects.
+- "Saved without sound" is only in the take URL; store it on the recording row so it survives reopening.
+- Stuck states: camera error before recording has no retry; `startRecording` / `muxAudio` have no timeout.
+- Android `muxAudio` reads segment durations on the main thread (jank with many segments).
+- Device-only: Media3 audio sequence starting with a gap; iOS caption text layer width slack.
+
+
 - No macOS/Xcode and no Android SDK in this container → native builds run in GitHub Actions instead; device tests need the founder's phones.
 - Store/developer accounts, RevenueCat project, Anthropic key: founder-owned.
 
