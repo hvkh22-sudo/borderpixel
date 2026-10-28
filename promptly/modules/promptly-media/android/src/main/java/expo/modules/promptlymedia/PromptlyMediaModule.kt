@@ -158,34 +158,43 @@ class PromptlyMediaModule : Module() {
       // Same placement rule as iOS: audio past the end of the video is dropped (otherwise the
       // longer audio sequence would extend the output past the last video frame), and a segment
       // entirely covered by earlier audio is skipped (a clip starting at/after its own end is invalid).
-      // Durations that cannot be read are 0 = unknown: the segment is then placed untrimmed.
+      // A segment whose duration cannot be read (0: unreadable, or an empty header-only WAV from a
+      // recognizer restart) is skipped, as on iOS: placed untrimmed it would shift every later segment
+      // by its real length and could run past the video.
       val videoMs = mediaDurationMs(videoUri)
       var cursorMs = 0.0
       var placedAudio = 0
       for (seg in segments.sortedBy { it.offsetMs }) {
         val segMs = mediaDurationMs(seg.uri)
+        if (segMs <= 0) continue
         val startMs = max(cursorMs, seg.offsetMs)
-        val segEndMs = if (segMs > 0) seg.offsetMs + segMs else Double.POSITIVE_INFINITY
+        val segEndMs = seg.offsetMs + segMs
         val endMs = if (videoMs > 0) min(segEndMs, videoMs) else segEndMs
         if (endMs <= startMs) continue
         if (startMs > cursorMs) audioSeq.addGap(((startMs - cursorMs) * 1000).toLong())
         val clip = MediaItem.ClippingConfiguration.Builder()
         // Overlap / audio started before the video: drop the leading part.
         if (startMs > seg.offsetMs) clip.setStartPositionMs((startMs - seg.offsetMs).toLong())
-        if (segMs > 0 && endMs < segEndMs) clip.setEndPositionMs((endMs - seg.offsetMs).toLong())
+        if (endMs < segEndMs) clip.setEndPositionMs((endMs - seg.offsetMs).toLong())
         val item = MediaItem.Builder().setUri(seg.uri).setClippingConfiguration(clip.build()).build()
         audioSeq.addItem(EditedMediaItem.Builder(item).setRemoveVideo(true).build())
         placedAudio++
-        cursorMs = if (segMs > 0) endMs else startMs
+        cursorMs = endMs
       }
-      val videoSeq = EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_VIDEO)).addItem(video).build()
-      // A sequence must contain at least one item.
-      val composition = if (placedAudio == 0) {
-        Composition.Builder(videoSeq).build()
+      // Segments were given but none landed inside the video: fail instead of exporting a silent
+      // take, so the caller keeps the WAVs rather than deleting audio that was never merged.
+      if (segments.isNotEmpty() && placedAudio == 0) {
+        promise.reject(CodedException("NoAudioPlaced", "No audio segment overlaps the video", null))
       } else {
-        Composition.Builder(videoSeq, audioSeq.build()).build()
+        val videoSeq = EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_VIDEO)).addItem(video).build()
+        // A sequence must contain at least one item.
+        val composition = if (placedAudio == 0) {
+          Composition.Builder(videoSeq).build()
+        } else {
+          Composition.Builder(videoSeq, audioSeq.build()).build()
+        }
+        runTransformer(jobId, outputUri, promise) { t, path -> t.start(composition, path) }
       }
-      runTransformer(jobId, outputUri, promise) { t, path -> t.start(composition, path) }
     }.runOnQueue(Queues.MAIN)
 
     AsyncFunction("extractAudioToWav") { inputUri: String, outputUri: String, sampleRate: Int ->

@@ -237,7 +237,11 @@ public final class PromptlyMediaModule: Module {
         cursor = end
         placedAudio = true
       }
-      if !placedAudio { composition.removeTrack(audioTrack) }
+      // Segments were given but none landed inside the video: fail instead of exporting a silent
+      // take, so the caller keeps the WAVs rather than deleting audio that was never merged.
+      if !placedAudio {
+        throw Exception(name: "NoAudioPlaced", description: "No audio segment overlaps the video")
+      }
     }
 
     try? FileManager.default.createDirectory(at: output.deletingLastPathComponent(), withIntermediateDirectories: true)
