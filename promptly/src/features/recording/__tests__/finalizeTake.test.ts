@@ -6,7 +6,7 @@ import { finalizeTake, type FinalizeInput } from '../finalizeTake';
 
 const mockFs = new Map<string, number>(); // uri -> size in bytes
 const mockFail = { copy: false, move: false };
-const mockRecordings: { id: string; fileName: string; status: string }[] = [];
+const mockRecordings: { id: string; fileName: string; status: string; audioMissing?: boolean }[] = [];
 const mockRepoFail = { add: false };
 const mockMux = jest.fn<Promise<string>, [string, { uri: string; offsetMs: number }[], string]>();
 const mockMuxAvailable = { value: true };
@@ -66,7 +66,7 @@ jest.mock('../../../services/db', () => ({
   getRepositories: async () => ({
     recordings: {
       list: async () => mockRecordings,
-      add: async (r: { id: string; fileName: string; status: string }) => {
+      add: async (r: { id: string; fileName: string; status: string; audioMissing?: boolean }) => {
         if (mockRepoFail.add) throw new Error('db');
         mockRecordings.push(r);
         return r;
@@ -180,6 +180,8 @@ describe('finalizeTake', () => {
       expect(mockRecordings[0]?.fileName).toBe('take_1.mp4');
       expect(mockFs.has(`${REC}/take_1.mp4`)).toBe(true);
       expect(mockFs.get(`${REC}/take_1_audio_0.wav`)).toBe(50);
+      // Stored on the row, so the take still says "no sound" when reopened from the library.
+      expect(mockRecordings[0]?.audioMissing).toBe(true);
     });
 
     it('treats an empty mux output or a failed move as a merge failure without losing anything', async () => {

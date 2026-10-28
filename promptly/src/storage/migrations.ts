@@ -52,6 +52,8 @@ export const MIGRATIONS: string[] = [
    );
    ALTER TABLE scripts ADD COLUMN folder_id TEXT;
    CREATE INDEX IF NOT EXISTS idx_scripts_folder ON scripts(folder_id);`,
+  // Separately captured audio (Voice Follow) could not be merged: the take is video only.
+  `ALTER TABLE recordings ADD COLUMN audio_missing INTEGER NOT NULL DEFAULT 0;`,
 ];
 
 export async function migrate(db: SqlExecutor): Promise<number> {

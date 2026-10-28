@@ -98,7 +98,7 @@ export default function Take() {
           </Text>
         )}
       </View>
-      {audioIssue ? (
+      {audioIssue || rec.audioMissing ? (
         <Text variant="callout" muted center accessibilityLiveRegion="polite">
           {t('record.savedNoAudio')}
         </Text>

@@ -126,6 +126,7 @@ async function finalizeNamed(input: FinalizeInput, id: string, inPlace: string |
     width: null,
     height: null,
     status: input.status ?? 'ready',
+    audioMissing: audioMergeFailed,
   });
   return { recordingId: id, audioMergeFailed };
 }

@@ -361,6 +361,8 @@ export interface Recording {
   captionPosition: CaptionPosition;
   savedToLibrary: boolean;
   status: RecordingStatusRow;
+  /** Saved without sound: the separately captured audio could not be merged (kept beside the file). */
+  audioMissing: boolean;
 }
 
 interface RecordingRow {
@@ -376,6 +378,7 @@ interface RecordingRow {
   caption_position: string;
   saved_to_library: number;
   status: string;
+  audio_missing?: number;
 }
 
 function parseCues(json: string | null): Cue[] | null {
@@ -401,14 +404,18 @@ const toRecording = (r: RecordingRow): Recording => ({
   captionPosition: r.caption_position === 'upper' || r.caption_position === 'middle' ? r.caption_position : 'lower',
   savedToLibrary: r.saved_to_library === 1,
   status: r.status === 'recovered' ? 'recovered' : 'ready',
+  audioMissing: r.audio_missing === 1,
 });
 
 export class RecordingRepository {
   constructor(private readonly deps: Deps) {}
 
-  async add(input: Omit<Recording, 'id' | 'createdAt' | 'cues' | 'captionStyle' | 'captionPosition' | 'savedToLibrary'> & { id?: string }): Promise<Recording> {
+  async add(
+    input: Omit<Recording, 'id' | 'createdAt' | 'cues' | 'captionStyle' | 'captionPosition' | 'savedToLibrary' | 'audioMissing'> & { id?: string; audioMissing?: boolean },
+  ): Promise<Recording> {
     const rec: Recording = {
       ...input,
+      audioMissing: input.audioMissing ?? false,
       id: input.id ?? this.deps.newId(),
       createdAt: this.deps.now(),
       cues: null,
@@ -417,9 +424,9 @@ export class RecordingRepository {
       savedToLibrary: false,
     };
     await this.deps.db.runAsync(
-      `INSERT INTO recordings (id, script_id, file_name, duration_ms, width, height, created_at, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [rec.id, rec.scriptId, rec.fileName, rec.durationMs, rec.width, rec.height, rec.createdAt, rec.status],
+      `INSERT INTO recordings (id, script_id, file_name, duration_ms, width, height, created_at, status, audio_missing)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [rec.id, rec.scriptId, rec.fileName, rec.durationMs, rec.width, rec.height, rec.createdAt, rec.status, rec.audioMissing ? 1 : 0],
     );
     return rec;
   }
