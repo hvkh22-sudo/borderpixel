@@ -1,7 +1,7 @@
 /* finalizeTake file-safety paths over an in-memory file system. */
 import { Platform } from 'react-native';
 
-import { finalizeTake, type FinalizeInput } from '../finalizeTake';
+import { finalizeTake, muxTimeoutMs, type FinalizeInput } from '../finalizeTake';
 
 
 const mockFs = new Map<string, number>(); // uri -> size in bytes
@@ -11,6 +11,7 @@ const mockRepoFail = { add: false };
 const mockMux = jest.fn<Promise<string>, [string, { uri: string; offsetMs: number }[], string]>();
 const mockMuxAvailable = { value: true };
 const mockLog = jest.fn();
+const mockCancel = jest.fn();
 
 jest.mock('expo-crypto', () => ({ randomUUID: () => 'uuid1' }));
 jest.mock('expo-file-system', () => {
@@ -78,7 +79,7 @@ jest.mock('../../../services/diagnosticsLog', () => ({ logDiagnostic: (...a: unk
 jest.mock('../../../services/nativeMedia', () => ({
   PromptlyMedia: {
     isAvailable: () => mockMuxAvailable.value,
-    muxAudio: (v: string, s: { uri: string; offsetMs: number }[], o: string) => ({ promise: mockMux(v, s, o) }),
+    muxAudio: (v: string, s: { uri: string; offsetMs: number }[], o: string) => ({ promise: mockMux(v, s, o), cancel: mockCancel }),
   },
 }));
 
@@ -182,6 +183,22 @@ describe('finalizeTake', () => {
       expect(mockFs.get(`${REC}/take_1_audio_0.wav`)).toBe(50);
       // Stored on the row, so the take still says "no sound" when reopened from the library.
       expect(mockRecordings[0]?.audioMissing).toBe(true);
+    });
+
+    it('gives up on a mux that never settles: cancels it and keeps the video and the audio', async () => {
+      jest.useFakeTimers();
+      try {
+        mockMux.mockReturnValue(new Promise<string>(() => {}));
+        const pending = finalizeTake({ ...base, separateAudio: [wav], expectSeparateAudio: true });
+        await jest.advanceTimersByTimeAsync(muxTimeoutMs(base.durationMs) + 1);
+        const r = await pending;
+        expect(mockCancel).toHaveBeenCalled();
+        expect(r.audioMergeFailed).toBe(true);
+        expect(mockFs.has(`${REC}/take_1.mp4`)).toBe(true);
+        expect(mockFs.has(`${REC}/take_1_audio_0.wav`)).toBe(true);
+      } finally {
+        jest.useRealTimers();
+      }
     });
 
     it('treats an empty mux output or a failed move as a merge failure without losing anything', async () => {

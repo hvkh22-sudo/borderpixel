@@ -75,11 +75,14 @@ async function finalizeNamed(input: FinalizeInput, id: string, inPlace: string |
         // directory, where orphan recovery would register it next to the raw take.
         const tmp = scratchFile(muxedName);
         if (tmp.exists) tmp.delete();
-        await PromptlyMedia.muxAudio(
+        const job = PromptlyMedia.muxAudio(
           raw.uri,
           input.separateAudio.map((a) => ({ uri: toFileUri(a.uri), offsetMs: a.startedAt - input.recordingStartedAt })),
           tmp.uri,
-        ).promise;
+        );
+        // A native call that never settles must not leave the take stuck in "finalizing": past the
+        // limit the job is cancelled and handled like any merge failure (video and WAVs kept).
+        await withTimeout(job.promise, muxTimeoutMs(input.durationMs), () => job.cancel());
         if (!exists(tmp)) throw new Error('mux produced no output');
         const dest = recordingFile(muxedName);
         await tmp.move(dest);
@@ -129,6 +132,26 @@ async function finalizeNamed(input: FinalizeInput, id: string, inPlace: string |
     audioMissing: audioMergeFailed,
   });
   return { recordingId: id, audioMergeFailed };
+}
+
+/** Generous: iOS re-encodes the video when adding audio. */
+export function muxTimeoutMs(durationMs: number): number {
+  return Math.max(120_000, durationMs * 3);
+}
+
+async function withTimeout<T>(promise: Promise<T>, ms: number, onTimeout: () => void): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      onTimeout();
+      reject(new Error('mux timed out'));
+    }, ms);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function deleteQuietly(f: File): void {

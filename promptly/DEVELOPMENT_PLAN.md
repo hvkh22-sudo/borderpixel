@@ -78,8 +78,8 @@ Open (need a device or a design call):
 - Recognizer WAVs live in the cache dir until finalize; a crash mid-take loses the link (and the OS may
   purge them). Fix: `recordingOptions.outputDirectory` under documents with a take-derived name — needs a
   device check of the path format the library expects.
-- "Saved without sound" is only in the take URL; store it on the recording row so it survives reopening.
-- Stuck states: camera error before recording has no retry; `startRecording` / `muxAudio` have no timeout.
+- ✅ "Saved without sound" is stored on the recording row (`audio_missing`) and shown when reopened.
+- Stuck states: camera error before recording has no retry. ✅ `muxAudio` now times out (max(2 min, 3× take length)) and is handled as a merge failure.
 - Android `muxAudio` reads segment durations on the main thread (jank with many segments).
 - Device-only: Media3 audio sequence starting with a gap; iOS caption text layer width slack.
 
