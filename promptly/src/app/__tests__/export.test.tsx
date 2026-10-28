@@ -8,7 +8,7 @@ import { createRepos, renderScreen } from './testUtils';
 
 let mockRepos: Awaited<ReturnType<typeof createRepos>>;
 const mockParams: Record<string, string> = {};
-const mockJob: { reject?: (e: Error) => void; cancel: jest.Mock } = { cancel: jest.fn() };
+const mockJob: { resolve?: (uri: string) => void; reject?: (e: Error) => void; cancel: jest.Mock; started: number } = { cancel: jest.fn(), started: 0 };
 
 jest.mock('../../services/db', () => ({ getRepositories: () => Promise.resolve(mockRepos) }));
 jest.mock('../../services/files', () => ({
@@ -18,11 +18,14 @@ jest.mock('../../services/files', () => ({
 jest.mock('../../services/deviceSupport', () => ({ support: { burnIn: () => ({ ok: true }) } }));
 jest.mock('../../services/nativeMedia', () => ({
   PromptlyMedia: {
-    burnInCaptions: () => ({
-      id: 'job1',
-      promise: new Promise<string>((_resolve, reject) => (mockJob.reject = reject)),
-      cancel: mockJob.cancel,
-    }),
+    burnInCaptions: () => {
+      mockJob.started++;
+      return {
+        id: 'job1',
+        promise: new Promise<string>((resolve, reject) => ((mockJob.resolve = resolve), (mockJob.reject = reject))),
+        cancel: mockJob.cancel,
+      };
+    },
   },
 }));
 jest.mock('expo-media-library', () => ({ requestPermissionsAsync: jest.fn(), Asset: { create: jest.fn() } }));
@@ -38,6 +41,8 @@ const cancelledError = (code: string) => Object.assign(new Error('Export cancell
 beforeEach(async () => {
   mockRepos = await createRepos();
   mockJob.cancel.mockClear();
+  mockJob.started = 0;
+  jest.mocked(require('expo-sharing').shareAsync).mockClear();
   const r = await mockRepos.recordings.add({ scriptId: null, fileName: 'take.mp4', durationMs: 4000, width: null, height: null, status: 'ready' });
   await mockRepos.recordings.saveCaptions(r.id, [{ id: 'c1', startMs: 0, endMs: 1000, text: 'Hello' }] as never, 'clean');
   mockParams.id = r.id;
@@ -62,5 +67,26 @@ describe('Export', () => {
     await screen.findByTestId('export-progress');
     mockJob.reject!(Object.assign(new Error('boom'), { code: 'ERR_EXPORT_FAILED' }));
     await waitFor(() => expect(screen.getByTestId('export-status')).toBeTruthy());
+  });
+
+  it('shares nothing when the burn-in finishes just as the user cancels', async () => {
+    const Export = require('../export/[id]').default;
+    await renderScreen(<Export />);
+    await fireEvent.press(await screen.findByTestId('export-share-video'));
+    await fireEvent.press(await screen.findByLabelText('Cancel'));
+    mockJob.resolve!('file:///cache/exports/captioned.mp4');
+    await new Promise((r) => setTimeout(r, 20));
+    expect(require('expo-sharing').shareAsync).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('export-status')).toBeNull();
+  });
+
+  it('starts one export for a quick double tap', async () => {
+    const Export = require('../export/[id]').default;
+    await renderScreen(<Export />);
+    const share = await screen.findByTestId('export-share-video');
+    fireEvent.press(share);
+    fireEvent.press(share);
+    await screen.findByTestId('export-progress');
+    expect(mockJob.started).toBe(1);
   });
 });

@@ -308,10 +308,11 @@ export const en = {
     voiceRetry: 'Retry Voice Follow',
     failed: 'Recording stopped unexpectedly.',
     failedRecovered: 'Recording stopped, but your take was saved.',
+    savedNoAudio: 'Saved without sound: the audio could not be added to this video.',
     interrupted: 'Recording was interrupted.',
     savedInterrupted: 'Recording was interrupted. Everything up to that point was saved.',
     savedStorageFull: 'Recording stopped because your device is almost out of storage. Your take was saved.',
-    discardTitle: 'Discard this take?',
+    discardTitle: 'Stop and save this take?',
     overlayNote: 'The script is visible to you only — it is not recorded.',
   },
   preview: {

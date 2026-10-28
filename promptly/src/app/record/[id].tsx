@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useKeepAwake } from 'expo-keep-awake';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, AppState, Linking, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Alert, AppState, BackHandler, Linking, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   Camera,
@@ -271,6 +271,8 @@ export default function RecordScreen() {
     if (state.status === 'recording' || state.status === 'starting') return void stopRecording();
     if (state.status === 'countdown') return dispatch({ type: 'CANCEL_COUNTDOWN' });
     if (state.status !== 'ready') return;
+    // Voice Follow is built from the script; starting before it loads would restart it mid-take.
+    if (script === null) return;
     if (voice && !checkFeature('voiceFollow', access, usage).allowed) {
       router.push('/paywall?trigger=voiceFollow');
       return;
@@ -318,6 +320,21 @@ export default function RecordScreen() {
     }
     router.back();
   };
+  // Android's back button must not leave mid-take: it goes through close() (stop and save), so the
+  // camera, recognizer and its audio files are finished before the screen unmounts.
+  const backRef = useRef(close);
+  useEffect(() => {
+    backRef.current = close;
+  });
+  const busyNow = isBusy(state.status);
+  useEffect(() => {
+    if (!busyNow) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      backRef.current();
+      return true;
+    });
+    return () => sub.remove();
+  }, [busyNow]);
 
   // ---------- Permission gate ----------
   if (!camPerm.hasPermission || !micPerm.hasPermission) {

@@ -39,6 +39,9 @@ export default function ExportScreen() {
   const jobRef = useRef<Job<string> | null>(null);
   /** Set when the user cancels a burn-in, whose job then rejects; that is not a failure. */
   const cancelledRef = useRef(false);
+  /** One export at a time: a quick double tap must not save two copies to Photos. */
+  const runningRef = useRef(false);
+  const [running, setRunning] = useState(false);
   const burnInAvailable = support.burnIn().ok;
   const access = useAccess((s) => s.access);
   const usage = useAccess((s) => s.usage);
@@ -79,9 +82,17 @@ export default function ExportScreen() {
   };
 
   const run = async (action: 'photos' | 'share') => {
+    if (runningRef.current) return;
+    runningRef.current = true;
+    setRunning(true);
     cancelledRef.current = false;
     try {
       const uri = await prepareVideo();
+      // The burn-in can finish just as Cancel is tapped; the user asked for nothing to be saved.
+      if (cancelledRef.current) {
+        setStatus({ kind: 'idle' });
+        return;
+      }
       if (action === 'photos') {
         const perm = await MediaLibrary.requestPermissionsAsync(true);
         if (!perm.granted) {
@@ -104,6 +115,9 @@ export default function ExportScreen() {
       }
       logDiagnostic('export', burnIn && hasCaptions ? `video_burn_in_${action}` : `video_${action}`, e);
       setStatus({ kind: 'error', message: t('export.failed') });
+    } finally {
+      runningRef.current = false;
+      setRunning(false);
     }
   };
 
@@ -121,7 +135,7 @@ export default function ExportScreen() {
     }
   };
 
-  const busy = status.kind === 'rendering';
+  const busy = status.kind === 'rendering' || running;
 
   return (
     <Screen>

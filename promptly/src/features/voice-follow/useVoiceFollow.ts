@@ -19,6 +19,9 @@ export interface VoiceFollowApi {
   resync(charOffset: number): void;
 }
 
+/** Longer than stop()'s wait for the last audioend, so an unmount never drops it. */
+const AUDIO_TAIL_MS = 2000;
+
 const IDLE: VoiceFollowSnapshot = { status: 'idle', cursor: -1, charOffset: 0, confidence: 0, error: null };
 
 export function useVoiceFollow(script: string): VoiceFollowApi {
@@ -49,12 +52,15 @@ export function useVoiceFollow(script: string): VoiceFollowApi {
         track({ name: 'voice_follow_failed', code });
       }),
       engine.onEnd(() => controller.handleSessionEnd()),
-      engine.onAudioPersisted((a) => persisted.current.push(a)),
     ];
+    const audioSub = engine.onAudioPersisted((a) => persisted.current.push(a));
     const tick = setInterval(() => active.current && controller.tick(Date.now()), 250);
     return () => {
       unsub();
       subs.forEach((u) => u());
+      // The last file's audioend arrives after the recognizer stops; if the screen unmounts mid-take,
+      // keep listening briefly so the take being finished still gets the speaker's audio.
+      setTimeout(audioSub, AUDIO_TAIL_MS);
       clearInterval(tick);
       gen.current++;
       if (active.current) void engine.stop().catch(() => {});

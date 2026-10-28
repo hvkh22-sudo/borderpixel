@@ -99,8 +99,8 @@ export default function Take() {
         )}
       </View>
       {audioIssue ? (
-        <Text variant="callout" muted center>
-          {t('record.failedRecovered')}
+        <Text variant="callout" muted center accessibilityLiveRegion="polite">
+          {t('record.savedNoAudio')}
         </Text>
       ) : null}
       {notice === 'interrupted' || notice === 'storage_full' ? (

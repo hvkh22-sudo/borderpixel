@@ -325,10 +325,11 @@ export const he: Strings = {
     voiceRetry: 'הפעלה מחדש של מעקב קולי',
     failed: 'ההקלטה נעצרה באופן לא צפוי.',
     failedRecovered: 'ההקלטה נעצרה, אבל הטייק נשמר.',
+    savedNoAudio: 'נשמר בלי קול: לא הצלחנו לצרף את האודיו לסרטון.',
     interrupted: 'ההקלטה הופסקה.',
     savedInterrupted: 'ההקלטה הופסקה. כל מה שהוקלט עד אז נשמר.',
     savedStorageFull: 'ההקלטה נעצרה כי האחסון במכשיר כמעט מלא. הטייק נשמר.',
-    discardTitle: 'למחוק את הטייק הזה?',
+    discardTitle: 'לעצור ולשמור את הטייק?',
     overlayNote: 'רק אתם רואים את התסריט — הוא לא מוקלט.',
   },
   preview: {
