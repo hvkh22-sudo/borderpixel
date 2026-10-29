@@ -189,7 +189,14 @@ jobs:
           xcrun simctl io "$UDID" screenshot e2e-ios/launch.png
           # Actions runs bash with -e: capture the core result without ending the step, so the tours
           # and the failure screenshots still run; the step fails at the end with this code.
-          CODE=0 ; maestro --device "$UDID" test .maestro/ --exclude-tags camera,hebrew,tour --test-output-dir e2e-ios/out || CODE=$?
+          # The XCTest driver sometimes needs more than Maestro's default to come up on a cold simulator.
+          export MAESTRO_DRIVER_STARTUP_TIMEOUT=240000
+          CODE=0 ; maestro --device "$UDID" test .maestro/ --exclude-tags camera,hebrew,tour --test-output-dir e2e-ios/out 2>&1 | tee e2e-ios/core.log ; CODE=${PIPESTATUS[0]}
+          # One retry, only when the driver never started: an app failure is not retried.
+          if [ "$CODE" != 0 ] && grep -q "driver not ready in time" e2e-ios/core.log; then
+            echo "Core flows: driver did not start, retrying once"
+            CODE=0 ; maestro --device "$UDID" test .maestro/ --exclude-tags camera,hebrew,tour --test-output-dir e2e-ios/out || CODE=$?
+          fi
           echo "--- Dark mode tour (08)"
           xcrun simctl ui "$UDID" appearance dark
           mkdir -p e2e-ios/dark
