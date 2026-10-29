@@ -32,18 +32,17 @@ export class AnthropicLlm implements LlmClient {
   constructor(
     apiKey: string,
     private readonly model: string,
-    private readonly maxTokens: number,
   ) {
-    // SDK retries 429/5xx with backoff; keep it short so the app's 45 s timeout holds.
-    this.client = new Anthropic({ apiKey, maxRetries: 1, timeout: 40_000 });
+    // No SDK retries: a retried call can be billed twice and outlast the app's 45 s timeout.
+    this.client = new Anthropic({ apiKey, maxRetries: 0, timeout: 40_000 });
   }
 
-  async complete(system: string, user: string, _wantsAlternatives: boolean, signal?: AbortSignal): Promise<LlmResult> {
+  async complete(system: string, user: string, _wantsAlternatives: boolean, maxTokens: number, signal?: AbortSignal): Promise<LlmResult> {
     try {
       const response = await this.client.messages.parse(
         {
           model: this.model,
-          max_tokens: this.maxTokens,
+          max_tokens: maxTokens,
           system,
           messages: [{ role: 'user', content: user }],
           output_config: { effort: 'low', format: zodOutputFormat(OutputSchema) },

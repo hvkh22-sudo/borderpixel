@@ -2,17 +2,23 @@
 
 Cloudflare Worker, `POST /v1/studio`, `GET /v1/balance`, `POST /v1/integrity/challenge`, `POST /v1/integrity/attest`. Header `x-app-user-id` = RevenueCat app user ID.
 
-Pipeline: validate (size ≤ 32 KB, field limits, enums) → per-IP daily limit → global daily budget →
-entitlement (RevenueCat REST, cached 10 min) → device integrity (see below) → atomic quota consume (Durable Object) → Claude call via
-`@anthropic-ai/sdk` `messages.parse` with a Zod schema (`{script, alternatives}`), `effort: low`,
-`max_tokens` 4000, 40 s timeout, 1 SDK retry → spend accounting → response. Billed usage (also of refused or unusable answers) always counts toward the daily budget. Aborts and upstream failures refund quota; a refused or unusable answer keeps its charge (it consumed a completion).
+Pipeline: validate (body ≤ 64 KB read with a byte cap — chunked bodies too; field limits, enums, language tag) →
+per-IP daily limit (IPv6 keyed on its /64) → entitlement (RevenueCat REST, cached 10 min) → device integrity (see below) →
+atomic quota consume (Durable Object) → **budget reservation**: the request's worst-case cost (input bounded by
+characters, output by `max_tokens`) is atomically reserved against the daily cap before the call, and for free-tier
+requests also against the free share (`FREE_BUDGET_SHARE`, default 50 %), so concurrent requests can't overshoot and
+free traffic can't lock out payers → Claude call via `@anthropic-ai/sdk` `messages.parse` with a Zod schema
+(`{script, alternatives}`), `effort: low`, `max_tokens` 4000 (hook: 800), 40 s timeout, **no SDK retry** → the
+reservation is settled to the billed usage. Unknown bill (timeout, connection loss): the worst case stays counted;
+rejected before generation (429/overloaded): released. Provider failures refund the user's quota; a refused or unusable
+answer, or a request the client abandoned, keeps its charge. `/v1/balance` and `/v1/integrity/*` are also IP-limited.
 
 Quotas (env, provisional): free 5/month, subscription 150/month, lifetime 300 total, +100 per credit pack.
 Errors: 400 invalid, 401 bad id, 402 quota, 403 integrity required (enforce, free tier), 413 too large, 429 rate limited, 422 refused, 502 upstream,
 503 budget exhausted / disabled / entitlement lookup failed.
 
-Prompt-injection hardening: creator text wrapped in `<creator_input>` tags and declared as data in the
-system prompt; output is plain text shown as an editable draft (no tools, no actions).
+Prompt-injection hardening: creator text wrapped in `<creator_input>` tags (a tag inside the text is neutralized so it
+can't close the data block) and declared as data in the system prompt; output is plain text shown as an editable draft (no tools, no actions).
 
 Privacy: logs contain tool, plan, token counts, latency — never content. Anthropic API data handling per
 Anthropic's commercial terms (to be disclosed in the privacy policy).

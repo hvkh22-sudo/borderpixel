@@ -57,6 +57,8 @@ function setup(opts: { mode?: IntegrityMode; ent?: Entitlement; play?: (token: s
       dailyBudgetUsd: 100,
       inputUsdPerMTok: 4,
       outputUsdPerMTok: 20,
+      maxOutputTokens: 1000,
+      freeBudgetShare: 1,
     },
     log: (e) => logs.push(e),
     integrity: {

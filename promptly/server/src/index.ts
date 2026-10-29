@@ -24,6 +24,8 @@ export interface Env {
   DAILY_BUDGET_USD: string;
   INPUT_USD_PER_MTOK: string;
   OUTPUT_USD_PER_MTOK: string;
+  /** Share of the daily budget the free tier may use (0..1, default 0.5): free traffic can't lock out payers. */
+  FREE_BUDGET_SHARE?: string;
   /** Kill switch: anything but "true" disables AI (no billable calls). */
   AI_ENABLED: string;
   /** Device integrity enforcement: off | report (default) | enforce. */
@@ -61,6 +63,12 @@ export class Counters extends DurableObject {
     await this.ctx.storage.put(key, v);
     return v;
   }
+  async reserve(key: string, amount: number, limit: number): Promise<boolean> {
+    const v = ((await this.ctx.storage.get<number>(key)) ?? 0) + amount;
+    if (v > limit) return false;
+    await this.ctx.storage.put(key, v);
+    return true;
+  }
   async cacheGet(key: string, now: number): Promise<unknown> {
     const e = await this.ctx.storage.get<{ value: unknown; expiresAt: number }>(`cache:${key}`);
     return e && e.expiresAt > now ? e.value : null;
@@ -96,6 +104,9 @@ class DurableQuotaStore implements QuotaStore {
   }
   add(scope: string, key: string, amount: number) {
     return this.stub(scope).add(key, amount);
+  }
+  reserve(scope: string, key: string, amount: number, limit: number) {
+    return this.stub(scope).reserve(key, amount, limit);
   }
   async cacheGet<T>(scope: string, key: string, now: number) {
     return (await this.stub(scope).cacheGet(key, now)) as T | null;
@@ -146,10 +157,12 @@ export default {
       dailyBudgetUsd: num(env.DAILY_BUDGET_USD, 5),
       inputUsdPerMTok: num(env.INPUT_USD_PER_MTOK, 4),
       outputUsdPerMTok: num(env.OUTPUT_USD_PER_MTOK, 20),
+      maxOutputTokens: num(env.MAX_OUTPUT_TOKENS, 4000),
+      freeBudgetShare: Math.min(1, num(env.FREE_BUDGET_SHARE, 0.5)),
     };
     return handle(req, {
       store: new DurableQuotaStore(env.COUNTERS),
-      llm: new AnthropicLlm(env.ANTHROPIC_API_KEY, env.MODEL, num(env.MAX_OUTPUT_TOKENS, 4000)),
+      llm: new AnthropicLlm(env.ANTHROPIC_API_KEY, env.MODEL),
       entitlement: (id) => fetchEntitlement(id, env.REVENUECAT_SECRET_KEY, Date.now()),
       now: Date.now,
       config,

@@ -1,7 +1,7 @@
 /**
  * Request handling, independent of the Workers runtime (fully unit-tested).
- * Order: validate → IP limit → global budget → entitlement → device integrity →
- * quota → LLM → account spend. Script text is never logged.
+ * Order: validate → IP limit → entitlement → device integrity → quota →
+ * budget reservation (worst case) → LLM → settle spend. Script text is never logged.
  */
 import {
   INTEGRITY_DEFAULTS,
@@ -26,6 +26,10 @@ export interface HandlerConfig {
   dailyBudgetUsd: number;
   inputUsdPerMTok: number;
   outputUsdPerMTok: number;
+  /** Output cap per request (the hook tool uses less). */
+  maxOutputTokens: number;
+  /** Share of the daily budget free-tier requests may use, so free traffic can't lock out payers. */
+  freeBudgetShare: number;
 }
 
 export interface Deps {
@@ -56,6 +60,8 @@ const json = (status: number, body: unknown) =>
 const USER_ID_RE = /^[A-Za-z0-9$:_\-.]{8,128}$/;
 const ENTITLEMENT_TTL_MS = 10 * 60 * 1000;
 const MICRO = 1_000_000;
+/** Three one- or two-sentence openings fit comfortably. */
+const HOOK_MAX_TOKENS = 800;
 
 function periodKeys(now: number) {
   const d = new Date(now);
@@ -100,11 +106,50 @@ async function remainingFor(store: QuotaStore, scope: string, q: ReturnType<type
   return Math.max(0, q.base.limit - baseUsed) + Math.max(0, q.credits.limit - creditsUsed);
 }
 
+/** Reads at most `max` bytes: a chunked body without content-length cannot make us buffer more. */
+async function readCapped(req: Request, max: number): Promise<string | null> {
+  if (!req.body) return '';
+  const reader = req.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > max) {
+      await reader.cancel().catch(() => {});
+      return null;
+    }
+    chunks.push(value);
+  }
+  const all = new Uint8Array(size);
+  let at = 0;
+  for (const c of chunks) {
+    all.set(c, at);
+    at += c.byteLength;
+  }
+  return new TextDecoder().decode(all);
+}
+
+/**
+ * Rate-limit key for a client address. IPv6 is keyed on its /64 (one subscriber's whole block);
+ * a missing address shares one bucket.
+ */
+export function ipKey(ip: string | null): string {
+  if (!ip) return 'ip:unknown';
+  if (!ip.includes(':')) return `ip:${ip}`;
+  const [head = ''] = ip.split('::');
+  const groups = head.split(':').filter(Boolean);
+  // "::" elides zero groups; anything shorter than four groups before it is padded with zeros.
+  const prefix = ip.includes('::') && groups.length < 4 ? [...groups, ...Array(4 - groups.length).fill('0')] : ip.split(':').slice(0, 4);
+  return `ip6:${prefix.map((g) => g.toLowerCase().replace(/^0+(?=.)/, '')).join(':')}::/64`;
+}
+
 async function readJson(req: Request): Promise<{ raw: string; body: unknown } | { error: Response }> {
   const length = Number(req.headers.get('content-length') ?? '0');
   if (length > LIMITS.maxBodyBytes) return { error: json(413, { error: 'too_large' }) };
-  const raw = await req.text();
-  if (raw.length > LIMITS.maxBodyBytes) return { error: json(413, { error: 'too_large' }) };
+  const raw = await readCapped(req, LIMITS.maxBodyBytes);
+  if (raw === null) return { error: json(413, { error: 'too_large' }) };
   try {
     return { raw, body: JSON.parse(raw) };
   } catch {
@@ -118,8 +163,18 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
   if (!USER_ID_RE.test(userId)) return json(401, { error: 'unauthorized' });
   const { month, day, monthResetsAt } = periodKeys(deps.now());
 
+  const ip = ipKey(req.headers.get('cf-connecting-ip'));
+
   if (req.method === 'GET' && url.pathname === '/v1/balance') {
-    const { e } = await resolveEntitlement(deps, userId);
+    // Each unknown user id costs a RevenueCat lookup: bounded per address like the studio route.
+    const ipBalance = await deps.store.consume(ip, `b:${day}`, deps.config.ipPerDay * 5);
+    if (!ipBalance.allowed) return json(429, { error: 'rate_limited' });
+    let e: Entitlement;
+    try {
+      ({ e } = await resolveEntitlement(deps, userId));
+    } catch {
+      return json(503, { error: 'entitlement_unavailable' });
+    }
     const q = quotaFor(e, deps.config, month);
     const remaining = await remainingFor(deps.store, `user:${userId}`, q);
     return json(200, { remaining, resetsAt: q.resets ? monthResetsAt : null, plan: e.plan });
@@ -130,6 +185,8 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
 
   if (req.method === 'POST' && url.pathname.startsWith('/v1/integrity/')) {
     if (integrity.config.mode === 'off') return json(404, { error: 'integrity_disabled' });
+    const ipIntegrity = await deps.store.consume(ip, `i:${day}`, deps.config.ipPerDay * 5);
+    if (!ipIntegrity.allowed) return json(429, { error: 'rate_limited' });
     if (url.pathname === '/v1/integrity/challenge') {
       const c = await issueChallenge(ctx, userId, day);
       return c ? json(200, c) : json(429, { error: 'rate_limited' });
@@ -156,15 +213,8 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
   const parsed = parseStudioRequest(body);
   if ('error' in parsed) return json(400, { error: parsed.error });
 
-  const ip = req.headers.get('cf-connecting-ip') ?? 'unknown';
-  const ipCheck = await deps.store.consume(`ip:${ip}`, `d:${day}`, deps.config.ipPerDay);
+  const ipCheck = await deps.store.consume(ip, `d:${day}`, deps.config.ipPerDay);
   if (!ipCheck.allowed) return json(429, { error: 'rate_limited' });
-
-  const spentMicro = await deps.store.get('global', `spend:${day}`);
-  if (spentMicro >= deps.config.dailyBudgetUsd * MICRO) {
-    deps.log({ event: 'budget_exhausted', day });
-    return json(503, { error: 'temporarily_unavailable' });
-  }
 
   let ent: Entitlement;
   let entFetchedAt: number;
@@ -217,13 +267,33 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
   if (!charge.allowed) return json(402, { error: 'quota_exceeded', remaining: 0 });
   const { q, chargedKey } = charge;
 
-  const started = deps.now();
   const { prompt, wantsAlternatives } = buildUserPrompt(parsed);
-  const recordSpend = (u: LlmUsage) =>
-    deps.store.add('global', `spend:${day}`, Math.ceil(u.inputTokens * deps.config.inputUsdPerMTok + u.outputTokens * deps.config.outputUsdPerMTok));
+  const maxTokens = parsed.tool === 'hook' ? Math.min(HOOK_MAX_TOKENS, deps.config.maxOutputTokens) : deps.config.maxOutputTokens;
+  const costMicro = (u: LlmUsage) => Math.ceil(u.inputTokens * deps.config.inputUsdPerMTok + u.outputTokens * deps.config.outputUsdPerMTok);
+  // Worst case is reserved before the call (atomic, so concurrent requests can't overshoot the cap);
+  // input tokens are bounded by characters. Settled to the billed usage afterwards.
+  const reserved = costMicro({ inputTokens: SYSTEM_PROMPT.length + prompt.length, outputTokens: maxTokens });
+  const budgetKeys = [{ key: `spend:${day}`, limit: deps.config.dailyBudgetUsd * MICRO }];
+  if (ent.plan === 'free') budgetKeys.unshift({ key: `spend_free:${day}`, limit: deps.config.dailyBudgetUsd * deps.config.freeBudgetShare * MICRO });
+  const held: string[] = [];
+  for (const b of budgetKeys) {
+    if (!(await deps.store.reserve('global', b.key, reserved, b.limit))) {
+      for (const k of held) await deps.store.add('global', k, -reserved);
+      await deps.store.refund(scope, chargedKey);
+      deps.log({ event: 'budget_exhausted', day, plan: ent.plan });
+      return json(503, { error: 'temporarily_unavailable' });
+    }
+    held.push(b.key);
+  }
+  /** Moves the reservation to the billed amount (worst case stays when the bill is unknown). */
+  const settle = async (billedMicro: number) => {
+    for (const k of held) await deps.store.add('global', k, billedMicro - reserved);
+  };
+
+  const started = deps.now();
   try {
-    const out = await deps.llm.complete(SYSTEM_PROMPT, prompt, wantsAlternatives, req.signal);
-    await recordSpend(out);
+    const out = await deps.llm.complete(SYSTEM_PROMPT, prompt, wantsAlternatives, maxTokens, req.signal);
+    await settle(costMicro(out));
     deps.log({ event: 'studio_ok', tool: parsed.tool, plan: ent.plan, in: out.inputTokens, out: out.outputTokens, ms: deps.now() - started });
     const response: StudioResponse = {
       text: out.text,
@@ -233,11 +303,13 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
     return json(200, response);
   } catch (e) {
     const kind = e instanceof LlmError ? e.kind : 'upstream';
-    // Whatever the provider billed counts toward the daily budget.
-    if (e instanceof LlmError && e.usage) await recordSpend(e.usage);
-    // A refused or unusable answer consumed a completion, so it keeps its charge
-    // (otherwise it could be retried for free). Aborts and upstream failures are refunded.
-    if (kind !== 'refused' && kind !== 'bad_output') await deps.store.refund(scope, chargedKey);
+    // Whatever the provider billed counts toward the daily budget. Rejected before generation
+    // (429/overloaded): nothing billed. Otherwise unknown (timeout, disconnect): the worst case stays.
+    if (e instanceof LlmError && e.usage) await settle(costMicro(e.usage));
+    else if (kind === 'rate_limited' || kind === 'overloaded') await settle(0);
+    // A refused or unusable answer consumed a completion, so it keeps its charge (otherwise it could
+    // be retried for free); so does a request the client abandoned. Provider failures are refunded.
+    if (kind !== 'refused' && kind !== 'bad_output' && kind !== 'aborted') await deps.store.refund(scope, chargedKey);
     deps.log({ event: 'studio_error', tool: parsed.tool, plan: ent.plan, kind, ms: deps.now() - started });
     if (kind === 'rate_limited') return json(429, { error: 'rate_limited' });
     if (kind === 'refused') return json(422, { error: 'refused' });

@@ -35,5 +35,5 @@ export interface LlmResult {
 }
 
 export interface LlmClient {
-  complete(system: string, user: string, wantsAlternatives: boolean, signal?: AbortSignal): Promise<LlmResult>;
+  complete(system: string, user: string, wantsAlternatives: boolean, maxTokens: number, signal?: AbortSignal): Promise<LlmResult>;
 }

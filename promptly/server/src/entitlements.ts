@@ -30,8 +30,10 @@ export function entitlementFromRevenueCat(body: RcSubscriberResponse, now: numbe
   if (owned(LIFETIME_PRODUCT) > 0) return { plan: 'lifetime', creditPacks };
   const pro = sub.entitlements?.[ENTITLEMENT_ID];
   if (pro) {
-    if (pro.product_identifier === LIFETIME_PRODUCT) return { plan: 'lifetime', creditPacks };
-    if (pro.expires_date === null || Date.parse(pro.expires_date) > now) return { plan: 'subscription', creditPacks };
+    // No expiry (lifetime product, or a promotional/manual grant): the one-time lifetime allowance,
+    // never a monthly allowance that would renew forever.
+    if (pro.product_identifier === LIFETIME_PRODUCT || pro.expires_date === null) return { plan: 'lifetime', creditPacks };
+    if (Date.parse(pro.expires_date) > now) return { plan: 'subscription', creditPacks };
   }
   return { plan: 'free', creditPacks };
 }

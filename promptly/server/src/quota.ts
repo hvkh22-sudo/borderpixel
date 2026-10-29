@@ -10,6 +10,8 @@ export interface QuotaStore {
   get(scope: string, key: string): Promise<number>;
   /** Adds to a floating-point counter (spend in micro-dollars stored as integer). */
   add(scope: string, key: string, amount: number): Promise<number>;
+  /** Atomically adds `amount` iff the result stays <= limit (budget reservation). */
+  reserve(scope: string, key: string, amount: number, limit: number): Promise<boolean>;
   /** Small JSON cache with TTL (entitlements). */
   cacheGet<T>(scope: string, key: string, now: number): Promise<T | null>;
   cachePut<T>(scope: string, key: string, value: T, expiresAt: number): Promise<void>;
@@ -43,6 +45,13 @@ export class MemoryQuotaStore implements QuotaStore {
     const v = (this.counters.get(id) ?? 0) + amount;
     this.counters.set(id, v);
     return v;
+  }
+  async reserve(scope: string, key: string, amount: number, limit: number) {
+    const id = this.k(scope, key);
+    const v = (this.counters.get(id) ?? 0) + amount;
+    if (v > limit) return false;
+    this.counters.set(id, v);
+    return true;
   }
   async cacheGet<T>(scope: string, key: string, now: number) {
     const e = this.cache.get(this.k(scope, key));

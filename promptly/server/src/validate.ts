@@ -27,7 +27,10 @@ export function parseStudioRequest(body: unknown): StudioRequest | { error: stri
   if (!isStr(b.topic, LIMITS.maxTopicChars)) return { error: 'topic_too_long' };
   if (!isStr(b.keyPoints, LIMITS.maxKeyPointsChars)) return { error: 'key_points_too_long' };
   if (!isStr(b.audience, LIMITS.maxAudienceChars)) return { error: 'audience_too_long' };
-  if (!isStr(b.language, 20)) return { error: 'invalid_language' };
+  // A language tag (e.g. "he", "en-US"): it is placed in the prompt outside the data tags.
+  if (b.language !== undefined && (typeof b.language !== 'string' || !/^[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8}){0,2}$/.test(b.language))) {
+    return { error: 'invalid_language' };
+  }
   if (b.platform !== undefined && (typeof b.platform !== 'string' || !PLATFORMS.has(b.platform))) return { error: 'invalid_platform' };
   if (b.tone !== undefined && (typeof b.tone !== 'string' || !TONES.has(b.tone))) return { error: 'invalid_tone' };
   if (

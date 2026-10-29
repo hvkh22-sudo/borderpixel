@@ -34,7 +34,7 @@ async function main() {
 
   const rows: Row[] = [];
   for (const model of models) {
-    const llm = new AnthropicLlm(key, model, maxTokens);
+    const llm = new AnthropicLlm(key, model);
     for (const c of CASES) rows.push(await runCase(llm, model, c));
   }
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -63,7 +63,7 @@ async function runCase(llm: AnthropicLlm, model: string, c: EvalCase): Promise<R
   const { prompt, wantsAlternatives } = buildUserPrompt(c.request);
   const started = Date.now();
   try {
-    const out = await llm.complete(SYSTEM_PROMPT, prompt, wantsAlternatives);
+    const out = await llm.complete(SYSTEM_PROMPT, prompt, wantsAlternatives, maxTokens);
     const p = PRICES[model]!;
     return {
       model,

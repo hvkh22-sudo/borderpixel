@@ -24,8 +24,11 @@ Reply in the same language as the creator's input unless a target language is gi
 
 const wordsFor = (sec?: number) => (sec ? Math.round((sec / 60) * 150) : undefined);
 
+/** Creator text must not be able to close its data tag and continue as instructions. */
+const neutralize = (text: string) => text.replace(/<(\/?)\s*creator_input/gi, '<$1creator-input');
+
 function wrap(label: string, text?: string): string {
-  return text ? `<creator_input name="${label}">\n${text}\n</creator_input>\n` : '';
+  return text ? `<creator_input name="${label}">\n${neutralize(text)}\n</creator_input>\n` : '';
 }
 
 export function buildUserPrompt(r: StudioRequest): { prompt: string; wantsAlternatives: boolean } {
