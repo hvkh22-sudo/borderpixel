@@ -404,6 +404,19 @@ describe('RecordingSession', () => {
     expect(h2.session.getState()).toMatchObject({ status: 'unrecoverableFailure', error: 'camera_unavailable' });
   });
 
+  it('recovers from a camera error before a take: when the camera restarts, or via Try again', () => {
+    const h = setup();
+    h.session.cameraError();
+    expect(h.status()).toBe('unrecoverableFailure');
+    h.session.cameraStarted();
+    expect(h.status()).toBe('ready');
+    h.session.cameraError();
+    h.session.retryCamera();
+    expect(h.status()).toBe('preparing');
+    h.session.cameraStarted();
+    expect(h.status()).toBe('ready');
+  });
+
   it('prepare goes straight to ready when the camera already runs', () => {
     const h = setup();
     h.session.dispatch({ type: 'DISCARD' });

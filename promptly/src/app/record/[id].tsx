@@ -61,6 +61,7 @@ export default function RecordScreen() {
   const usage = useAccess((s) => s.usage);
 
   const [script, setScript] = useState<string | null>(null);
+  const [cameraKey, setCameraKey] = useState(0);
   const [position, setPosition] = useState(cameraSettings.position);
   const [playing, setPlaying] = useState(false);
   const [countdown, setCountdown] = useState(0);
@@ -386,6 +387,7 @@ export default function RecordScreen() {
   return (
     <View style={styles.root}>
       <Camera
+        key={cameraKey}
         style={StyleSheet.absoluteFill}
         isActive={appActive}
         device={position}
@@ -477,6 +479,18 @@ export default function RecordScreen() {
                 {noticeMessage}
               </Text>
               {state.status === 'recoverableFailure' ? <Button label={t('common.retry')} variant="secondary" onPress={() => session.retry()} /> : null}
+              {state.status === 'unrecoverableFailure' && state.error === 'camera_unavailable' ? (
+                <Button
+                  testID="record-camera-retry"
+                  label={t('common.retry')}
+                  variant="secondary"
+                  onPress={() => {
+                    session.retryCamera();
+                    // A camera that errored may not restart by itself: mount a fresh one.
+                    setCameraKey((k) => k + 1);
+                  }}
+                />
+              ) : null}
             </View>
           ) : !recording && lowStorageSec < 300 ? (
             <Text variant="caption" color={palette.amber500} center>

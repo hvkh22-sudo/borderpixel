@@ -79,7 +79,7 @@ Open (need a device or a design call):
   purge them). Fix: `recordingOptions.outputDirectory` under documents with a take-derived name — needs a
   device check of the path format the library expects.
 - ✅ "Saved without sound" is stored on the recording row (`audio_missing`) and shown when reopened.
-- Stuck states: camera error before recording has no retry. ✅ `muxAudio` now times out (max(2 min, 3× take length)) and is handled as a merge failure.
+- ✅ Camera error before recording: "Try again" remounts the camera, and a camera that comes back by itself returns to ready. `muxAudio` now times out (max(2 min, 3× take length)) and is handled as a merge failure.
 - Android `muxAudio` reads segment durations on the main thread (jank with many segments).
 - Device-only: Media3 audio sequence starting with a gap; iOS caption text layer width slack.
 

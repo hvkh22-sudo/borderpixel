@@ -166,7 +166,18 @@ export class RecordingSession {
 
   cameraStarted(): void {
     this.cameraRunning = true;
+    // The camera came back after an error with no take running (another app released it): ready again.
+    if (!this.take && this.state.status === 'unrecoverableFailure' && this.state.error === 'camera_unavailable') {
+      this.dispatch({ type: 'PREPARE' });
+    }
     this.dispatch({ type: 'CAMERA_READY' });
+  }
+
+  /** "Try again" after the camera failed before a take; the screen also remounts the camera. */
+  retryCamera(): void {
+    if (this.take || this.state.error !== 'camera_unavailable') return;
+    this.cameraRunning = false;
+    this.dispatch({ type: 'PREPARE' });
   }
 
   cameraStopped(): void {
@@ -184,6 +195,7 @@ export class RecordingSession {
       return;
     }
     if (this.state.status === 'countdown') this.dispatch({ type: 'CANCEL_COUNTDOWN' });
+    this.cameraRunning = false;
     this.dispatch({ type: 'FAILED', error: 'camera_unavailable' });
   }
 
