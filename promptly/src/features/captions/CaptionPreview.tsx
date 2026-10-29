@@ -1,7 +1,7 @@
 /** In-app caption rendering that mirrors the native burn-in styles. */
 import { StyleSheet, Text, View } from 'react-native';
 
-import { detectDirection } from '../teleprompter/textDirection';
+import { majorityDirection } from '../teleprompter/textDirection';
 import { CAPTION_POSITION_Y, CAPTION_STYLES, type CaptionPosition, type CaptionStyleId } from './captionStyles';
 
 interface Props {
@@ -36,7 +36,7 @@ export function CaptionPreview({ text, styleId, position, frameWidth, activeWord
             fontWeight: s.fontWeight,
             color: s.textColor,
             textAlign: 'center',
-            writingDirection: detectDirection(text),
+            writingDirection: majorityDirection(text),
             textShadowColor: s.strokeColor ?? 'transparent',
             textShadowRadius: s.strokeColor ? frameWidth * s.strokeWidthRatio * 2 : 0,
           }}

@@ -42,3 +42,12 @@ describe('scriptTextAlign', () => {
     expect(scriptTextAlign('left', 'ltr', true)).toBe('right');
   });
 });
+
+describe('majorityDirection (captions)', () => {
+  const { majorityDirection } = require('../textDirection') as typeof import('../textDirection');
+  it('reads a Hebrew caption that starts with a Latin word as right-to-left', () => {
+    expect(majorityDirection('iPhone חדש עם מצלמה טובה')).toBe('rtl');
+    expect(majorityDirection('Hello world שלום')).toBe('ltr');
+    expect(majorityDirection('123 !')).toBe('ltr');
+  });
+});

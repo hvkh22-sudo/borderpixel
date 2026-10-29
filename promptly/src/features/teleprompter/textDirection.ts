@@ -30,6 +30,26 @@ export function detectDirection(text: string, fallback: TextDirection = 'ltr'): 
 }
 
 /**
+ * Direction of a short caption line by majority of strong letters, not the first one: a Hebrew
+ * caption cut so that it starts with "iPhone" is still a right-to-left line. Ties and text with no
+ * letters fall back to the first-strong rule.
+ */
+export function majorityDirection(text: string, fallback: TextDirection = 'ltr'): TextDirection {
+  let rtl = 0;
+  let ltr = 0;
+  for (const ch of text) {
+    if (!LETTER.test(ch)) continue;
+    if (STRONG_RTL.test(ch)) rtl++;
+    else ltr++;
+  }
+  if (rtl === ltr) return detectDirection(text, fallback);
+  return rtl > ltr ? 'rtl' : 'ltr';
+}
+
+/** U+200F RIGHT-TO-LEFT MARK: sets the base direction of plain text (SRT) whose first word is Latin. */
+export const RLM = '\u200F';
+
+/**
  * React Native `textAlign` for script text. The prompter's 'left' setting
  * means "start of line" in the script's direction.
  *

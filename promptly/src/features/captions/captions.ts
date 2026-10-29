@@ -8,6 +8,7 @@
  */
 
 import { normalizeWord, tokenize, wordSimilarity } from '../voice-follow/text';
+import { RLM, detectDirection, majorityDirection } from '../teleprompter/textDirection';
 
 export interface TimedWord {
   text: string;
@@ -378,11 +379,16 @@ export function formatSrtTime(ms: number): string {
   return `${pad(h)}:${pad(m)}:${pad(s)},${pad(msPart, 3)}`;
 }
 
+/** A right-to-left line whose first strong letter is Latin gets an RLM, or players lay it out LTR. */
+function srtLine(text: string): string {
+  return majorityDirection(text) === 'rtl' && detectDirection(text) === 'ltr' ? RLM + text : text;
+}
+
 export function toSrt(cues: Cue[]): string {
   return (
     cues
       .filter((c) => c.text.trim().length > 0)
-      .map((c, i) => `${i + 1}\n${formatSrtTime(c.startMs)} --> ${formatSrtTime(c.endMs)}\n${c.text.trim()}\n`)
+      .map((c, i) => `${i + 1}\n${formatSrtTime(c.startMs)} --> ${formatSrtTime(c.endMs)}\n${srtLine(c.text.trim())}\n`)
       .join('\n')
   );
 }
