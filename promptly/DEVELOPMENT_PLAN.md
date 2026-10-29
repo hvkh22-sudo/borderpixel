@@ -80,10 +80,21 @@ Open (need a device or a design call):
   device check of the path format the library expects.
 - ✅ "Saved without sound" is stored on the recording row (`audio_missing`) and shown when reopened.
 - ✅ Camera error before recording: "Try again" remounts the camera, and a camera that comes back by itself returns to ready. `muxAudio` now times out (max(2 min, 3× take length)) and is handled as a merge failure.
-- Android `muxAudio` reads segment durations on the main thread (jank with many segments).
+- ✅ Android `muxAudio`/`burnInCaptions` read durations off the main thread; a cancel before the Transformer starts is honoured.
 - Device-only: Media3 audio sequence starting with a gap; iOS caption text layer width slack.
 
+## Code review: AI proxy, purchases, captions (2026-10-29)
+Fixed (unit-tested; AI stays disabled): AI proxy budget reservation (concurrency/timeouts can't overshoot), free-tier budget
+share, IPv6 /64 rate limit, IP limits on balance/integrity, byte-capped body, prompt tag escape, no SDK retry, hook token cap,
+no-expiry entitlement = lifetime. Purchases: access applied as soon as it loads; gates don't downgrade/paywall before it
+loads; purchase listener registered even if the first fetch failed; refunded lifetime no longer unlocks Pro (the lifetime
+product must be attached to the `pro` entitlement in RevenueCat). Captions: trailing space while typing, unsaved-changes
+prompt, shift-all no longer drops cues, empty cues not burned in, regenerate; RTL lines that start with a Latin word keep RTL
+in the preview and SRT (RLM).
+Open: free Voice Follow counter resets on reinstall (needs Keychain/Keystore or a server-side counter — design call); the
+native burn-in renderers still use the platform's first-strong direction for mixed Hebrew/English cues — verify on a device.
 
+## Blockers
 - No macOS/Xcode and no Android SDK in this container → native builds run in GitHub Actions instead; device tests need the founder's phones.
 - Store/developer accounts, RevenueCat project, Anthropic key: founder-owned.
 
