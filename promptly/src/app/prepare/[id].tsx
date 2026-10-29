@@ -73,7 +73,9 @@ export default function Prepare() {
     track({ name: 'first_run_step', step: 'setup_tip_dismissed' });
   };
 
-  const voiceGate = checkFeature('voiceFollow', access, usage);
+  const accessLoaded = useAccess((s) => s.loaded);
+  // Until purchases have loaded the answer is unknown: never downgrade or paywall a paying user then.
+  const voiceGate = accessLoaded ? checkFeature('voiceFollow', access, usage) : { allowed: true as const };
   const voiceSupported = vfSupport.ok;
 
   const chooseMode = (mode: ScrollMode) => {

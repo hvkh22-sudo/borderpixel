@@ -54,6 +54,10 @@ describe('deriveAccess', () => {
     expect(a).toMatchObject({ isPro: true, source: 'lifetime', expiresAt: null });
   });
 
+  it('a refunded lifetime purchase still in the history does not grant Pro', () => {
+    expect(deriveAccess(info({ nonSubscriptionProductIds: [PRODUCT_IDS.lifetime] })).isPro).toBe(false);
+  });
+
   it('credit packs alone do not grant Pro', () => {
     expect(deriveAccess(info({ nonSubscriptionProductIds: [PRODUCT_IDS.credits100] })).isPro).toBe(false);
   });
@@ -95,7 +99,7 @@ describe('paywallPlan', () => {
     expect(paywallPlan(FREE_ACCESS)).toMatchObject({ showSubscriptions: true, showLifetime: true });
     const sub = deriveAccess(info({ pro: {} }));
     expect(paywallPlan(sub)).toMatchObject({ showSubscriptions: false, showLifetime: true });
-    const life = deriveAccess(info({ nonSubscriptionProductIds: [PRODUCT_IDS.lifetime] }));
+    const life = deriveAccess(info({ pro: { productIdentifier: PRODUCT_IDS.lifetime, expirationDate: null }, nonSubscriptionProductIds: [PRODUCT_IDS.lifetime] }));
     expect(paywallPlan(life)).toMatchObject({ showSubscriptions: false, showLifetime: false });
   });
 

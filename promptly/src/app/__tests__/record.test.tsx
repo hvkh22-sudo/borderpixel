@@ -320,7 +320,7 @@ beforeEach(async () => {
   });
   useSettings.getState().reset();
   useSettings.getState().setPrompter({ countdownSec: 0, mode: 'timed' });
-  useAccess.setState({ access: FREE_ACCESS, usage: { voiceFollowSessionsUsed: 0 } });
+  useAccess.setState({ access: FREE_ACCESS, usage: { voiceFollowSessionsUsed: 0 }, loaded: true });
   useSpeakingRate.getState().reset();
 });
 

@@ -23,7 +23,7 @@
 Implementation: `src/features/monetization/entitlements.ts` (client gates) and `server/src/handler.ts`
 (server-enforced AI quota). Product IDs: `promptly_pro_monthly`, `promptly_pro_annual`,
 `promptly_lifetime` (non-consumable), `promptly_ai_credits_100` (consumable credit pack). One RevenueCat
-entitlement: `pro`.
+entitlement: `pro`, attached to all three products (monthly, annual **and lifetime** — the app grants Pro only from the active entitlement, so a lifetime product left out of it would not unlock Pro).
 
 ## Why this shape
 - The free tier delivers the full core loop (write → record → caption → export) without a watermark —

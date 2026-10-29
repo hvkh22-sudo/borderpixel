@@ -10,6 +10,7 @@ import { useFirstRun } from '../../state/firstRun';
 import { useSettings } from '../../state/settings';
 import { useSpeakingRate } from '../../state/speakingRate';
 import { createRepos, renderScreen } from './testUtils';
+import { useAccess } from '../../state/access';
 
 let mockRepos: Awaited<ReturnType<typeof createRepos>>;
 const mockPush = jest.fn();
@@ -44,6 +45,7 @@ jest.mock('expo-router', () => {
 let events: AnalyticsEvent[] = [];
 
 beforeEach(async () => {
+  useAccess.setState({ loaded: true });
   mockRepos = await createRepos();
   mockPush.mockClear();
   for (const k of Object.keys(mockParams)) delete mockParams[k];

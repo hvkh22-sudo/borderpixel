@@ -57,7 +57,6 @@ export default function RecordScreen() {
   const speechLocale = useSettings((s) => s.speechLocale);
   const remoteEnabled = useSettings((s) => s.remoteEnabled);
   const remoteRecordToggle = useSettings((s) => s.remoteRecordToggle);
-  const access = useAccess((s) => s.access);
   const usage = useAccess((s) => s.usage);
 
   const [script, setScript] = useState<string | null>(null);
@@ -123,7 +122,8 @@ export default function RecordScreen() {
       if (mode === 'timed') setPlaying(true);
     },
     onVoiceFollowStarted: async () => {
-      if (access.isPro) return;
+      // Read at the moment of use: purchases may have loaded since this screen rendered.
+      if (useAccess.getState().access.isPro) return;
       const repos = await getRepositories();
       useAccess.getState().setUsage({ voiceFollowSessionsUsed: await repos.kv.increment(USAGE_VF_KEY) });
     },
@@ -274,7 +274,8 @@ export default function RecordScreen() {
     if (state.status !== 'ready') return;
     // Voice Follow is built from the script; starting before it loads would restart it mid-take.
     if (script === null) return;
-    if (voice && !checkFeature('voiceFollow', access, usage).allowed) {
+    // Purchases not loaded yet: the answer is unknown, so a paying user is never sent to the paywall.
+    if (voice && useAccess.getState().loaded && !checkFeature('voiceFollow', useAccess.getState().access, usage).allowed) {
       router.push('/paywall?trigger=voiceFollow');
       return;
     }

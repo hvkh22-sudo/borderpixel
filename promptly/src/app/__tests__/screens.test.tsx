@@ -7,6 +7,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { useSettings } from '../../state/settings';
 import { SPEAKING_RATE_KEY, useSpeakingRate } from '../../state/speakingRate';
 import { createRepos, renderScreen } from './testUtils';
+import { useAccess } from '../../state/access';
 
 let mockRepos: Awaited<ReturnType<typeof createRepos>>;
 const mockPush = jest.fn();
@@ -28,6 +29,7 @@ jest.mock('expo-router', () => {
 });
 
 beforeEach(async () => {
+  useAccess.setState({ loaded: true });
   mockRepos = await createRepos();
   mockPush.mockClear();
   for (const k of Object.keys(mockParams)) delete mockParams[k];

@@ -81,8 +81,12 @@ export function useBootstrap(): { ready: boolean; recovered: number } {
       void diagnosticsLog.load();
       // Purchases (SDK configure + network/cache) overlap orphan recovery
       // instead of running after it; neither blocks the first screen.
+      // Applied as soon as it arrives (not after recovery): a paying user must never see the free tier.
       const customerInfo = fetchCustomerInfo().then(
-        (info) => ({ ok: true as const, info }),
+        (info) => {
+          if (alive) useAccess.getState().setAccess(deriveAccess(info));
+          return { ok: true as const, info };
+        },
         (error: unknown) => ({ ok: false as const, error }),
       );
 
@@ -111,17 +115,14 @@ export function useBootstrap(): { ready: boolean; recovered: number } {
       }
 
       const purchases = await customerInfo;
-      if (purchases.ok) {
-        useAccess.getState().setAccess(deriveAccess(purchases.info));
-        try {
-          unsubscribePurchases = subscribeCustomerInfo((info) => useAccess.getState().setAccess(deriveAccess(info)));
-          if (!alive) unsubscribePurchases(); // unmounted while fetching
-        } catch (e) {
-          if (__DEV__) console.warn('purchases unavailable', e);
-        }
-      } else if (__DEV__) {
-        // Offline / store unavailable: the SDK cache is used next time; stay on current state.
-        console.warn('purchases unavailable', purchases.error);
+      // Offline / store unavailable at launch: stay on the current state, but still listen, so a
+      // purchase, renewal or expiry later in this session reaches the app.
+      if (!purchases.ok && __DEV__) console.warn('purchases unavailable', purchases.error);
+      try {
+        unsubscribePurchases = subscribeCustomerInfo((info) => useAccess.getState().setAccess(deriveAccess(info)));
+        if (!alive) unsubscribePurchases(); // unmounted while fetching
+      } catch (e) {
+        if (__DEV__) console.warn('purchases unavailable', e);
       }
     })();
     return () => {

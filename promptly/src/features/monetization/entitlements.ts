@@ -59,10 +59,12 @@ export interface CustomerInfoLike {
 
 export function deriveAccess(info: CustomerInfoLike | null): AccessState {
   if (!info) return FREE_ACCESS;
-  const ownsLifetime = info.nonSubscriptionProductIds.includes(PRODUCT_IDS.lifetime);
   const pro = info.entitlements.active[ENTITLEMENT_PRO];
-  // Lifetime wins over a concurrently active subscription: it never expires.
-  if (ownsLifetime || (pro?.isActive && pro.productIdentifier === PRODUCT_IDS.lifetime)) {
+  const ownsLifetime = info.nonSubscriptionProductIds.includes(PRODUCT_IDS.lifetime);
+  // Pro needs the active entitlement: the purchase history alone may still list a refunded lifetime
+  // purchase. With it active, owning lifetime wins over a concurrent subscription (it never expires).
+  // The lifetime product must be attached to the "pro" entitlement in RevenueCat.
+  if (pro?.isActive && (ownsLifetime || pro.productIdentifier === PRODUCT_IDS.lifetime)) {
     return {
       isPro: true,
       source: 'lifetime',
