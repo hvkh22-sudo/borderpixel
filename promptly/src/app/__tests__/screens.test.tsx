@@ -128,6 +128,20 @@ describe('Prepare', () => {
     await fireEvent.press(screen.getByLabelText('Open camera'));
     expect(mockPush).toHaveBeenCalledWith(`/record/${s.id}?mode=voice`);
   });
+
+  it('does not downgrade Voice Follow or show the paywall before purchases have loaded', async () => {
+    // A subscriber whose purchases have not loaded yet, with the free trial used up on this device.
+    useAccess.setState({ loaded: false, usage: { voiceFollowSessionsUsed: 99 } });
+    useSettings.setState({ prompter: { ...useSettings.getState().prompter, mode: 'voice' } });
+    const s = await mockRepos.scripts.create({ title: 'T', body: 'Hello world' });
+    mockParams.id = s.id;
+    const Prepare = require('../prepare/[id]').default;
+    await renderScreen(<Prepare />);
+    await fireEvent.press(await screen.findByLabelText('Open camera'));
+    expect(mockPush).toHaveBeenCalledWith(`/record/${s.id}?mode=voice`);
+    expect(mockPush).not.toHaveBeenCalledWith(expect.stringContaining('/paywall'));
+    useAccess.setState({ usage: { voiceFollowSessionsUsed: 0 } });
+  });
 });
 
 describe('Prepare presets', () => {
