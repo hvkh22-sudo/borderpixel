@@ -366,6 +366,9 @@ export const en = {
       failed: 'Captions couldn’t be created. Please try again.',
     },
     save: 'Save captions',
+    unsavedTitle: 'Save your caption changes?',
+    discard: 'Discard',
+    regenerate: 'Generate again',
     saved: 'Captions saved',
   },
   export: {

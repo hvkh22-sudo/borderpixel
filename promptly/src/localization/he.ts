@@ -383,6 +383,9 @@ export const he: Strings = {
       failed: 'לא הצלחנו ליצור כתוביות. נסו שוב.',
     },
     save: 'שמירת הכתוביות',
+    unsavedTitle: 'לשמור את השינויים בכתוביות?',
+    discard: 'לא לשמור',
+    regenerate: 'יצירה מחדש',
     saved: 'הכתוביות נשמרו',
   },
   export: {

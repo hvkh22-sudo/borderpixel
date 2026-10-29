@@ -25,4 +25,17 @@ describe('burnInPayload', () => {
       expect(p.cues.every((c) => c.words === undefined)).toBe(true);
     }
   });
+
+  it('leaves emptied cues out of the video (they would draw an empty pill)', () => {
+    const p = burnInPayload(
+      [
+        { id: 'a', startMs: 0, endMs: 500, text: 'hello' },
+        { id: 'b', startMs: 500, endMs: 900, text: '  ' },
+      ],
+      'clean',
+      'lower',
+      false,
+    );
+    expect(p.cues.map((c) => c.text)).toEqual(['hello']);
+  });
 });

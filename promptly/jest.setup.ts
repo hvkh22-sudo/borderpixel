@@ -49,3 +49,8 @@ jest.mock('expo-audio', () => ({
   setAudioModeAsync: () => Promise.resolve(),
   setIsAudioActiveAsync: () => Promise.resolve(),
 }));
+// Screens render without a navigator in tests: removal prevention is recorded, not wired to navigation.
+jest.mock('expo-router/react-navigation', () => ({
+  ...jest.requireActual('expo-router/react-navigation'),
+  usePreventRemove: jest.fn(),
+}));

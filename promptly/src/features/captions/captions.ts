@@ -244,7 +244,9 @@ function preservePunctuation(recognized: string, scriptWord: string, script: str
 export function updateCueText(cues: Cue[], id: string, text: string): Cue[] {
   return cues.map((c) => {
     if (c.id !== id) return c;
-    const next = text.replace(/\s+/g, ' ').trim();
+    // Whitespace is collapsed but not trimmed while typing: a trailing space is how the next word
+    // starts (trimming it would glue words together). normalizeCueTexts trims on save.
+    const next = text.replace(/\s+/g, ' ');
     if (next === c.text) return c;
     const { words: _dropped, ...rest } = c;
     return { ...rest, text: next };
@@ -302,12 +304,21 @@ export function retimeCue(cues: Cue[], id: string, startMs: number, endMs: numbe
   return next;
 }
 
-/** Shift every cue by a constant offset (fixes global A/V caption drift). */
+/**
+ * Shift every cue by a constant offset (fixes global A/V caption drift). An earlier shift stops when
+ * the first cue reaches 0, so cues are never dropped or squashed and a shift back restores them.
+ */
 export function shiftAll(cues: Cue[], deltaMs: number): Cue[] {
-  return cues
-    .map((c) => ({ ...c, startMs: c.startMs + deltaMs, endMs: c.endMs + deltaMs, ...(c.words ? { words: shiftWords(c.words, deltaMs) } : {}) }))
-    .filter((c) => c.endMs > 0)
-    .map((c) => ({ ...c, startMs: Math.max(0, c.startMs) }));
+  if (cues.length === 0) return cues;
+  const earliest = Math.min(...cues.map((c) => c.startMs));
+  const d = Math.max(deltaMs, -earliest);
+  if (d === 0) return cues;
+  return cues.map((c) => ({ ...c, startMs: c.startMs + d, endMs: c.endMs + d, ...(c.words ? { words: shiftWords(c.words, d) } : {}) }));
+}
+
+/** Trims cue text for saving (editing keeps a trailing space so the next word can be typed). */
+export function normalizeCueTexts(cues: Cue[]): Cue[] {
+  return cues.map((c) => (c.text === c.text.trim() ? c : { ...c, text: c.text.trim() }));
 }
 
 function shiftWords(words: CueWord[], deltaMs: number): CueWord[] {

@@ -73,8 +73,12 @@ describe('Captions editor', () => {
     expect(screen.getByDisplayValue('hit record.')).toBeTruthy();
 
     await fireEvent.changeText(screen.getByDisplayValue('hit record.'), 'hit Record!');
+    // Leaving before saving would lose minutes of on-device work: the screen asks first.
+    const preventRemove = jest.mocked(require('expo-router/react-navigation').usePreventRemove);
+    expect(preventRemove.mock.calls.at(-1)?.[0]).toBe(true);
     await fireEvent.press(screen.getByLabelText('Save captions'));
     await waitFor(async () => expect((await mockRepos.recordings.get(r.id))?.cues?.map((c) => c.text)).toEqual(['Write your script before you', 'hit Record!']));
+    expect(preventRemove.mock.calls.at(-1)?.[0]).toBe(false);
   });
 
   it('tells the user when no speech was heard and never invents text', async () => {

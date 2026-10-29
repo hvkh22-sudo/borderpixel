@@ -13,7 +13,8 @@ export function burnInPayload(
   const s = CAPTION_STYLES[styleId];
   const lit = highlight && !!s.highlightColor;
   return {
-    cues: cues.map((c) => ({
+    // An emptied cue would still draw its background pill in the video.
+    cues: cues.filter((c) => c.text.trim()).map((c) => ({
       startMs: c.startMs,
       endMs: c.endMs,
       text: c.text,

@@ -1,8 +1,9 @@
 import { useEvent } from 'expo';
 import { router, useLocalSearchParams } from 'expo-router';
+import { usePreventRemove } from 'expo-router/react-navigation';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { Button } from '../../components/Button';
 import { IconButton } from '../../components/IconButton';
@@ -21,6 +22,7 @@ import {
   estimateWordsFromTranscript,
   hasWordLevelTiming,
   mergeWithNext,
+  normalizeCueTexts,
   segmentWords,
   segmentsToWords,
   shiftAll,
@@ -66,6 +68,8 @@ export default function CaptionsEditor() {
   const [frameWidth, setFrameWidth] = useState(200);
   const [part, setPart] = useState<{ n: number; total: number } | null>(null);
   const [justGenerated, setJustGenerated] = useState(false);
+  /** Generated or edited captions not yet saved: leaving asks first (generation can take minutes). */
+  const [dirty, setDirty] = useState(false);
   const wordHighlight = useSettings((s) => s.captionWordHighlight);
   const highlightAllowed = checkFeature('captionWordHighlight', access, usage).allowed;
   const abortRef = useRef<AbortController | null>(null);
@@ -82,7 +86,8 @@ export default function CaptionsEditor() {
       const r = await repos.recordings.get(id);
       setRec(r);
       if (r?.scriptId) setScriptBody((await repos.scripts.get(r.scriptId))?.body ?? '');
-      if (r?.cues) {
+      // Saved with no cues left: start over from "Generate" instead of an empty editor.
+      if (r?.cues?.length) {
         setCues(r.cues);
         setStyleId(r.captionStyle ?? 'clean');
         setPosition(r.captionPosition);
@@ -127,6 +132,7 @@ export default function CaptionsEditor() {
       }
       setNotes(n);
       setCues(segmentWords(words));
+      setDirty(true);
       setPhase('ready');
       setJustGenerated(true);
       track({ name: 'captions_generated', words: words.length, durationSec: Math.round((Date.now() - started) / 1000) });
@@ -145,6 +151,7 @@ export default function CaptionsEditor() {
       return;
     }
     setStyleId(s);
+    setDirty(true);
   };
 
   const toggleHighlight = (v: boolean) => {
@@ -155,10 +162,39 @@ export default function CaptionsEditor() {
     useSettings.getState().set({ captionWordHighlight: v });
   };
 
+  const persist = async () => {
+    await (await getRepositories()).recordings.saveCaptions(id, normalizeCueTexts(cues), styleId, position);
+  };
   const save = async () => {
-    await (await getRepositories()).recordings.saveCaptions(id, cues, styleId, position);
+    await persist();
+    setDirty(false);
     router.back();
   };
+  const editCues = (f: (c: Cue[]) => Cue[]) => {
+    setCues(f);
+    setDirty(true);
+  };
+  usePreventRemove(dirty, ({ repeat }) => {
+    Alert.alert(t('captions.unsavedTitle'), undefined, [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('captions.discard'),
+        style: 'destructive',
+        onPress: () => {
+          setDirty(false);
+          repeat();
+        },
+      },
+      {
+        text: t('captions.save'),
+        onPress: () =>
+          void persist().then(() => {
+            setDirty(false);
+            repeat();
+          }),
+      },
+    ]);
+  });
 
   const nowMs = time.currentTime * 1000;
   const active = cueAt(cues, nowMs);
@@ -257,7 +293,10 @@ export default function CaptionsEditor() {
           <Segmented
             accessibilityLabel={t('captions.position')}
             value={position}
-            onChange={setPosition}
+            onChange={(p) => {
+              setPosition(p);
+              setDirty(true);
+            }}
             options={[
               { value: 'upper', label: t('captions.upper') },
               { value: 'middle', label: t('captions.middle') },
@@ -266,9 +305,10 @@ export default function CaptionsEditor() {
           />
           <View style={styles.shiftRow}>
             <Text variant="callout">{t('captions.shiftAll')}</Text>
-            <IconButton icon="play-back" iconStyle={flipInRtl()} label={t('a11y.shiftEarlier')} onPress={() => setCues((c) => shiftAll(c, -100))} />
-            <IconButton icon="play-forward" iconStyle={flipInRtl()} label={t('a11y.shiftLater')} onPress={() => setCues((c) => shiftAll(c, 100))} />
+            <IconButton icon="play-back" iconStyle={flipInRtl()} label={t('a11y.shiftEarlier')} onPress={() => editCues((c) => shiftAll(c, -100))} />
+            <IconButton icon="play-forward" iconStyle={flipInRtl()} label={t('a11y.shiftLater')} onPress={() => editCues((c) => shiftAll(c, 100))} />
           </View>
+          <Button testID="captions-regenerate" label={t('captions.regenerate')} icon="refresh" variant="ghost" onPress={() => setPhase('idle')} />
         </View>
       )}
     </View>
@@ -306,15 +346,15 @@ export default function CaptionsEditor() {
             <TextInput
               maxFontSizeMultiplier={MAX_FONT_SCALE}
               value={item.text}
-              onChangeText={(v) => setCues((c) => updateCueText(c, item.id, v))}
+              onChangeText={(v) => editCues((c) => updateCueText(c, item.id, v))}
               style={[styles.cueInput, { color: colors.text }, contentDirectionStyle(item.text)]}
               multiline
               accessibilityLabel={t('a11y.cueText', { n: index + 1, time: formatClock(item.startMs) })}
             />
             <View style={styles.cueActions}>
-              <IconButton icon="cut-outline" size={18} label={t('captions.split')} onPress={() => setCues((c) => splitCue(c, item.id, Math.ceil(item.text.split(' ').length / 2)))} />
-              <IconButton icon="git-merge-outline" size={18} label={t('captions.merge')} disabled={index === cues.length - 1} onPress={() => setCues((c) => mergeWithNext(c, item.id))} />
-              <IconButton icon="trash-outline" size={18} label={t('captions.deleteCue')} onPress={() => setCues((c) => deleteCue(c, item.id))} />
+              <IconButton icon="cut-outline" size={18} label={t('captions.split')} onPress={() => editCues((c) => splitCue(c, item.id, Math.ceil(item.text.split(' ').length / 2)))} />
+              <IconButton icon="git-merge-outline" size={18} label={t('captions.merge')} disabled={index === cues.length - 1} onPress={() => editCues((c) => mergeWithNext(c, item.id))} />
+              <IconButton icon="trash-outline" size={18} label={t('captions.deleteCue')} onPress={() => editCues((c) => deleteCue(c, item.id))} />
             </View>
           </View>
         )}

@@ -19,6 +19,7 @@ import {
   splitCue,
   toSrt,
   updateCueText,
+  normalizeCueTexts,
 } from '../captions';
 import { CAPTION_STYLE_ORDER, CAPTION_STYLES, isCaptionStyleId } from '../captionStyles';
 
@@ -109,8 +110,9 @@ describe('cue editing', () => {
     { id: 'c2', startMs: 1000, endMs: 2000, text: 'five six' },
   ];
 
-  it('edits text and normalizes whitespace', () => {
-    expect(updateCueText(base, 'c2', '  five   SIX ')[1]!.text).toBe('five SIX');
+  it('edits text, collapsing whitespace but keeping the trailing space the next word starts with', () => {
+    expect(updateCueText(base, 'c2', 'five   SIX ')[1]!.text).toBe('five SIX ');
+    expect(normalizeCueTexts(updateCueText(base, 'c2', '  five   SIX '))[1]!.text).toBe('five SIX');
   });
 
   it('retimes within neighbours and rejects too-short cues', () => {
@@ -128,10 +130,17 @@ describe('cue editing', () => {
     expect(merged[0]!.endMs).toBe(1000);
   });
 
-  it('shifts all cues and drops ones pushed before zero', () => {
-    const shifted = shiftAll(base, -1500);
-    expect(shifted).toHaveLength(1);
-    expect(shifted[0]).toMatchObject({ startMs: 0, endMs: 500 });
+  it('shifts all cues, stopping at zero so nothing is dropped and a shift back restores them', () => {
+    const later = shiftAll(base, 200);
+    expect(later[0]).toMatchObject({ startMs: 200, endMs: 1200 });
+    const earlier = shiftAll(later, -1500);
+    expect(earlier).toHaveLength(2);
+    expect(earlier[0]).toMatchObject({ startMs: 0, endMs: 1000 });
+    expect(shiftAll(earlier, -100)).toBe(earlier);
+    let round = base.map((c) => ({ ...c, startMs: c.startMs + 200, endMs: c.endMs + 200 }));
+    for (let i = 0; i < 10; i++) round = shiftAll(round, -100);
+    for (let i = 0; i < 2; i++) round = shiftAll(round, 100);
+    expect(round.map((c) => [c.startMs, c.endMs])).toEqual([[200, 1200], [1200, 2200]]);
   });
 
   it('finds the active cue', () => {
