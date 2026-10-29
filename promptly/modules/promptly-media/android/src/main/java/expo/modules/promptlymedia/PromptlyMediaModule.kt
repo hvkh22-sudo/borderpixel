@@ -93,6 +93,7 @@ private class ActiveExport(val transformer: Transformer, val promise: Promise, v
 class PromptlyMediaModule : Module() {
   // Main-thread only: Transformer is bound to the Looper it was built on.
   private val exports = mutableMapOf<String, ActiveExport>()
+  private val cancelledBeforeStart = mutableSetOf<String>()
   private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
   private val context get() = requireNotNull(appContext.reactContext) { "React context unavailable" }
 
@@ -149,8 +150,10 @@ class PromptlyMediaModule : Module() {
       val overlay = CaptionOverlay(cues.sortedBy { it.startMs }, style, width)
       val effects = Effects(ImmutableList.of(), ImmutableList.of<Effect>(OverlayEffect(ImmutableList.of<TextureOverlay>(overlay))))
       val item = EditedMediaItem.Builder(MediaItem.fromUri(inputUri)).setEffects(effects).build()
-      runTransformer(jobId, outputUri, promise) { t, path -> t.start(item, path) }
-    }.runOnQueue(Queues.MAIN)
+      // The width lookup above reads the file, so this runs on the module's background queue; the
+      // Transformer itself must be built and started on the main looper.
+      mainHandler.post { runTransformer(jobId, outputUri, promise) { t, path -> t.start(item, path) } }
+    }
 
     AsyncFunction("muxAudio") { jobId: String, videoUri: String, segments: List<AudioSegmentRecord>, outputUri: String, promise: Promise ->
       val video = EditedMediaItem.Builder(MediaItem.fromUri(videoUri)).setRemoveAudio(true).build()
@@ -193,9 +196,10 @@ class PromptlyMediaModule : Module() {
         } else {
           Composition.Builder(videoSeq, audioSeq.build()).build()
         }
-        runTransformer(jobId, outputUri, promise) { t, path -> t.start(composition, path) }
+        // Duration reads above happen off the main thread (one per segment); the Transformer runs on it.
+        mainHandler.post { runTransformer(jobId, outputUri, promise) { t, path -> t.start(composition, path) } }
       }
-    }.runOnQueue(Queues.MAIN)
+    }
 
     AsyncFunction("extractAudioToWav") { inputUri: String, outputUri: String, sampleRate: Int ->
       extractWav(inputUri, outputUri, sampleRate)
@@ -204,10 +208,14 @@ class PromptlyMediaModule : Module() {
     Function("cancel") { jobId: String ->
       mainHandler.post {
         // Transformer.cancel() does not invoke the listener, so settle the promise here.
-        exports.remove(jobId)?.let {
-          it.transformer.cancel()
-          it.outFile.delete()
-          it.promise.reject(CodedException("Cancelled", "Export cancelled", null))
+        val active = exports.remove(jobId)
+        if (active != null) {
+          active.transformer.cancel()
+          active.outFile.delete()
+          active.promise.reject(CodedException("Cancelled", "Export cancelled", null))
+        } else {
+          // Not started yet (still reading durations off the main thread): runTransformer drops it.
+          cancelledBeforeStart.add(jobId)
         }
       }
       Unit
@@ -215,6 +223,10 @@ class PromptlyMediaModule : Module() {
   }
 
   private fun runTransformer(jobId: String, outputUri: String, promise: Promise, start: (Transformer, String) -> Unit) {
+    if (cancelledBeforeStart.remove(jobId)) {
+      promise.reject(CodedException("Cancelled", "Export cancelled", null))
+      return
+    }
     val outFile = File(Uri.parse(outputUri).path ?: outputUri)
     outFile.parentFile?.mkdirs()
     if (outFile.exists()) outFile.delete()
