@@ -1,0 +1,71 @@
+# Manual stress run: repeats the Android camera flows on the emulator to reproduce rare crashes,
+# printing app crash lines and native backtraces after every round. Reuses the test APK of an
+# earlier promptly-ci run (no build). Not part of the regular CI.
+name: promptly-stress
+
+on:
+  # Runs when this file changes (edit STRESS_RUN_ID / rounds below to start a new stress run).
+  push:
+    branches: [claude/youthful-volta-vdsr0x]
+    paths: ['.github/workflows/promptly-stress.yml']
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: promptly-ci run id whose promptly-android-test-apk to test
+        required: false
+      rounds:
+        description: How many times to repeat flows 03–05
+        default: '6'
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  # APK under test: promptly-ci run 56 (head of the night's fixes).
+  STRESS_RUN_ID: '41000951156'
+
+jobs:
+  android-camera-stress:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: promptly-android-test-apk
+          path: apk
+          run-id: ${{ inputs.run_id || env.STRESS_RUN_ID }}
+          github-token: ${{ github.token }}
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - name: Install Maestro
+        run: |
+          curl -fsSL https://get.maestro.mobile.dev | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+      - name: Repeat camera flows
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          ROUNDS: ${{ inputs.rounds || '6' }}
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          ram-size: 4096M
+          cores: 4
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back emulated -camera-front emulated
+          disable-animations: true
+          working-directory: promptly
+          script: |
+            adb install -r ../apk/*.apk
+            mkdir -p e2e && adb logcat -c && adb shell settings put global hide_error_dialogs 1 ; sleep 20
+            (adb logcat -v time > e2e/logcat.txt &) ; sh ../.github/scripts/stress-camera.sh "$ROUNDS"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: promptly-android-stress
+          path: promptly/e2e
+          retention-days: 7
