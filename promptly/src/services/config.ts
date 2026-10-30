@@ -6,6 +6,19 @@ import { Platform } from 'react-native';
 
 import { parseIosVoiceFollowAudio, type IosVoiceFollowAudio } from '../features/platform/audioStrategy';
 
+/**
+ * Script text and the purchase ID travel to the AI service: only over HTTPS. A plain-http URL is
+ * accepted for a local dev server (localhost / 10.0.2.2 / 127.0.0.1) in development builds only;
+ * anything else disables the AI Studio instead of sending text unencrypted.
+ */
+export function secureAiBaseUrl(raw: string | undefined, dev: boolean): string {
+  const url = (raw ?? '').trim().replace(/\/+$/, '');
+  if (!url) return '';
+  if (/^https:\/\/[^/\s]+/i.test(url)) return url;
+  if (dev && /^http:\/\/(localhost|127\.0\.0\.1|10\.0\.2\.2)(:\d+)?(\/|$)/i.test(url)) return url;
+  return '';
+}
+
 const SITE = process.env.EXPO_PUBLIC_SITE_URL || 'https://hvkh22-sudo.github.io/borderpixel/apps/promptly';
 
 export const config = {
@@ -14,7 +27,7 @@ export const config = {
       ios: process.env.EXPO_PUBLIC_RC_IOS_KEY,
       android: process.env.EXPO_PUBLIC_RC_ANDROID_KEY,
     }) ?? '',
-  aiBaseUrl: process.env.EXPO_PUBLIC_AI_BASE_URL ?? '',
+  aiBaseUrl: secureAiBaseUrl(process.env.EXPO_PUBLIC_AI_BASE_URL, typeof __DEV__ !== 'undefined' && __DEV__),
   /** Google Cloud project number linked to the Play app (Play Integrity). Public, not a secret. */
   playCloudProjectNumber: process.env.EXPO_PUBLIC_PLAY_CLOUD_PROJECT_NUMBER ?? '',
   supportEmail: process.env.EXPO_PUBLIC_SUPPORT_EMAIL || 'hvkh22@gmail.com',

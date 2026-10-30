@@ -15,7 +15,7 @@
 | Question | Proposed answer | Basis |
 |---|---|---|
 | Does your app collect or share any of the required user data types? | **Yes** | RevenueCat purchase history + anonymous ID; AI text; AI counters. |
-| Is all of the user data collected by your app encrypted in transit? | **Yes**, provided `EXPO_PUBLIC_AI_BASE_URL` is `https://` (the Worker is HTTPS-only on `*.workers.dev` / custom domain) and RevenueCat uses HTTPS. | `src/services/config.ts`. **GAP:** nothing enforces an https URL. Add a build-time check. |
+| Is all of the user data collected by your app encrypted in transit? | **Yes**, provided `EXPO_PUBLIC_AI_BASE_URL` is `https://` (the Worker is HTTPS-only on `*.workers.dev` / custom domain) and RevenueCat uses HTTPS. | `src/services/config.ts`. **Fixed 2026-10-30:** `secureAiBaseUrl` (`src/services/config.ts`) accepts only `https://` (plain http only for a localhost / emulator dev server in development builds); any other URL disables the AI Studio instead of sending text unencrypted. |
 | Do you provide a way for users to request that their data is deleted? | **Yes**, via the support email (manual deletion of the Worker counters for an ID, and a RevenueCat customer delete). | **GAP:** there is no procedure and no tooling yet. The local "Delete all my data" does not touch server data. Also the user would need to send their anonymous ID, but the ID is not shown anywhere in the app. Add "Copy support ID" in Settings › Help. |
 | Account creation | **The app does not allow users to create an account.** So the account-deletion URL requirement does not apply. | No login anywhere. Purchases use an anonymous ID. |
 | Independent security review (MASA) | No (optional). | — |
