@@ -94,6 +94,8 @@ class PromptlyMediaModule : Module() {
   // Main-thread only: Transformer is bound to the Looper it was built on.
   private val exports = mutableMapOf<String, ActiveExport>()
   private val cancelledBeforeStart = mutableSetOf<String>()
+  /** Set on teardown: a job still reading files off the main thread must not start afterwards. */
+  @Volatile private var destroyed = false
   private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
   private val context get() = requireNotNull(appContext.reactContext) { "React context unavailable" }
 
@@ -112,6 +114,7 @@ class PromptlyMediaModule : Module() {
     }.runOnQueue(Queues.MAIN)
 
     OnDestroy {
+      destroyed = true
       RemoteKeys.emitter = null
       // JS reload / teardown: stop running exports (they would keep encoding for a dead runtime).
       mainHandler.post {
@@ -223,7 +226,7 @@ class PromptlyMediaModule : Module() {
   }
 
   private fun runTransformer(jobId: String, outputUri: String, promise: Promise, start: (Transformer, String) -> Unit) {
-    if (cancelledBeforeStart.remove(jobId)) {
+    if (cancelledBeforeStart.remove(jobId) || destroyed) {
       promise.reject(CodedException("Cancelled", "Export cancelled", null))
       return
     }

@@ -40,6 +40,8 @@ function job<T>(run: (id: string) => Promise<T>, onProgress?: (p: number) => voi
   return { id, promise, cancel: () => mod().cancel(id) };
 }
 
+let remoteListeners = 0;
+
 export const PromptlyMedia = {
   isAvailable: () => native != null,
 
@@ -62,10 +64,16 @@ export const PromptlyMedia = {
       }
     };
     const sub = m.addListener('onRemoteKey', onKey);
-    setEnabled(true);
+    // Native has one switch: an old screen's late cleanup must not turn keys off for a newer one.
+    remoteListeners += 1;
+    if (remoteListeners === 1) setEnabled(true);
+    let removed = false;
     return () => {
-      setEnabled(false);
+      if (removed) return;
+      removed = true;
       sub.remove();
+      remoteListeners -= 1;
+      if (remoteListeners === 0) setEnabled(false);
     };
   },
 

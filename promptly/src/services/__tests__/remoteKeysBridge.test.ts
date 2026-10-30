@@ -42,6 +42,16 @@ describe('PromptlyMedia.listenRemoteKeys', () => {
     await Promise.resolve(); // rejected native promises are swallowed
   });
 
+  it('keeps keys on while another screen still listens (one native switch)', () => {
+    const stopOld = PromptlyMedia.listenRemoteKeys(() => {});
+    const stopNew = PromptlyMedia.listenRemoteKeys(() => {});
+    stopOld(); // the old record screen unmounts after the new one mounted
+    stopOld(); // a second call is harmless
+    expect(mockCalls).toEqual([true]);
+    stopNew();
+    expect(mockCalls).toEqual([true, false]);
+  });
+
   it('is a no-op on builds without the native API', () => {
     mockHasApi = false;
     expect(PromptlyMedia.remoteKeysAvailable()).toBe(false);

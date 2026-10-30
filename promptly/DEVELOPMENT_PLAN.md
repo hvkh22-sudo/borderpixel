@@ -114,6 +114,19 @@ cancels Generate when the screen closes (no paywall over another screen), names 
 an over-long script, and keeps Run disabled until the script has loaded. Open (low): a script with no line breaks renders
 as one text block, so Voice Follow re-measures all of it on every word (not measured on a device).
 
+## Code review: native media module (2026-10-30, code reading only)
+Fixed (compile-checked by CI only, not run on a device): iOS caption layers drew at 4x the pixels
+(`contentsScale` 2 on a pixel-sized render) — now 1, which also cuts burn-in memory; iOS remote keys
+come back after the keyboard hides; remote keys are reference-counted in JS so an old record screen's
+late cleanup can't switch them off for a new one; Android rejects an export that would start after
+the JS runtime was torn down; a mux output that lands in scratch after the timeout is deleted.
+Open, need device checks or a larger change: HDR/10-bit input re-encoded as 8-bit H.264 on both
+platforms (camera HDR setting unknown); iOS mux re-encodes video instead of passthrough (slow, quality
+loss); iOS burn-in inserts tracks with the file's length, not each track's; very long cues have no
+line cap; Android audio extract ignores the AAC start offset (~20–50 ms caption shift) and boxes every
+sample; iOS reports no key repeat; Android may press a focused button on Enter/Space after keyboard use;
+iOS stroke is about half as thick as Android's.
+
 ## Blockers
 - No macOS/Xcode and no Android SDK in this container → native builds run in GitHub Actions instead; device tests need the founder's phones.
 - Store/developer accounts, RevenueCat project, Anthropic key: founder-owned.

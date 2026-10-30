@@ -201,6 +201,23 @@ describe('finalizeTake', () => {
       }
     });
 
+    it('removes a late mux output left in scratch after a timeout', async () => {
+      jest.useFakeTimers();
+      try {
+        mockMux.mockReturnValue(new Promise<string>(() => {}));
+        // The native job finishes writing just as the limit passes: the cancel comes too late.
+        mockCancel.mockImplementationOnce(() => mockFs.set('file:///cache/scratch/take_1_av.mp4', 150));
+        const pending = finalizeTake({ ...base, separateAudio: [wav], expectSeparateAudio: true });
+        await jest.advanceTimersByTimeAsync(muxTimeoutMs(base.durationMs) + 1);
+        const r = await pending;
+        expect(r.audioMergeFailed).toBe(true);
+        expect(mockFs.has('file:///cache/scratch/take_1_av.mp4')).toBe(false);
+        expect(mockFs.has(`${REC}/take_1_audio_0.wav`)).toBe(true);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
     it('treats an empty mux output or a failed move as a merge failure without losing anything', async () => {
       mockMux.mockImplementation(async (_v, _s, out) => {
         mockFs.set(out, 150);

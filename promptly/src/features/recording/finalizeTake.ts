@@ -94,6 +94,13 @@ async function finalizeNamed(input: FinalizeInput, id: string, inPlace: string |
       } catch (e) {
         logDiagnostic('mux', `mux_failed_${Platform.OS}`, e);
         audioMergeFailed = true;
+        // A job that finished just as it timed out leaves its output in scratch; the take keeps
+        // the video-only original and the WAVs, so the partial or late output is not needed.
+        try {
+          deleteQuietly(scratchFile(muxedName));
+        } catch {
+          // Scratch is cleared on Delete all; nothing else depends on this file.
+        }
       }
     } else {
       logDiagnostic('mux', 'media_module_missing');

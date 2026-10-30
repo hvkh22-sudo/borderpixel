@@ -341,7 +341,8 @@ public final class PromptlyMediaModule: Module {
     textLayer.string = attributed
     textLayer.isWrapped = true
     textLayer.alignmentMode = .center
-    textLayer.contentsScale = 2
+    // The render size is already in pixels: a scale of 2 drew every caption layer at 4x the pixels.
+    textLayer.contentsScale = 1
     textLayer.frame = CGRect(x: padH, y: padV, width: bounds.width, height: bounds.height)
     container.addSublayer(textLayer)
 
@@ -365,7 +366,7 @@ public final class PromptlyMediaModule: Module {
         wordLayer.string = marked
         wordLayer.isWrapped = true
         wordLayer.alignmentMode = .center
-        wordLayer.contentsScale = 2
+        wordLayer.contentsScale = 1
         wordLayer.frame = textLayer.frame
         // Lit from this word's start until the next word starts (no flicker in pauses).
         let from = min(max(words[i].startMs, cue.startMs), cue.endMs)

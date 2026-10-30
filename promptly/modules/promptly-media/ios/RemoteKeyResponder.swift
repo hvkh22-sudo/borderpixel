@@ -102,6 +102,8 @@ final class RemoteKeyController {
       observers = [
         center.addObserver(forName: UIWindow.didBecomeKeyNotification, object: nil, queue: .main) { [weak self] _ in self?.attach() },
         center.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in self?.attach() },
+        // A text field took first responder while typing; reclaim once the keyboard is gone.
+        center.addObserver(forName: UIResponder.keyboardDidHideNotification, object: nil, queue: .main) { [weak self] _ in self?.attach() },
       ]
     }
     attach()
