@@ -21,9 +21,20 @@
     "production": {
       "autoIncrement": true,
       "channel": "production"
+    },
+    "testflight": {
+      "distribution": "store",
+      "channel": "testflight",
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_FLAG_BURN_IN": "on"
+      }
     }
   },
   "submit": {
-    "production": {}
+    "production": {},
+    "testflight": {
+      "ios": {}
+    }
   }
 }
