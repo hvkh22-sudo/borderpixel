@@ -5,6 +5,7 @@
 import { create } from 'zustand';
 
 import type { CaptionPosition } from '../features/captions/captionStyles';
+import { deviceSpeechLocale } from '../features/settings/speechLocales';
 
 export type ScrollMode = 'manual' | 'timed' | 'voice';
 export type Appearance = 'system' | 'light' | 'dark';
@@ -113,7 +114,8 @@ export const useSettings = create<SettingsStore>((set) => ({
   set: (patch) => set(patch),
   setPrompter: (patch) => set((s) => ({ prompter: { ...s.prompter, ...patch } })),
   setCamera: (patch) => set((s) => ({ camera: { ...s.camera, ...patch } })),
-  reset: () => set({ ...DEFAULT_SETTINGS, hydrated: true, onboardingDone: true }),
+  // Back to defaults, but speech follows the device language as on first launch (not en-US).
+  reset: () => set({ ...DEFAULT_SETTINGS, speechLocale: deviceSpeechLocale(), hydrated: true, onboardingDone: true }),
 }));
 
 export function persistableSettings(s: SettingsState): Omit<SettingsState, 'hydrated'> {

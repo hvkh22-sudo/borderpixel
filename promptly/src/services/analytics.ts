@@ -49,7 +49,8 @@ export function setAnalyticsSink(next: Sink): void {
   sink = next;
 }
 
-let enabled = true;
+// Off until settings load: the default (and a failed settings read) is opted out.
+let enabled = false;
 export function setAnalyticsEnabled(v: boolean): void {
   enabled = v;
 }

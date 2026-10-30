@@ -7,6 +7,7 @@
  */
 import { getLocales } from 'expo-localization';
 import { useEffect, useState } from 'react';
+import { AppState } from 'react-native';
 
 import { deriveAccess } from '../features/monetization/entitlements';
 import { loadFirstRun } from '../features/onboarding/firstRun';
@@ -39,6 +40,13 @@ export function useBootstrap(): { ready: boolean; recovered: number } {
     let alive = true;
     let unsubscribePurchases = () => {};
     let unsubscribeSettings = () => {};
+    let flushSettings = () => {};
+    // Analytics follow the setting whatever changes it (hydrate, the toggle, Delete all).
+    const unsubscribeAnalytics = useSettings.subscribe((s) => setAnalyticsEnabled(s.analyticsEnabled));
+    // A pending settings save must not wait for a timer the OS may never run in the background.
+    const appStateSub = AppState.addEventListener('change', (st) => {
+      if (st !== 'active') flushSettings();
+    });
     (async () => {
       const locale = getLocales()[0];
       setLanguage(locale?.languageCode ?? 'en');
@@ -67,9 +75,17 @@ export function useBootstrap(): { ready: boolean; recovered: number } {
 
         // Persist settings on change (debounced).
         let timer: ReturnType<typeof setTimeout> | null = null;
-        unsubscribeSettings = useSettings.subscribe((s) => {
+        const save = () => {
           if (timer) clearTimeout(timer);
-          timer = setTimeout(() => void r.kv.set(SETTINGS_KEY, persistableSettings(s)), 400);
+          timer = null;
+          void r.kv.set(SETTINGS_KEY, persistableSettings(useSettings.getState())).catch(() => {});
+        };
+        flushSettings = () => {
+          if (timer) save();
+        };
+        unsubscribeSettings = useSettings.subscribe(() => {
+          if (timer) clearTimeout(timer);
+          timer = setTimeout(save, 400);
         });
       } catch (e) {
         if (__DEV__) console.warn('bootstrap storage failed', e);
@@ -131,6 +147,8 @@ export function useBootstrap(): { ready: boolean; recovered: number } {
       alive = false;
       unsubscribePurchases();
       unsubscribeSettings();
+      unsubscribeAnalytics();
+      appStateSub.remove();
     };
   }, []);
 

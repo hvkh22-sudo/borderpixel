@@ -54,3 +54,6 @@ jest.mock('expo-router/react-navigation', () => ({
   ...jest.requireActual('expo-router/react-navigation'),
   usePreventRemove: jest.fn(),
 }));
+
+// The app starts with analytics off until settings load; screen tests assert the events they emit.
+require('./src/services/analytics').setAnalyticsEnabled(true);

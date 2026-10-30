@@ -3,6 +3,8 @@
  * locale, e.g. he-IL on a Hebrew phone) is always listed so it shows as selected and can be
  * picked again; Hebrew is offered alongside English because the UI ships in both.
  */
+import { getLocales } from 'expo-localization';
+
 const BASE_LOCALES = ['en-US', 'en-GB', 'en-AU', 'en-CA', 'en-IN', 'he-IL'];
 
 /** Region used when the device reports a bare language (the iOS Simulator reports "he"). */
@@ -18,6 +20,11 @@ export function canonicalSpeechLocale(tag: string): string {
   const code = lang.toLowerCase() === 'iw' ? 'he' : lang.toLowerCase();
   const region = rest.length ? rest.map((p) => p.toUpperCase()) : DEFAULT_REGION[code] ? [DEFAULT_REGION[code]] : [];
   return [code, ...region].join('-');
+}
+
+/** The device's locale as a speech locale: the default before the user picks one. */
+export function deviceSpeechLocale(): string {
+  return canonicalSpeechLocale(getLocales()[0]?.languageTag ?? 'en-US');
 }
 
 export function speechLocaleOptions(current: string, uiLanguage: string): string[] {
