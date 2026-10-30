@@ -12,6 +12,9 @@ import { appUserId } from './purchases';
 export type AiErrorCode =
   | 'not_configured'
   | 'invalid_request'
+  | 'script_too_long'
+  | 'refused'
+  | 'aborted'
   | 'quota_exceeded'
   | 'rate_limited'
   | 'unauthorized'
@@ -64,7 +67,7 @@ export function aiAvailable(): boolean {
 export async function runStudio(req: StudioRequest, signal?: AbortSignal): Promise<StudioResponse> {
   if (!aiAvailable()) throw new AiError('not_configured');
   const invalid = validateStudioRequest(req);
-  if (invalid) throw new AiError('invalid_request', invalid);
+  if (invalid) throw new AiError(invalid === 'script_too_long' ? 'script_too_long' : 'invalid_request', invalid);
   const userId = await appUserId();
   if (!userId) throw new AiError('not_configured', 'purchases not configured');
 
@@ -87,7 +90,7 @@ export async function runStudio(req: StudioRequest, signal?: AbortSignal): Promi
     });
   } catch (e) {
     clearTimeout(timer);
-    if ((e as Error).name === 'AbortError') throw new AiError(signal?.aborted ? 'invalid_request' : 'timeout');
+    if ((e as Error).name === 'AbortError') throw new AiError(signal?.aborted ? 'aborted' : 'timeout');
     throw new AiError('offline');
   }
   clearTimeout(timer);
@@ -95,7 +98,7 @@ export async function runStudio(req: StudioRequest, signal?: AbortSignal): Promi
   const err = (await res.json().catch(() => ({}))) as { error?: string };
   switch (res.status) {
     case 400:
-      throw new AiError('invalid_request', err.error);
+      throw new AiError(err.error === 'script_too_long' ? 'script_too_long' : 'invalid_request', err.error);
     case 403:
       // Server could not verify this install: re-attest from scratch on the next attempt. Not when
       // the diagnostics override withheld the headers: the stored key is fine and must be kept.
@@ -107,6 +110,10 @@ export async function runStudio(req: StudioRequest, signal?: AbortSignal): Promi
       throw new AiError('quota_exceeded');
     case 429:
       throw new AiError('rate_limited');
+    case 422:
+      // The model declined. The request was still charged, so retrying the same text won't help.
+      if (err.error === 'refused') throw new AiError('refused');
+      throw new AiError('server_error', err.error);
     default:
       throw new AiError('server_error', err.error);
   }

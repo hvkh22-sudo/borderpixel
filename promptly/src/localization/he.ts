@@ -196,6 +196,8 @@ export const he: Strings = {
     errors: {
       not_configured: 'AI Script Studio עדיין לא זמין בגרסה הזו.',
       invalid_request: 'בדקו את השדות ונסו שוב.',
+      script_too_long: 'התסריט ארוך מדי עבור AI Studio. קצרו אותו ונסו שוב.',
+      refused: 'AI Studio לא יכול לעזור עם הבקשה הזו. נסו נושא או ניסוח אחר.',
       quota_exceeded: 'ניצלתם את בקשות ה-AI לבינתיים.',
       rate_limited: 'יותר מדי בקשות. המתינו רגע.',
       unauthorized: 'לא הצלחנו לאמת את המכשיר. נסו שוב מאוחר יותר.',

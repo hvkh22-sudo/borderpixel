@@ -43,3 +43,33 @@ describe('runStudio integrity_required', () => {
     expect(mockIntegrity.reset).not.toHaveBeenCalled();
   });
 });
+
+describe('runStudio error codes', () => {
+  const code = (p: Promise<unknown>) => p.then(() => 'ok', (e: AiError) => e.code);
+
+  it('tells a refusal apart from a server failure', async () => {
+    fetchMock.mockResolvedValue({ ok: false, status: 422, json: async () => ({ error: 'refused' }) });
+    expect(await code(runStudio(req))).toBe('refused');
+    fetchMock.mockResolvedValue({ ok: false, status: 502, json: async () => ({ error: 'upstream' }) });
+    expect(await code(runStudio(req))).toBe('server_error');
+  });
+
+  it('names an over-long script instead of a generic field error', async () => {
+    const long = { tool: 'improve', script: 'x'.repeat(20000) } as StudioRequest;
+    expect(await code(runStudio(long))).toBe('script_too_long');
+    expect(fetchMock).not.toHaveBeenCalled();
+    fetchMock.mockResolvedValue({ ok: false, status: 400, json: async () => ({ error: 'script_too_long' }) });
+    expect(await code(runStudio({ tool: 'improve', script: 'short' } as StudioRequest))).toBe('script_too_long');
+  });
+
+  it('reports a cancelled request as aborted', async () => {
+    const ac = new AbortController();
+    fetchMock.mockImplementation((_u: string, init: { signal: AbortSignal }) =>
+      new Promise((_r, reject) => init.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })))),
+    );
+    const p = code(runStudio(req, ac.signal));
+    await new Promise((r) => setTimeout(r, 0));
+    ac.abort();
+    expect(await p).toBe('aborted');
+  });
+});

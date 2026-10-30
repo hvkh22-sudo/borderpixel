@@ -63,8 +63,10 @@ export default function Studio() {
       setScript(await r.scripts.get(params.scriptId!));
       setVersions(await r.scripts.listVersions(params.scriptId!));
     });
-    return () => abortRef.current?.abort();
   }, [params.scriptId]);
+
+  // Leaving the Studio cancels a running request (Generate has no script id, so this is separate).
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   const run = async () => {
     if (!tool) return;
@@ -76,13 +78,16 @@ export default function Studio() {
     setError(null);
     setResult(null);
     setReported(false);
-    abortRef.current = new AbortController();
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
-      const res = await runStudio(req, abortRef.current.signal);
+      const res = await runStudio(req, controller.signal);
       setResult(res);
       track({ name: 'ai_request', tool, ok: true });
     } catch (e) {
       const code = e instanceof AiError ? e.code : 'server_error';
+      // The screen was left: no error on a screen that is gone, no paywall over another one.
+      if (code === 'aborted' || controller.signal.aborted) return;
       setError(t(`studio.errors.${code}` as TKey));
       track({ name: 'ai_request', tool, ok: false });
       if (code === 'quota_exceeded') router.push('/paywall?trigger=general');
@@ -91,7 +96,23 @@ export default function Studio() {
     }
   };
 
+  const applyingRef = useRef(false);
+  const [applying, setApplying] = useState(false);
+  // One apply per result: a second tap would add duplicate versions or scripts and navigate back twice.
   const apply = async (text: string) => {
+    if (applyingRef.current) return;
+    applyingRef.current = true;
+    setApplying(true);
+    try {
+      await applyDraft(text);
+    } catch {
+      applyingRef.current = false;
+      setApplying(false);
+      Alert.alert(t('errors.generic'));
+    }
+  };
+
+  const applyDraft = async (text: string) => {
     const repos = await getRepositories();
     if (!script) {
       const s = await repos.scripts.create({ title: deriveTitle(text, topic || t('common.untitled')), body: text });
@@ -220,7 +241,7 @@ export default function Studio() {
               <Segmented accessibilityLabel={t('studio.duration')} value={duration} onChange={setDuration} options={DURATIONS.map((d) => ({ value: d, label: t('common.seconds', { n: d }) }))} />
             </>
           ) : null}
-          <Button label={busy ? t('studio.running') : t('studio.run')} icon="sparkles" onPress={run} loading={busy} disabled={tool === 'generate' && !topic.trim()} />
+          <Button label={busy ? t('studio.running') : t('studio.run')} icon="sparkles" onPress={run} loading={busy} disabled={tool === 'generate' ? !topic.trim() : !script} />
           {busy ? <ActivityIndicator color={colors.primary} {...decorative} /> : null}
           {error ? (
             <Text center color={colors.danger} accessibilityLiveRegion="assertive">
@@ -242,7 +263,7 @@ export default function Studio() {
             result.alternatives.map((h) => (
               <Card key={h}>
                 <Text>{h}</Text>
-                <Button label={t('studio.insertHook')} variant="secondary" onPress={() => apply(applyHook(script?.body ?? '', h))} />
+                <Button label={t('studio.insertHook')} variant="secondary" onPress={() => apply(applyHook(script?.body ?? '', h))} disabled={applying} />
               </Card>
             ))
           ) : (
@@ -263,7 +284,7 @@ export default function Studio() {
           <Text variant="caption" muted>
             {t('studio.draftNote')} · {t('studio.remaining', { n: result.remaining })}
           </Text>
-          {tool !== 'hook' ? <Button label={t('studio.useDraft')} onPress={() => apply(result.text)} /> : null}
+          {tool !== 'hook' ? <Button label={t('studio.useDraft')} onPress={() => apply(result.text)} loading={applying} disabled={applying} /> : null}
           <Button label={t('studio.regenerate')} variant="ghost" icon="refresh" onPress={run} disabled={busy} />
           {reported ? (
             <Text variant="caption" muted center accessibilityLiveRegion="polite">

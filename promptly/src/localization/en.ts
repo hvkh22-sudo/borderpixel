@@ -178,6 +178,8 @@ export const en = {
     errors: {
       not_configured: 'AI Studio isn’t available in this build yet.',
       invalid_request: 'Please check the fields and try again.',
+      script_too_long: 'This script is too long for AI Studio. Shorten it and try again.',
+      refused: 'AI Studio can’t help with this request. Try a different topic or wording.',
       quota_exceeded: 'You’ve used your AI requests for now.',
       rate_limited: 'Too many requests. Please wait a moment.',
       unauthorized: 'Couldn’t verify this device. Please try again later.',
