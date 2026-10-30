@@ -1,0 +1,35 @@
+# Settings: speech languages are listed by name (not codes); Delete all my data returns to Home.
+# Runs on a fresh install, so the deletion removes only the sample data this flow created.
+appId: app.promptly.placeholder
+tags:
+  - core
+---
+- runFlow: shared/launch.yaml
+- runFlow: shared/skip-onboarding.yaml
+
+- tapOn:
+    id: home-settings
+- assertVisible:
+    id: settings-speech-en-US
+- assertVisible: "English \\(United States\\)"
+- assertNotVisible: "en-US"
+- takeScreenshot: screenshots/09-1-settings-languages
+
+- scrollUntilVisible:
+    element:
+      id: settings-privacy
+    direction: DOWN
+- tapOn:
+    id: settings-privacy
+- scrollUntilVisible:
+    element: "Delete all my data"
+    direction: DOWN
+- tapOn: "Delete all my data"
+- takeScreenshot: screenshots/09-2-delete-confirm
+# The confirm dialog's destructive button (Android may draw it in capitals).
+- tapOn: "(?i)delete"
+- extendedWaitUntil:
+    visible:
+      id: home-settings
+    timeout: 15000
+- takeScreenshot: screenshots/09-3-home-after-delete
