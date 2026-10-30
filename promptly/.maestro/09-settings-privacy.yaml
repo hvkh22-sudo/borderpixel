@@ -28,8 +28,14 @@ tags:
 - takeScreenshot: screenshots/09-2-delete-confirm
 # The confirm dialog's destructive button (Android may draw it in capitals).
 - tapOn: "(?i)delete"
+# "All data deleted" is an alert; on Android it hides the screen below from Maestro until dismissed.
+- extendedWaitUntil:
+    visible: "All data deleted"
+    timeout: 15000
+- takeScreenshot: screenshots/09-3-deleted-alert
+- tapOn: "(?i)ok"
 - extendedWaitUntil:
     visible:
       id: home-settings
     timeout: 15000
-- takeScreenshot: screenshots/09-3-home-after-delete
+- takeScreenshot: screenshots/09-4-home-after-delete
