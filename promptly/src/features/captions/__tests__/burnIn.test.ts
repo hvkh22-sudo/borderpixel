@@ -38,4 +38,9 @@ describe('burnInPayload', () => {
     );
     expect(p.cues.map((c) => c.text)).toEqual(['hello']);
   });
+
+  it('keeps a right-to-left cue that starts with a Latin word RTL in the video (RLM)', () => {
+    const p = burnInPayload([{ id: 'a', startMs: 0, endMs: 500, text: 'iPhone חדש עם מצלמה' }], 'clean', 'lower', false);
+    expect(p.cues[0]!.text).toBe('\u200FiPhone חדש עם מצלמה');
+  });
 });

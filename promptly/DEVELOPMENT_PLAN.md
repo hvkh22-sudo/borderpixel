@@ -91,8 +91,7 @@ loads; purchase listener registered even if the first fetch failed; refunded lif
 product must be attached to the `pro` entitlement in RevenueCat). Captions: trailing space while typing, unsaved-changes
 prompt, shift-all no longer drops cues, empty cues not burned in, regenerate; RTL lines that start with a Latin word keep RTL
 in the preview and SRT (RLM).
-Open: free Voice Follow counter resets on reinstall (needs Keychain/Keystore or a server-side counter — design call); the
-native burn-in renderers still use the platform's first-strong direction for mixed Hebrew/English cues — verify on a device.
+Open: free Voice Follow counter resets on reinstall (needs Keychain/Keystore or a server-side counter — design call); mixed Hebrew/English cues now get an RLM in the burn-in payload too — verify the rendering on a device.
 
 ## Code review: Voice Follow engine, scripts & data (2026-10-30)
 Fixed (unit-tested, **not tested on a device**): tap-to-resync / Restart no longer undone by words the recognizer still

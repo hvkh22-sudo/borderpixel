@@ -2,6 +2,7 @@
 import type { NativeCaptionStyle, NativeCue } from '../../../modules/promptly-media';
 import { cueHasWordTiming, type Cue } from './captions';
 import { CAPTION_POSITION_Y, CAPTION_STYLES, type CaptionPosition, type CaptionStyleId } from './captionStyles';
+import { RLM, detectDirection, majorityDirection } from '../teleprompter/textDirection';
 
 export function burnInPayload(
   cues: Cue[],
@@ -17,7 +18,9 @@ export function burnInPayload(
     cues: cues.filter((c) => c.text.trim()).map((c) => ({
       startMs: c.startMs,
       endMs: c.endMs,
-      text: c.text,
+      // A right-to-left line that starts with a Latin word: the native renderers pick the paragraph
+      // direction from the first strong letter, so an RLM keeps it RTL (as in the preview and SRT).
+      text: majorityDirection(c.text) === 'rtl' && detectDirection(c.text) === 'ltr' ? RLM + c.text : c.text,
       // Only cues whose word timing is still valid (not edited) get a highlight.
       ...(lit && cueHasWordTiming(c) ? { words: c.words.map(({ startMs, endMs }) => ({ startMs, endMs })) } : {}),
     })),
