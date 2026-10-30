@@ -376,7 +376,7 @@ class PromptlyMediaModule : Module() {
             }
             val resampled = resampler.process(mono, srcRate)
             val bytes = ByteBuffer.allocate(resampled.size * 2).order(ByteOrder.LITTLE_ENDIAN)
-            resampled.forEach { bytes.putShort(it) }
+            bytes.asShortBuffer().put(resampled)
             file.write(bytes.array())
             dataBytes += bytes.capacity()
             codec.releaseOutputBuffer(outIdx, false)
@@ -420,18 +420,20 @@ private class LinearResampler(private val targetRate: Int) {
   fun process(input: ShortArray, srcRate: Int): ShortArray {
     if (srcRate == targetRate) return input
     val step = srcRate.toDouble() / targetRate
-    val out = ArrayList<Short>((input.size / step).toInt() + 2)
+    // Primitive array: a boxed Short per output sample churned the GC on long takes.
+    val out = ShortArray(maxOf(0, ((input.size - position) / step).toInt() + 2))
+    var n = 0
     while (position < input.size) {
       val i = position.toInt()
       val frac = position - i
       val a = if (i - 1 >= 0) input[i - 1] else last
       val b = input[i]
-      out.add((a + (b - a) * frac).roundToInt().toShort())
+      out[n++] = (a + (b - a) * frac).roundToInt().toShort()
       position += step
     }
     position -= input.size
     if (input.isNotEmpty()) last = input[input.size - 1]
-    return out.toShortArray()
+    return if (n == out.size) out else out.copyOf(n)
   }
 }
 
