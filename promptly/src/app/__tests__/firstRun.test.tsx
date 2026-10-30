@@ -225,3 +225,42 @@ describe('Take screen tip', () => {
     expect(screen.queryByTestId('take-tip')).toBeNull();
   });
 });
+
+describe('Take screen states', () => {
+  it('says a missing take no longer exists instead of a blank screen', async () => {
+    mockParams.id = 'gone';
+    const Take = require('../take/[id]').default;
+    await renderScreen(<Take />);
+    expect(await screen.findByText('This take no longer exists.')).toBeTruthy();
+    expect(screen.getByTestId('take-not-found-back')).toBeTruthy();
+  });
+
+  it('offers Retake only while the script still exists', async () => {
+    const s = await mockRepos.scripts.create({ title: 'T', body: 'x' });
+    const take = await addTake(s.id);
+    mockParams.id = take.id;
+    const Take = require('../take/[id]').default;
+    const r = await renderScreen(<Take />);
+    expect(await screen.findByTestId('take-retake')).toBeTruthy();
+    await r.unmount();
+    await mockRepos.scripts.remove(s.id);
+    await renderScreen(<Take />);
+    await screen.findByTestId('take-export');
+    expect(screen.queryByTestId('take-retake')).toBeNull();
+  });
+
+  it('reports a failed delete and stays on the take', async () => {
+    const { Alert } = require('react-native');
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const take = await addTake();
+    mockParams.id = take.id;
+    jest.spyOn(mockRepos.recordings, 'remove').mockRejectedValueOnce(new Error('disk I/O'));
+    const Take = require('../take/[id]').default;
+    await renderScreen(<Take />);
+    await fireEvent.press(await screen.findByTestId('take-delete'));
+    const buttons = alert.mock.calls[0]![2] as { style?: string; onPress?: () => Promise<void> }[];
+    await buttons.find((b) => b.style === 'destructive')!.onPress!();
+    expect(alert).toHaveBeenLastCalledWith('Something went wrong.');
+    expect(require('expo-router').router.back).not.toHaveBeenCalled();
+  });
+});

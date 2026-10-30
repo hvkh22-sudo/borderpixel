@@ -1,7 +1,7 @@
 import { useEvent } from 'expo';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 
 import { Button } from '../../components/Button';
@@ -15,6 +15,7 @@ import { takeTip } from '../../features/onboarding/firstRun';
 import { useFocusData } from '../../hooks/useAsyncData';
 import { formatClock, t } from '../../localization/i18n';
 import { getRepositories } from '../../services/db';
+import { logDiagnostic } from '../../services/diagnosticsLog';
 import { deleteRecordingFile, recordingFile } from '../../services/files';
 import { useAccess } from '../../state/access';
 import { useFirstRun } from '../../state/firstRun';
@@ -23,9 +24,17 @@ import { radius, spacing } from '../../theme/tokens';
 
 export default function Take() {
   const { id, audioIssue, notice } = useLocalSearchParams<{ id: string; audioIssue?: string; notice?: string }>();
-  const { data: rec } = useFocusData(async () => (await getRepositories()).recordings.get(id), [id]);
-  const file = rec ? recordingFile(rec.fileName) : null;
-  const exists = file?.exists ?? false;
+  const { data, error } = useFocusData(async () => {
+    const repos = await getRepositories();
+    const r = await repos.recordings.get(id);
+    // Retake needs the script; a deleted one would open an empty prepare screen.
+    const hasScript = r?.scriptId ? (await repos.scripts.get(r.scriptId)) != null : false;
+    return { rec: r, hasScript };
+  }, [id]);
+  const rec = data?.rec ?? null;
+  // Once per loaded take, not per render: playback re-renders this screen ten times a second.
+  const file = useMemo(() => (rec ? recordingFile(rec.fileName) : null), [rec]);
+  const exists = useMemo(() => file?.exists ?? false, [file]);
   const player = useVideoPlayer(exists && file ? file.uri : null, (p) => {
     p.loop = true;
     p.timeUpdateEventInterval = 0.1;
@@ -50,7 +59,18 @@ export default function Take() {
   }, [hasRec, firstRunHydrated]);
   const tip = firstRunHydrated && rec && exists ? takeTip(firstRunFlags, !!rec.cues?.length) : null;
 
-  if (!rec) return <Screen>{null}</Screen>;
+  if (!rec) {
+    // Loading (nothing yet), or a stale link / failed load: say so instead of a blank screen.
+    if (data === undefined && !error) return <Screen>{null}</Screen>;
+    return (
+      <Screen>
+        <Text center accessibilityLiveRegion="polite">
+          {t('preview.notFound')}
+        </Text>
+        <Button testID="take-not-found-back" label={t('common.back')} variant="secondary" onPress={() => router.back()} />
+      </Screen>
+    );
+  }
 
   const activeCue = rec.cues ? cueAt(rec.cues, time.currentTime * 1000) : undefined;
 
@@ -62,8 +82,14 @@ export default function Take() {
         style: 'destructive',
         onPress: async () => {
           player.pause();
-          deleteRecordingFile(rec.fileName);
-          await (await getRepositories()).recordings.remove(rec.id);
+          try {
+            deleteRecordingFile(rec.fileName);
+            await (await getRepositories()).recordings.remove(rec.id);
+          } catch (e) {
+            logDiagnostic('storage', 'take_delete_failed', e);
+            Alert.alert(t('errors.generic'));
+            return;
+          }
           router.back();
         },
       },
@@ -120,7 +146,7 @@ export default function Take() {
         {t('preview.duration', { d: formatClock(rec.durationMs) })} · {new Date(rec.createdAt).toLocaleString()}
       </Text>
       <View style={styles.row}>
-        {rec.scriptId ? (
+        {rec.scriptId && data?.hasScript ? (
           <Button testID="take-retake" label={t('preview.retake')} icon="refresh" variant="ghost" onPress={() => router.replace(`/prepare/${rec.scriptId}`)} />
         ) : null}
         <Button testID="take-delete" label={t('preview.delete')} icon="trash-outline" variant="danger" onPress={remove} />

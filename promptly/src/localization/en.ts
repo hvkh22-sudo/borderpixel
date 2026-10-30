@@ -327,6 +327,7 @@ export const en = {
     delete: 'Delete take',
     deleteConfirm: 'This permanently deletes the video from Promptly. Copies you saved to Photos are not affected.',
     duration: 'Duration {d}',
+    notFound: 'This take no longer exists.',
     missingFile: 'This video file is missing.',
   },
   captions: {
@@ -448,6 +449,14 @@ export const en = {
     light: 'Light',
     dark: 'Dark',
     prompter: 'Teleprompter defaults',
+    speechLocaleNames: {
+      'en-US': 'English (United States)',
+      'en-GB': 'English (United Kingdom)',
+      'en-AU': 'English (Australia)',
+      'en-CA': 'English (Canada)',
+      'en-IN': 'English (India)',
+      'he-IL': 'Hebrew (Israel)',
+    },
     speechLanguage: 'Speech language',
     subscription: 'Subscription',
     privacy: 'Privacy & data',

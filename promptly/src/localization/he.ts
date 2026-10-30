@@ -344,6 +344,7 @@ export const he: Strings = {
     delete: 'מחיקת הטייק',
     deleteConfirm: 'הסרטון יימחק לצמיתות מ-Promptly. עותקים ששמרתם בתמונות לא יושפעו.',
     duration: 'משך: {d}',
+    notFound: 'הטייק הזה כבר לא קיים.',
     missingFile: 'קובץ הווידאו חסר.',
   },
   captions: {
@@ -465,6 +466,14 @@ export const he: Strings = {
     light: 'בהיר',
     dark: 'כהה',
     prompter: 'ברירות מחדל לטלפרומפטר',
+    speechLocaleNames: {
+      'en-US': 'אנגלית (ארצות הברית)',
+      'en-GB': 'אנגלית (בריטניה)',
+      'en-AU': 'אנגלית (אוסטרליה)',
+      'en-CA': 'אנגלית (קנדה)',
+      'en-IN': 'אנגלית (הודו)',
+      'he-IL': 'עברית (ישראל)',
+    },
     speechLanguage: 'שפת הדיבור',
     subscription: 'מינוי',
     privacy: 'פרטיות ונתונים',

@@ -75,7 +75,10 @@ export default function ExportScreen() {
       source.uri,
       payload.cues,
       payload.style,
-      (progress) => setStatus({ kind: 'rendering', progress }),
+      // A late progress event must not bring the progress bar back after Cancel.
+      (progress) => {
+        if (!cancelledRef.current) setStatus({ kind: 'rendering', progress });
+      },
     );
     jobRef.current = job;
     return job.promise;
@@ -86,8 +89,12 @@ export default function ExportScreen() {
     runningRef.current = true;
     setRunning(true);
     cancelledRef.current = false;
+    let uri: string | null = null;
+    // A captioned copy is a full-size temporary file: removed once saved to Photos or abandoned.
+    // A shared copy is kept (the receiving app may still be reading it) until launch cleanup.
+    let keepCopy = false;
     try {
-      const uri = await prepareVideo();
+      uri = await prepareVideo();
       // The burn-in can finish just as Cancel is tapped; the user asked for nothing to be saved.
       if (cancelledRef.current) {
         setStatus({ kind: 'idle' });
@@ -100,9 +107,11 @@ export default function ExportScreen() {
           return;
         }
         await MediaLibrary.Asset.create(uri);
-        await (await getRepositories()).recordings.markSavedToLibrary(rec.id);
+        // The video is in Photos now: a failed bookkeeping write must not invite a duplicate save.
+        await (await getRepositories()).recordings.markSavedToLibrary(rec.id).catch((e: unknown) => logDiagnostic('export', 'mark_saved', e));
         setStatus({ kind: 'done', message: t('export.saved') });
       } else {
+        keepCopy = true;
         setStatus({ kind: 'idle' });
         await Sharing.shareAsync(uri, { mimeType: 'video/mp4', UTI: 'public.mpeg-4' });
       }
@@ -116,13 +125,22 @@ export default function ExportScreen() {
       logDiagnostic('export', burnIn && hasCaptions ? `video_burn_in_${action}` : `video_${action}`, e);
       setStatus({ kind: 'error', message: t('export.failed') });
     } finally {
+      if (uri && uri !== source.uri && !keepCopy) {
+        try {
+          new File(uri).delete();
+        } catch {
+          // Launch cleanup removes it later.
+        }
+      }
       runningRef.current = false;
       setRunning(false);
     }
   };
 
   const shareSrt = async () => {
-    if (!rec.cues) return;
+    if (!rec.cues || runningRef.current) return;
+    runningRef.current = true;
+    setRunning(true);
     try {
       const f = new File(exportsDir(), `captions_${rec.id.slice(0, 8)}.srt`);
       await f.write(toSrt(rec.cues));
@@ -132,6 +150,9 @@ export default function ExportScreen() {
     } catch (e) {
       logDiagnostic('export', 'srt', e);
       setStatus({ kind: 'error', message: t('export.failed') });
+    } finally {
+      runningRef.current = false;
+      setRunning(false);
     }
   };
 

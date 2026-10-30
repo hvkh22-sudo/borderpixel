@@ -100,9 +100,10 @@ describe('Settings', () => {
   it('marks the chosen speech language as selected instead of a bare checkmark', async () => {
     useSettings.getState().set({ speechLocale: 'en-GB' });
     const Settings = require('../settings/index').default;
+    // Language names, not codes: a screen reader used to spell out "e n dash G B".
     await renderScreen(<Settings />);
-    expect(screen.getByRole('button', { name: 'en-GB' }).props.accessibilityState).toMatchObject({ selected: true });
-    expect(screen.getByRole('button', { name: 'en-US' }).props.accessibilityState).toMatchObject({ selected: false });
+    expect(screen.getByRole('button', { name: 'English (United Kingdom)' }).props.accessibilityState).toMatchObject({ selected: true });
+    expect(screen.getByRole('button', { name: 'English (United States)' }).props.accessibilityState).toMatchObject({ selected: false });
     expect(screen.getByRole('header', { name: 'Appearance' })).toBeTruthy();
   });
 });
