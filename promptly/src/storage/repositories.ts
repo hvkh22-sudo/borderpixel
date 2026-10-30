@@ -61,6 +61,13 @@ export function deriveTitle(body: string, fallback: string): string {
 
 const escapeLike = (s: string) => s.replace(/[\\%_]/g, (c) => `\\${c}`);
 
+/** Case-, accent- and niqqud-insensitive form for search. */
+export function foldForSearch(text: string): string {
+  return text.normalize('NFKD').replace(/\p{M}/gu, '').toLocaleLowerCase();
+}
+
+const TITLE_COLLATOR = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
+
 export class ScriptRepository {
   constructor(private readonly deps: Deps) {}
 
@@ -94,28 +101,24 @@ export class ScriptRepository {
   async list(opts: { query?: string; favoritesOnly?: boolean; sort?: ScriptSort; folderId?: string | null } = {}): Promise<Script[]> {
     const where = ['deleted_at IS NULL'];
     const params: SqlValue[] = [];
-    if (opts.query?.trim()) {
-      const q = `%${escapeLike(opts.query.trim())}%`;
-      where.push("(title LIKE ? ESCAPE '\\' OR body LIKE ? ESCAPE '\\')");
-      params.push(q, q);
-    }
     if (opts.favoritesOnly) where.push('favorite = 1');
     if (opts.folderId === null) where.push('folder_id IS NULL');
     else if (opts.folderId !== undefined) {
       where.push('folder_id = ?');
       params.push(opts.folderId);
     }
-    const order =
-      opts.sort === 'title'
-        ? 'title COLLATE NOCASE ASC'
-        : opts.sort === 'recent'
-          ? 'COALESCE(last_opened_at, updated_at) DESC'
-          : 'updated_at DESC';
+    const order = opts.sort === 'recent' ? 'COALESCE(last_opened_at, updated_at) DESC' : 'updated_at DESC';
     const rows = await this.deps.db.getAllAsync<ScriptRow>(
       `SELECT * FROM scripts WHERE ${where.join(' AND ')} ORDER BY ${order}`,
       params,
     );
-    return rows.map(toScript);
+    let scripts = rows.map(toScript);
+    // Search and title sort run here, not in SQL: SQLite's LIKE / NOCASE only fold ASCII, so "écrire"
+    // missed "Écrire", a pointed Hebrew title missed a plain query, and non-Latin titles sorted last.
+    const q = opts.query?.trim() ? foldForSearch(opts.query.trim()) : '';
+    if (q) scripts = scripts.filter((sc) => foldForSearch(sc.title).includes(q) || foldForSearch(sc.body).includes(q));
+    if (opts.sort === 'title') scripts.sort((a, b) => TITLE_COLLATOR.compare(a.title, b.title));
+    return scripts;
   }
 
   async update(id: string, patch: Partial<Pick<Script, 'title' | 'body' | 'favorite'>>): Promise<void> {

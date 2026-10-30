@@ -104,6 +104,19 @@ describe('FolderRepository', () => {
     ]);
   });
 
+  it('searches ignoring case, accents and Hebrew niqqud, and sorts titles across scripts', async () => {
+    const { scripts } = await setup();
+    const fr = await scripts.create({ title: 'Écrire vite', body: '' });
+    const he = await scripts.create({ title: 'שָׁלוֹם לכולם', body: '' });
+    const ru = await scripts.create({ title: 'Привет', body: '' });
+    expect((await scripts.list({ query: 'écrire' })).map((s) => s.id)).toEqual([fr.id]);
+    expect((await scripts.list({ query: 'ECRIRE' })).map((s) => s.id)).toEqual([fr.id]);
+    expect((await scripts.list({ query: 'שלום' })).map((s) => s.id)).toEqual([he.id]);
+    expect((await scripts.list({ query: 'привет' })).map((s) => s.id)).toEqual([ru.id]);
+    const titles = (await scripts.list({ sort: 'title' })).map((s) => s.title);
+    expect(titles.indexOf('Écrire vite')).toBeLessThan(titles.indexOf('Привет'));
+  });
+
   it('lists scripts by folder and keeps search and sort inside the folder', async () => {
     const { scripts, folders } = await setup();
     const f = await folders.create('Series');

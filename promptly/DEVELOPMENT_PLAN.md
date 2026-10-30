@@ -102,7 +102,7 @@ never followed); Android busy/client/too-many-requests retried with backoff; lat
 leftover take files, and reports failures; deleting a muxed take removes its leftover original; re-importing a backup never
 duplicates; restoring over a deleted script keeps the newer text as a version; favoriting no longer counts as an edit;
 far-future timestamps rejected on import; deleted scripts purged after 30 days; the editor saves when the screen loses focus.
-Open: search/sort ignore case and accents only for ASCII (needs a normalized search column); number words 13–19 and
+Search now ignores case, accents and niqqud for every script, and title sort uses the locale collator (done in JS after the SQL filter). Open: number words 13–19 and
 hyphenated numbers don't match digits in Voice Follow (minor).
 
 ## Blockers
