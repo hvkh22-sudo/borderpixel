@@ -18,37 +18,42 @@ export interface Token {
 }
 
 // Combining marks (Hebrew niqqud, decomposed accents) belong to the word they sit on.
-const WORD_RE = /[\p{L}\p{N}][\p{L}\p{M}\p{N}]*(?:['’\-][\p{L}\p{N}][\p{L}\p{M}\p{N}]*)*/gu;
+const WORD_RE = /[\p{L}\p{N}][\p{L}\p{M}\p{N}]*(?:(?:['’\-׳״]|[,.](?=\p{N}))[\p{L}\p{N}][\p{L}\p{M}\p{N}]*)*/gu;
 const COMBINING_MARKS_RE = /\p{M}/gu;
 
-/** Small number words → digits so "ten" and "10" match. */
-const NUMBER_WORDS: Record<string, string> = {
-  zero: '0',
-  one: '1',
-  two: '2',
-  three: '3',
-  four: '4',
-  five: '5',
-  six: '6',
-  seven: '7',
-  eight: '8',
-  nine: '9',
-  ten: '10',
-  eleven: '11',
-  twelve: '12',
-  twenty: '20',
-  thirty: '30',
-  hundred: '100',
+/** Number words → digits so "fifteen" and "15", "twenty-five" and "25" match. */
+const UNITS: Record<string, number> = {
+  zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9,
+  ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16,
+  seventeen: 17, eighteen: 18, nineteen: 19,
 };
+const TENS: Record<string, number> = { twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 };
+const SCALES: Record<string, string> = { hundred: '100', thousand: '1000', million: '1000000' };
+
+function numberWord(w: string): string | undefined {
+  if (w in UNITS) return String(UNITS[w]);
+  if (w in TENS) return String(TENS[w]);
+  if (w in SCALES) return SCALES[w];
+  // "twentyfive" (hyphen already removed) → 25
+  for (const [t, v] of Object.entries(TENS)) {
+    if (w.startsWith(t)) {
+      const u = UNITS[w.slice(t.length)];
+      if (u !== undefined && u > 0 && u < 10) return String(v + u);
+    }
+  }
+  return undefined;
+}
 
 export function normalizeWord(word: string): string {
   const base = word
     .normalize('NFKD')
     .replace(COMBINING_MARKS_RE, '')
     .toLowerCase()
-    .replace(/[’']/g, '')
+    .replace(/[’'׳״"]/g, '')
     .replace(/-/g, '');
-  return NUMBER_WORDS[base] ?? base;
+  // Digit groups: "1,000" and "1000" are the same number.
+  if (/^\p{N}[\p{N},.]*$/u.test(base)) return base.replace(/,/g, '');
+  return numberWord(base) ?? base;
 }
 
 export function tokenize(text: string): Token[] {

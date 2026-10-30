@@ -237,3 +237,12 @@ describe('tokenize with combining marks', () => {
     expect(tokenize('re\u0301sume\u0301 ready').map((t) => t.norm)).toEqual(['resume', 'ready']);
   });
 });
+
+describe('number words and digits', () => {
+  const norms = (t: string) => tokenize(t).map((x) => x.norm);
+  it('match across spellings', () => {
+    expect(norms('fifteen twenty-five ninety 1,000 thousand')).toEqual(['15', '25', '90', '1000', '1000']);
+    expect(norms('15 25 90 1000')).toEqual(['15', '25', '90', '1000']);
+    expect(norms('ג׳ירפה end. Next')).toEqual(['גירפה', 'end', 'next']);
+  });
+});
