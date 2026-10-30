@@ -500,7 +500,9 @@ describe('Record: Voice Follow (iOS)', () => {
     const target = SCRIPT.indexOf('cameras');
     await act(async () => mockPrompter.props!.onTapChar(target));
     expect(mockPrompter.handle.jumpToChar).toHaveBeenCalledWith(target);
-    await waitFor(() => expect(mockPrompter.props!.followCharOffset).toBeGreaterThanOrEqual(target));
+    // Voice Follow resyncs to just before the tapped word (it has not been read yet).
+    await waitFor(() => expect(mockPrompter.props!.followCharOffset).toBeLessThanOrEqual(target));
+    expect(mockPrompter.props!.followCharOffset).toBeGreaterThan(SCRIPT.lastIndexOf(' ', target - 2));
 
     // Recognizer failure: message shown, recording continues.
     await act(async () => mockSpeech.emit('error', { error: 'network', message: 'offline' }));

@@ -80,6 +80,11 @@ export class ScriptAligner {
   private lastHypothesisKey = '';
   /** Spoken word count of the previous hypothesis in this utterance. */
   private lastSpokenCount = 0;
+  /**
+   * Words at the start of the current hypothesis said before a manual resync: the recognizer
+   * keeps them in its transcript, and they must not pull the cursor back to where they matched.
+   */
+  private ignoreSpoken = 0;
 
   /**
    * Performance (see docs/architecture/performance.md): script words are
@@ -155,10 +160,13 @@ export class ScriptAligner {
    * current utterance. Returns the alignment decision.
    */
   update(hypothesis: string): AlignmentResult {
-    const spoken = tokenize(hypothesis);
+    const all = tokenize(hypothesis);
+    this.ignoreSpoken = Math.min(this.ignoreSpoken, all.length);
+    const spoken = this.ignoreSpoken > 0 ? all.slice(this.ignoreSpoken) : all;
     const tail = spoken.slice(-this.config.tailWords).map((t) => t.norm);
     const key = tail.join(' ');
     if (tail.length === 0 || this.tokens.length === 0 || key === this.lastHypothesisKey) {
+      this.lastSpokenCount = all.length;
       return this.result('hold', 0);
     }
     this.lastHypothesisKey = key;
@@ -167,8 +175,8 @@ export class ScriptAligner {
     // A revision to fewer words (iOS resends the whole transcript) is not new
     // speech: count it as one word so large moves still need confirmation.
     // Only resetUtterance() (lastSpokenCount = 0) grants a full-size step.
-    const newWords = spoken.length >= this.lastSpokenCount ? spoken.length - this.lastSpokenCount : 1;
-    this.lastSpokenCount = spoken.length;
+    const newWords = all.length >= this.lastSpokenCount ? all.length - this.lastSpokenCount : 1;
+    this.lastSpokenCount = all.length;
 
     const { backWindow, forwardWindow } = this.config;
     const from = Math.max(0, this.cursorIndex - backWindow);
@@ -191,6 +199,23 @@ export class ScriptAligner {
   resetUtterance(): void {
     this.lastHypothesisKey = '';
     this.lastSpokenCount = 0;
+    this.ignoreSpoken = 0;
+  }
+
+  /**
+   * Manual resync mid-utterance: the words recognized so far stay in the transcript but no longer
+   * count; only speech after this point moves the cursor.
+   */
+  ignoreSpokenSoFar(): void {
+    this.ignoreSpoken = this.lastSpokenCount;
+    this.lastHypothesisKey = '';
+  }
+
+  /** Cursor for "start reading at this character": the word before the one that starts there. */
+  cursorBeforeChar(charOffset: number): number {
+    const i = this.wordIndexAtChar(charOffset);
+    if (i < 0) return -1;
+    return this.tokens[i]!.start >= charOffset ? i - 1 : i;
   }
 
   private decide(c: Candidate, newWords: number): AlignmentResult {

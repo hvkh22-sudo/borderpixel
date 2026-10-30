@@ -17,7 +17,8 @@ export interface Token {
   end: number;
 }
 
-const WORD_RE = /[\p{L}\p{N}]+(?:['’\-][\p{L}\p{N}]+)*/gu;
+// Combining marks (Hebrew niqqud, decomposed accents) belong to the word they sit on.
+const WORD_RE = /[\p{L}\p{N}][\p{L}\p{M}\p{N}]*(?:['’\-][\p{L}\p{N}][\p{L}\p{M}\p{N}]*)*/gu;
 const COMBINING_MARKS_RE = /\p{M}/gu;
 
 /** Small number words → digits so "ten" and "10" match. */

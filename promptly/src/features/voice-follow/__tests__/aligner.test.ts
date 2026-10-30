@@ -230,3 +230,10 @@ describe('ScriptAligner', () => {
     });
   });
 });
+
+describe('tokenize with combining marks', () => {
+  it('keeps Hebrew niqqud and decomposed accents inside their word', () => {
+    expect(tokenize('שָׁלוֹם עוֹלָם').map((t) => t.norm)).toEqual(['שלום', 'עולם']);
+    expect(tokenize('re\u0301sume\u0301 ready').map((t) => t.norm)).toEqual(['resume', 'ready']);
+  });
+});

@@ -70,4 +70,39 @@ describe('ExpoSpeechEngine', () => {
     jest.advanceTimersByTime(200);
     expect(start).toHaveBeenCalledTimes(1);
   });
+
+  it('retries transient Android errors (busy/client) with backoff before reporting an error', async () => {
+    const engine = new ExpoSpeechEngine();
+    const errors = jest.fn();
+    engine.onEnd(() => {});
+    engine.onError(errors);
+    await engine.start(opts);
+    for (let i = 1; i <= 3; i++) {
+      emit('error', { error: i % 2 ? 'busy' : 'client', message: '' });
+      emit('end');
+      jest.advanceTimersByTime(1000);
+      expect(start).toHaveBeenCalledTimes(1 + i);
+    }
+    expect(errors).not.toHaveBeenCalled();
+    emit('error', { error: 'busy', message: '' });
+    expect(errors).toHaveBeenCalledWith('unknown', '');
+  });
+
+  it('ignores a late error from a session that was already stopped', async () => {
+    const engine = new ExpoSpeechEngine();
+    const errors = jest.fn();
+    engine.onEnd(() => {});
+    engine.onError(errors);
+    await engine.start(opts);
+    await engine.stop();
+    await engine.start(opts);
+    emit('error', { error: 'audio-capture', message: '' }); // from the stopped session
+    expect(errors).not.toHaveBeenCalled();
+    emit('end'); // its end
+    jest.advanceTimersByTime(200);
+    // The new session still restarts on its own end.
+    emit('end');
+    jest.advanceTimersByTime(200);
+    expect(start).toHaveBeenCalledTimes(3);
+  });
 });

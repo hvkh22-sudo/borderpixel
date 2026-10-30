@@ -121,6 +121,8 @@ export class VoiceFollowController {
     if (this.status === 'idle') {
       return { kind: 'hold', cursor: this.aligner.cursor, charOffset: this.aligner.charOffsetForCursor(), confidence: 0 };
     }
+    // Speech resuming after a pause: the time spent listening is not "lost".
+    if (this.status === 'listening') this.lastAdvanceAt = now;
     const r = this.aligner.update(e.transcript);
     this.lastSpeechAt = now;
     this.lastConfidence = r.confidence;
@@ -155,8 +157,9 @@ export class VoiceFollowController {
 
   /** Manual override: user dragged or tapped the script. */
   resyncToChar(charOffset: number, now: number): void {
-    this.aligner.setCursor(this.aligner.wordIndexAtChar(charOffset));
-    this.aligner.resetUtterance();
+    // The tapped word has not been read yet; words said before the tap no longer count.
+    this.aligner.setCursor(this.aligner.cursorBeforeChar(charOffset));
+    this.aligner.ignoreSpokenSoFar();
     this.lastAdvanceAt = now;
     if (this.status === 'lost' || this.status === 'finished') this.setStatus('listening');
     else this.emit();

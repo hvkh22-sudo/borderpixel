@@ -31,6 +31,12 @@ const KNOWN_ERRORS: ReadonlySet<SpeechErrorCode> = new Set([
 
 /** Errors that are part of normal operation and should restart silently. */
 const BENIGN_ERRORS = new Set(['no-speech', 'speech-timeout', 'aborted', 'nomatch']);
+/**
+ * Android recognizer hiccups, typical right after the automatic restart: retried with backoff
+ * a few times before Voice Follow reports an error.
+ */
+const TRANSIENT_ERRORS = new Set(['busy', 'client', 'too-many-requests']);
+const MAX_TRANSIENT_RETRIES = 3;
 
 export class ExpoSpeechEngine implements SpeechEngine {
   private running = false;
@@ -46,10 +52,13 @@ export class ExpoSpeechEngine implements SpeechEngine {
    * treated as the new session ending.
    */
   private staleEnds = 0;
+  /** Consecutive transient errors since the last result (backoff and give-up count). */
+  private transientErrors = 0;
 
   async start(options: SpeechStartOptions): Promise<void> {
     this.lastOptions = options;
     this.running = true;
+    this.transientErrors = 0;
     this.clearRestart();
     this.startNative();
   }
@@ -106,7 +115,10 @@ export class ExpoSpeechEngine implements SpeechEngine {
   onResult(cb: Parameters<SpeechEngine['onResult']>[0]): () => void {
     const sub = ExpoSpeechRecognitionModule.addListener('result', (e) => {
       const best = e.results[0];
-      if (best) cb({ transcript: best.transcript, isFinal: e.isFinal });
+      if (best) {
+        this.transientErrors = 0;
+        cb({ transcript: best.transcript, isFinal: e.isFinal });
+      }
     });
     return () => sub.remove();
   }
@@ -114,6 +126,12 @@ export class ExpoSpeechEngine implements SpeechEngine {
   onError(cb: Parameters<SpeechEngine['onError']>[0]): () => void {
     const sub = ExpoSpeechRecognitionModule.addListener('error', (e) => {
       if (BENIGN_ERRORS.has(e.error)) return;
+      // A late error from a session we already stopped is not about the current one.
+      if (this.staleEnds > 0) return;
+      if (TRANSIENT_ERRORS.has(e.error) && this.running && this.transientErrors < MAX_TRANSIENT_RETRIES) {
+        this.transientErrors++;
+        return; // the session's 'end' restarts it, with backoff
+      }
       const code = KNOWN_ERRORS.has(e.error as SpeechErrorCode) ? (e.error as SpeechErrorCode) : 'unknown';
       this.running = false;
       cb(code, e.message);
@@ -138,7 +156,7 @@ export class ExpoSpeechEngine implements SpeechEngine {
         this.restartTimer = setTimeout(() => {
           this.restartTimer = null;
           if (this.running && !this.nativeActive) this.startNative();
-        }, Platform.OS === 'android' ? 50 : 150);
+        }, this.transientErrors > 0 ? 300 * this.transientErrors : Platform.OS === 'android' ? 50 : 150);
       }
     });
     return () => sub.remove();
@@ -187,6 +205,6 @@ export function getSpeechCapabilities(): SpeechCapabilities {
 
 /** Distinctive words/phrases from the script to bias the recognizer. */
 export function contextualStringsFor(script: string): string[] {
-  const words = script.match(/[\p{L}\p{N}'’-]{6,}/gu) ?? [];
+  const words = script.match(/[\p{L}\p{M}\p{N}'’-]{6,}/gu) ?? [];
   return Array.from(new Set(words.map((w) => w.toLowerCase()))).slice(0, 100);
 }
