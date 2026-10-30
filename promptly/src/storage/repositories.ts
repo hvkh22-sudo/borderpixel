@@ -98,7 +98,7 @@ export class ScriptRepository {
   /**
    * `folderId`: omitted = every folder, a string = that folder only, `null` = scripts in "No folder".
    */
-  async list(opts: { query?: string; favoritesOnly?: boolean; sort?: ScriptSort; folderId?: string | null } = {}): Promise<Script[]> {
+  async list(opts: { query?: string; favoritesOnly?: boolean; sort?: ScriptSort; folderId?: string | null; limit?: number } = {}): Promise<Script[]> {
     const where = ['deleted_at IS NULL'];
     const params: SqlValue[] = [];
     if (opts.favoritesOnly) where.push('favorite = 1');
@@ -108,8 +108,10 @@ export class ScriptRepository {
       params.push(opts.folderId);
     }
     const order = opts.sort === 'recent' ? 'COALESCE(last_opened_at, updated_at) DESC' : 'updated_at DESC';
+    // A limit only applies in SQL when nothing is filtered or re-sorted in JS below.
+    const sqlLimit = opts.limit != null && !opts.query?.trim() && opts.sort !== 'title' ? ` LIMIT ${Math.max(0, Math.floor(opts.limit))}` : '';
     const rows = await this.deps.db.getAllAsync<ScriptRow>(
-      `SELECT * FROM scripts WHERE ${where.join(' AND ')} ORDER BY ${order}`,
+      `SELECT * FROM scripts WHERE ${where.join(' AND ')} ORDER BY ${order}${sqlLimit}`,
       params,
     );
     let scripts = rows.map(toScript);
@@ -118,7 +120,7 @@ export class ScriptRepository {
     const q = opts.query?.trim() ? foldForSearch(opts.query.trim()) : '';
     if (q) scripts = scripts.filter((sc) => foldForSearch(sc.title).includes(q) || foldForSearch(sc.body).includes(q));
     if (opts.sort === 'title') scripts.sort((a, b) => TITLE_COLLATOR.compare(a.title, b.title));
-    return scripts;
+    return opts.limit != null ? scripts.slice(0, Math.max(0, opts.limit)) : scripts;
   }
 
   async update(id: string, patch: Partial<Pick<Script, 'title' | 'body' | 'favorite'>>): Promise<void> {
@@ -443,8 +445,9 @@ export class RecordingRepository {
     return row ? toRecording(row) : null;
   }
 
-  async list(): Promise<Recording[]> {
-    const rows = await this.deps.db.getAllAsync<RecordingRow>('SELECT * FROM recordings ORDER BY created_at DESC', []);
+  async list(opts: { limit?: number } = {}): Promise<Recording[]> {
+    const limit = opts.limit != null ? ` LIMIT ${Math.max(0, Math.floor(opts.limit))}` : '';
+    const rows = await this.deps.db.getAllAsync<RecordingRow>(`SELECT * FROM recordings ORDER BY created_at DESC${limit}`, []);
     return rows.map(toRecording);
   }
 

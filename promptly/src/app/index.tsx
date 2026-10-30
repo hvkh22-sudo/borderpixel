@@ -33,8 +33,9 @@ export default function Home() {
   const paceWpm = useDurationWpm();
   const { data } = useFocusData(async () => {
     const repos = await getRepositories();
-    const [scripts, takes] = await Promise.all([repos.scripts.list({ sort: 'recent' }), repos.recordings.list()]);
-    return { scripts: scripts.slice(0, 3), takes: takes.slice(0, 3) };
+    // Only the three shown: not every script body and every take's captions on each focus.
+    const [scripts, takes] = await Promise.all([repos.scripts.list({ sort: 'recent', limit: 3 }), repos.recordings.list({ limit: 3 })]);
+    return { scripts, takes };
   });
   const firstRunHydrated = useFirstRun((s) => s.hydrated);
   const firstRunFlags = useFirstRun((s) => s.flags);

@@ -116,3 +116,10 @@ Device: measure on Hermes with real partial-result rates (iOS ~10/s).
   instead of following it.
 - Not measured: Node's SQLite is synchronous, so the parallel reads show no difference in Jest.
   Cold start (TTI) and the scan's cost with many recordings need device profiling.
+
+## Home list queries (2026-10-30)
+Home showed the latest three scripts and takes but loaded every row (full script bodies, every take's
+parsed captions) on each focus. It now asks SQLite for three (`list({ limit: 3 })`; a filtered or
+title-sorted list applies the limit after filtering). Probe in Jest with Node's SQLite on the CI-like
+container, 300 takes × 300 cues + 300 scripts × 2,000 words: ~187 ms → ~3 ms per Home load. Not
+measured on a phone; expo-sqlite on a device has different absolute numbers.

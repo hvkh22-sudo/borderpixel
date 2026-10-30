@@ -187,6 +187,21 @@ describe('RecordingRepository', () => {
   });
 });
 
+describe('list limits (Home shows the latest three)', () => {
+  it('returns the same first rows as the full list, in SQL when possible', async () => {
+    const { scripts, recordings } = await setup();
+    for (let i = 0; i < 6; i++) {
+      await scripts.create({ title: `S${i}`, body: i % 2 ? 'match me' : 'other' });
+      await recordings.add({ scriptId: null, fileName: `r${i}.mp4`, durationMs: 1000, width: null, height: null, status: 'ready' });
+    }
+    expect(await scripts.list({ sort: 'recent', limit: 3 })).toEqual((await scripts.list({ sort: 'recent' })).slice(0, 3));
+    expect(await recordings.list({ limit: 3 })).toEqual((await recordings.list()).slice(0, 3));
+    // Filtered or JS-sorted lists apply the limit after filtering, never before.
+    expect((await scripts.list({ query: 'match', limit: 2 })).map((s) => s.body)).toEqual(['match me', 'match me']);
+    expect((await scripts.list({ sort: 'title', limit: 2 })).map((s) => s.title)).toEqual(['S0', 'S1']);
+  });
+});
+
 describe('KeyValueStore', () => {
   it('gets, sets and increments JSON values', async () => {
     const { kv } = await setup();
