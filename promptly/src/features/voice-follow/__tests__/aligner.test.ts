@@ -246,3 +246,16 @@ describe('number words and digits', () => {
     expect(norms('ג׳ירפה end. Next')).toEqual(['גירפה', 'end', 'next']);
   });
 });
+
+describe('countWords for scripts without spaces', () => {
+  const { countWords } = require('../text');
+  it('counts word equivalents, not whole phrases', () => {
+    expect(countWords('Hello world, 15 times')).toBe(4);
+    // ~17 English words; previously counted as 2.
+    expect(countWords('大家好，今天我想和大家分享三个简单的习惯，这些习惯改变了我录制视频的方式。')).toBeGreaterThanOrEqual(15);
+    // Thai vowel marks are not letters; previously counted as 2.
+    expect(countWords('สวัสดีทุกคน วันนี้ผมอยากแบ่งปันนิสัยง่ายๆ สามอย่างที่เปลี่ยนวิธีการอัดวิดีโอของผม')).toBeGreaterThanOrEqual(12);
+    expect(countWords('皆さん、こんにちは。今日は3つの習慣を紹介します。')).toBeGreaterThanOrEqual(10);
+    expect(countWords('שלום לכולם')).toBe(2);
+  });
+});

@@ -25,6 +25,7 @@ import { createRepos, renderScreen } from './testUtils';
 let mockRepos: Awaited<ReturnType<typeof createRepos>>;
 const mockRouter = { push: jest.fn(), replace: jest.fn(), back: jest.fn() };
 const mockParams: Record<string, string> = {};
+const mockFocused = { value: true };
 
 /** In-memory file system: file:// uri -> size in bytes. */
 const mockFs = new Map<string, number>();
@@ -98,6 +99,8 @@ interface MockPrompterProps {
   playing: boolean;
   mode: string;
   onTapChar(c: number): void;
+  onEnd?(): void;
+  onUserScroll?(): void;
 }
 const mockPrompter = {
   props: null as MockPrompterProps | null,
@@ -120,6 +123,7 @@ jest.mock('expo-router', () => ({
     back: (...a: unknown[]) => mockRouter.back(...a),
   },
   useLocalSearchParams: () => mockParams,
+  useIsFocused: () => mockFocused.value,
 }));
 jest.mock('expo-keep-awake', () => ({ useKeepAwake: jest.fn() }));
 jest.mock('expo-crypto', () => ({ randomUUID: () => `uuid${++mockUuid}` }));
@@ -293,6 +297,7 @@ beforeEach(async () => {
   mockRouter.replace.mockClear();
   mockRouter.back.mockClear();
   for (const k of Object.keys(mockParams)) delete mockParams[k];
+  mockFocused.value = true;
   mockFs.clear();
   mockDisk.free = 50 * 1024 ** 3;
   mockCam.perms = { camera: { has: true, canRequest: true }, mic: { has: true, canRequest: true } };
@@ -643,6 +648,40 @@ describe('Record: failures and interruptions', () => {
   });
 });
 
+describe('Record: learned speaking rate (timed)', () => {
+  const timedTake = async (before?: () => Promise<void>) => {
+    useSettings.getState().setPrompter({ countdownSec: 0 });
+    await openRecord();
+    if (before) await before();
+    await startTake();
+    await advance(12_000);
+    await act(async () => mockPrompter.props!.onEnd?.());
+    await stopTakeAndSave();
+    return useSpeakingRate.getState().history.samples;
+  };
+
+  it('learns from a take read from the top to the end', async () => {
+    expect(await timedTake()).toHaveLength(1);
+  });
+
+  it('does not learn when the prompter was already moved before the take', async () => {
+    const samples = await timedTake(async () => {
+      await fireEvent.press(screen.getByLabelText('Play'));
+      await advance(500);
+      await fireEvent.press(screen.getByLabelText('Pause'));
+    });
+    expect(samples).toHaveLength(0);
+  });
+
+  it('learns again after Restart puts the prompter back at the top', async () => {
+    const samples = await timedTake(async () => {
+      await act(async () => mockPrompter.props!.onUserScroll?.());
+      await fireEvent.press(screen.getByLabelText('Back to start'));
+    });
+    expect(samples).toHaveLength(1);
+  });
+});
+
 describe('Record: Bluetooth remote', () => {
   const key = (k: string, repeat = false) => act(async () => mockMedia.keyListeners.forEach((cb) => cb({ key: k, repeat })));
 
@@ -674,6 +713,12 @@ describe('Record: Bluetooth remote', () => {
     await key('Enter');
     await waitFor(() => expect(mockRouter.replace).toHaveBeenCalled());
     expect(await mockRepos.recordings.list()).toHaveLength(1);
+  });
+
+  it('does not listen while another screen (the paywall) is on top', async () => {
+    mockFocused.value = false;
+    await openRecord();
+    expect(mockMedia.keyListeners.size).toBe(0);
   });
 
   it('does not listen when the remote is turned off', async () => {

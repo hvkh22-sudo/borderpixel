@@ -121,6 +121,39 @@ export function lineAtY(index: LineIndex, y: number): number {
 }
 
 /**
+ * Keeps the reading position on the same text when the script reflows (rotation, font size,
+ * text width): converts the content `y` on the reading line in the old layout to a character,
+ * then returns the `y` of that character in the new layout, clamped to the new content.
+ */
+export function remapOffset(from: LineIndex, to: LineIndex, y: number): number {
+  const { lines } = from;
+  if (lines.length === 0 || to.lines.length === 0) return clamp(y, 0, to.contentHeight);
+  // Last line starting at or above y (y may sit in the spacing between chunks).
+  let lo = 0;
+  let hi = lines.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (lines[mid]!.y <= y) lo = mid;
+    else hi = mid - 1;
+  }
+  const line = lines[lo]!;
+  if (y < line.y) return clamp(y, 0, to.contentHeight);
+  const len = Math.max(1, line.text.length);
+  const within = line.height > 0 ? (y - line.y) / line.height : 0;
+  if (within >= 1) {
+    // Below the line: keep the same distance below the same text in the new layout.
+    const target = to.lines[lineForChar(to, from.starts[lo]! + line.text.length - 1)]!;
+    return clamp(target.y + target.height + (y - line.y - line.height), 0, to.contentHeight);
+  }
+  const char = from.starts[lo]! + Math.floor(within * len);
+  const ti = lineForChar(to, char);
+  const target = to.lines[ti]!;
+  const tLen = Math.max(1, target.text.length);
+  const frac = Math.min(1, Math.max(0, (char - to.starts[ti]!) / tLen));
+  return clamp(target.y + frac * target.height, 0, to.contentHeight);
+}
+
+/**
  * Timed mode, one frame: the next offset, or null when the frame callback
  * must not write (dragging, or a restart/jump animation owns the offset —
  * assigning offset.value would cancel that withTiming).

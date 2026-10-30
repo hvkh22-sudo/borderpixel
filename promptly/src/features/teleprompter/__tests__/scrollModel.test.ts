@@ -9,6 +9,7 @@ import {
   lineForChar,
   maxScroll,
   pixelsPerSecond,
+  remapOffset,
   scrollOffsetForChar,
 } from '../scrollModel';
 
@@ -140,5 +141,38 @@ describe('scrollModel', () => {
     // Long frames are capped (64 ms) and the result clamps to the end.
     expect(timedStep(100, 1000, 500, 1000, false)).toBe(164);
     expect(timedStep(990, 1000, 64, 1000, false)).toBe(1000);
+  });
+});
+
+describe('remapOffset (reflow keeps the reading position on the same text)', () => {
+  // Portrait: 4 lines of 10 chars, 40px each. Landscape: 2 lines of 20 chars, 30px each.
+  const text = 'aaaaaaaaa bbbbbbbbb ccccccccc ddddddddd ';
+  const narrow = buildLineIndex([0, 1, 2, 3].map((i) => ({ text: text.slice(i * 10, i * 10 + 10), y: i * 40, height: 40 })));
+  const wide = buildLineIndex([0, 1].map((i) => ({ text: text.slice(i * 20, i * 20 + 20), y: i * 30, height: 30 })));
+
+  it('maps the reading line to the same characters in the new layout', () => {
+    // Start of line 3 ("ccc…", char 20) → start of the second wide line.
+    expect(remapOffset(narrow, wide, 80)).toBe(30);
+    // Halfway through "ddd…" (char 35) → 3/4 through the second wide line.
+    expect(remapOffset(narrow, wide, 140)).toBeCloseTo(52.5);
+    // And back.
+    expect(remapOffset(wide, narrow, 30)).toBe(80);
+  });
+
+  it('never lands past the end of the shorter content', () => {
+    expect(remapOffset(narrow, wide, narrow.contentHeight)).toBe(wide.contentHeight);
+    expect(remapOffset(narrow, wide, 10_000)).toBe(wide.contentHeight);
+    expect(remapOffset(narrow, wide, 0)).toBe(0);
+  });
+
+  it('handles spacing between chunks and empty layouts', () => {
+    const gapped = buildLineIndex([
+      { text: 'aaaaaaaaa ', y: 0, height: 40 },
+      { text: 'bbbbbbbbb ', y: 60, height: 40 },
+    ]);
+    const flat = buildLineIndex([{ text: 'aaaaaaaaa bbbbbbbbb ', y: 0, height: 30 }]);
+    // 10px into the 20px gap after "aaa…" → just past the end of the single line.
+    expect(remapOffset(gapped, flat, 50)).toBe(30);
+    expect(remapOffset(buildLineIndex([]), flat, 50)).toBe(30);
   });
 });

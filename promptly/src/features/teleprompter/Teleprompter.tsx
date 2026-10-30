@@ -39,6 +39,7 @@ import {
   lineAtY,
   lineForChar,
   pixelsPerSecond,
+  remapOffset,
   scrollOffsetForChar,
   splitScript,
   timedStep,
@@ -103,9 +104,16 @@ export const Teleprompter = forwardRef<TeleprompterHandle, Props>(function Telep
     rebuildTimer.current = null;
     const idx = buildChunkedLineIndex(chunksRef.current, chunkLayouts.current);
     if (!idx) return;
+    const prev = lineIndexRef.current;
+    // Reflow (rotation, font size, width): stay on the same text instead of the same pixel,
+    // which would land elsewhere or past the new end. A running animation retargets itself.
+    if (prev && !animating.value && !dragging.value && (prev.contentHeight !== idx.contentHeight || prev.lines.length !== idx.lines.length)) {
+      offset.value = remapOffset(prev, idx, offset.value);
+      if (offset.value < idx.contentHeight) endNotified.value = false;
+    }
     lineIndexRef.current = idx;
     setContentHeight(idx.contentHeight);
-  }, []);
+  }, [animating, dragging, offset, endNotified]);
 
   useEffect(() => {
     chunksRef.current = chunks;

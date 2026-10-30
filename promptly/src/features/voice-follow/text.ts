@@ -109,8 +109,33 @@ export function wordSimilarity(a: string, b: string): number {
 /** Words per minute used for duration estimates when the user has no history. */
 export const DEFAULT_SPEAKING_WPM = 150;
 
+// Scripts written without spaces between words: a token there is a whole phrase or sentence.
+// Han/kana are counted per character (about 250 characters a minute ≈ 150 words a minute);
+// Thai, Lao, Khmer and Burmese letters per average word length (marks are not letters).
+// Explicit ranges rather than \p{Script=…}, which not every JS engine supports.
+const CJK_CHAR_RE = /[\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/gu;
+const SOUTHEAST_ASIAN_LETTER_RE = /(?=\p{L})[\u0E00-\u0EFF\u1000-\u109F\u1780-\u17FF]/gu;
+const CJK_WORDS_PER_CHAR = 0.6;
+const SOUTHEAST_ASIAN_LETTERS_PER_WORD = 3.5;
+
+/**
+ * Word count used for timing (Timed scroll speed, duration estimates, learned speaking rate).
+ * Space-separated scripts count tokens; unspaced scripts count word equivalents.
+ */
 export function countWords(text: string): number {
-  return tokenize(text).length;
+  let words = 0;
+  for (const token of tokenize(text)) {
+    const raw = text.slice(token.start, token.end);
+    const cjk = raw.match(CJK_CHAR_RE)?.length ?? 0;
+    const sea = raw.match(SOUTHEAST_ASIAN_LETTER_RE)?.length ?? 0;
+    if (cjk === 0 && sea === 0) {
+      words += 1;
+      continue;
+    }
+    const rest = [...raw.replace(CJK_CHAR_RE, '').replace(SOUTHEAST_ASIAN_LETTER_RE, '')].filter((c) => /[\p{L}\p{N}]/u.test(c)).length;
+    words += Math.max(1, cjk * CJK_WORDS_PER_CHAR + sea / SOUTHEAST_ASIAN_LETTERS_PER_WORD + (rest > 0 ? 1 : 0));
+  }
+  return Math.round(words);
 }
 
 export function estimateSpeakingSeconds(text: string, wpm = DEFAULT_SPEAKING_WPM): number {

@@ -6,7 +6,7 @@
  */
 import { Ionicons } from '@expo/vector-icons';
 import { useKeepAwake } from 'expo-keep-awake';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, AppState, BackHandler, Linking, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -107,6 +107,8 @@ export default function RecordScreen() {
   const playSinceRef = useRef(0);
   const timedEndMsRef = useRef<number | null>(null);
   const manualScrollRef = useRef(false);
+  /** The prompter left the top before the take started (played, dragged, tapped or nudged). */
+  const movedBeforeTakeRef = useRef(false);
 
   // Recording lifecycle (races, interruptions, salvage) lives in RecordingSession; the screen
   // only maps UI and camera events onto it. UI callbacks never fire after unmount.
@@ -116,7 +118,8 @@ export default function RecordScreen() {
       paceRef.current = createPaceTracker();
       playedMsRef.current = 0;
       timedEndMsRef.current = null;
-      manualScrollRef.current = false;
+      // A take that starts mid-script would teach a too-fast pace (whole script, part of the time).
+      manualScrollRef.current = movedBeforeTakeRef.current;
       setElapsed(0);
       track({ name: 'recording_started', mode });
       if (mode === 'timed') setPlaying(true);
@@ -139,7 +142,10 @@ export default function RecordScreen() {
   const isRecording = state.status === 'recording';
   const playedNow = () => playedMsRef.current + (playSinceRef.current ? Date.now() - playSinceRef.current : 0);
   const markManualJump = () => {
-    if (!isRecording) return;
+    if (!isRecording) {
+      movedBeforeTakeRef.current = true;
+      return;
+    }
     manualScrollRef.current = true;
     paceRef.current = breakPaceSegment(paceRef.current);
   };
@@ -152,13 +158,14 @@ export default function RecordScreen() {
 
   // Timed: time actually spent scrolling (pauses excluded).
   useEffect(() => {
+    if (playing && !isBusy(state.status)) movedBeforeTakeRef.current = true;
     if (!(playing && isRecording)) return;
     playSinceRef.current = Date.now();
     return () => {
       playedMsRef.current += Date.now() - playSinceRef.current;
       playSinceRef.current = 0;
     };
-  }, [playing, isRecording]);
+  }, [playing, isRecording, state.status]);
 
   useEffect(() => {
     let alive = true;
@@ -307,10 +314,12 @@ export default function RecordScreen() {
       }
     };
   });
+  // Not while another screen (the paywall) is on top: keys would act on the hidden prompter.
+  const focused = useIsFocused();
   useEffect(() => {
-    if (!remoteEnabled || !appActive) return;
+    if (!remoteEnabled || !appActive || !focused) return;
     return PromptlyMedia.listenRemoteKeys((e) => remoteHandlerRef.current(e.key, e.repeat));
-  }, [remoteEnabled, appActive]);
+  }, [remoteEnabled, appActive, focused]);
 
   const close = () => {
     if (isBusy(state.status)) {
@@ -542,6 +551,7 @@ export default function RecordScreen() {
             <IconButton icon="play-skip-back" label={t('record.restart')} color="#fff" background="rgba(0,0,0,0.35)" onPress={() => {
               markManualJump();
               prompterRef.current?.restart();
+              if (!isRecording) movedBeforeTakeRef.current = false;
               if (voice) vf.resync(0);
             }} />
           </View>
