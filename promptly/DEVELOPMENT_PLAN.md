@@ -101,8 +101,18 @@ never followed); Android busy/client/too-many-requests retried with backoff; lat
 leftover take files, and reports failures; deleting a muxed take removes its leftover original; re-importing a backup never
 duplicates; restoring over a deleted script keeps the newer text as a version; favoriting no longer counts as an edit;
 far-future timestamps rejected on import; deleted scripts purged after 30 days; the editor saves when the screen loses focus.
-Search now ignores case, accents and niqqud for every script, and title sort uses the locale collator (done in JS after the SQL filter). Open: number words 13–19 and
-hyphenated numbers don't match digits in Voice Follow (minor).
+Search now ignores case, accents and niqqud for every script, and title sort uses the locale collator (done in JS after the SQL filter). Number words (13–19, tens,
+hyphenated compounds, "1,000") now match digits in Voice Follow.
+
+## Code review: teleprompter, remote, AI Studio (2026-10-30)
+Fixed with tests (unit/screen tests only; none verified on a device): text reflow (rotation, font size, width) keeps the
+reading line on the same text instead of the same pixel, which could jump to the end and log a false "end of script";
+Timed word count treats Chinese/Japanese characters and Thai/Lao/Khmer/Burmese letters as word equivalents (a CJK script
+scrolled its whole length in ~1 s); the remote no longer acts on the record screen while the paywall is on top; a timed
+take started with the prompter already moved doesn't teach a speaking rate; Studio applies a draft once on a double tap,
+cancels Generate when the screen closes (no paywall over another screen), names a refusal (charged, retry won't help) and
+an over-long script, and keeps Run disabled until the script has loaded. Open (low): a script with no line breaks renders
+as one text block, so Voice Follow re-measures all of it on every word (not measured on a device).
 
 ## Blockers
 - No macOS/Xcode and no Android SDK in this container → native builds run in GitHub Actions instead; device tests need the founder's phones.
