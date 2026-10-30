@@ -245,3 +245,60 @@ describe('Subscription', () => {
     expect(mockPush).toHaveBeenCalledWith('/paywall');
   });
 });
+
+/**
+ * Accessibility audit: every pressable host element on the main screens exposes a role and a name
+ * (accessibilityLabel or visible text), so screen-reader users hear what each control does.
+ */
+describe('Accessibility audit', () => {
+  type Node = { type: unknown; props: Record<string, unknown>; children: (Node | string)[] };
+  const textOf = (n: Node | string): string =>
+    typeof n === 'string' ? n : [n.props.accessibilityLabel as string | undefined, ...n.children.map(textOf)].filter(Boolean).join(' ');
+  function unnamedControls(): string[] {
+    const bad: string[] = [];
+    let controls = 0;
+    const visit = (n: Node | string) => {
+      if (typeof n === 'string') return;
+      const hidden = n.props.accessibilityElementsHidden || n.props.importantForAccessibility === 'no-hide-descendants';
+      if (hidden) return;
+      const pressable = typeof n.type === 'string' && typeof n.props.onClick === 'function' && n.props.accessible !== false;
+      if (pressable) {
+        controls++;
+        const name = ((n.props.accessibilityLabel as string | undefined) ?? textOf(n)).trim();
+        const role = n.props.accessibilityRole ?? n.props.role;
+        if (!name || !role) bad.push(`${String(n.props.testID ?? n.type)} role=${String(role)} name="${name}"`);
+      }
+      n.children.forEach(visit);
+    };
+    visit(screen.toJSON() as unknown as Node);
+    // The audit must actually see the screen's controls, or it would pass vacuously.
+    if (controls === 0) bad.push('no controls found');
+    return bad;
+  }
+
+  it.each([
+    ['Home', () => require('../index').default],
+    ['Library', () => require('../scripts/index').default],
+    ['Settings', () => require('../settings/index').default],
+    ['Paywall', () => require('../paywall').default],
+    ['Create', () => require('../create').default],
+  ])('%s: every control has a role and a name', async (_name, load) => {
+    await mockRepos.scripts.create({ title: 'A script', body: 'Hello world' });
+    const Screen = load();
+    await renderScreen(<Screen />);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(unnamedControls()).toEqual([]);
+  });
+
+  it.each([
+    ['Editor', () => require('../scripts/[id]').default],
+    ['Prepare', () => require('../prepare/[id]').default],
+  ])('%s: every control has a role and a name', async (_name, load) => {
+    const s = await mockRepos.scripts.create({ title: 'A script', body: 'Hello world' });
+    mockParams.id = s.id;
+    const Screen = load();
+    await renderScreen(<Screen />);
+    await new Promise((res) => setTimeout(res, 50));
+    expect(unnamedControls()).toEqual([]);
+  });
+});
