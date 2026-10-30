@@ -13,8 +13,14 @@ const mockParams: Record<string, string> = {};
 const mockFocus = { cbs: new Set<() => void | (() => void)>() };
 const mockFetchPackages = jest.fn();
 const mockPurchase = jest.fn();
+const mockWipe = jest.fn(() => 0);
 
 jest.mock('../../services/db', () => ({ getRepositories: () => Promise.resolve(mockRepos) }));
+jest.mock('../../services/files', () => ({
+  ...jest.requireActual('../../services/files'),
+  wipeLocalFiles: () => mockWipe(),
+  deleteRecordingFile: jest.fn(),
+}));
 jest.mock('../../services/purchases', () => ({
   fetchPackages: () => mockFetchPackages(),
   purchase: (...a: unknown[]) => mockPurchase(...a),
@@ -117,6 +123,31 @@ describe('Editor auto title', () => {
 });
 
 describe('Delete all my data', () => {
+  const confirmDelete = async () => {
+    const Privacy = require('../settings/privacy').default;
+    await renderScreen(<Privacy />);
+    await fireEvent.press(screen.getByLabelText('Delete all my data'));
+    const buttons = (Alert.alert as jest.Mock).mock.calls[0][2] as { style?: string; onPress?: () => Promise<void> }[];
+    await act(async () => buttons.find((b) => b.style === 'destructive')!.onPress!());
+  };
+
+  it('wipes local files and confirms when everything was deleted', async () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    mockWipe.mockReturnValueOnce(0);
+    await confirmDelete();
+    expect(mockWipe).toHaveBeenCalled();
+    expect(alert).toHaveBeenLastCalledWith('All data deleted');
+  });
+
+  it('reports an error and logs it when some files could not be deleted', async () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    mockWipe.mockReturnValueOnce(2);
+    const { diagnosticsLog } = require('../../services/diagnosticsLog');
+    await confirmDelete();
+    expect(alert).toHaveBeenLastCalledWith('Something went wrong.');
+    expect(diagnosticsLog.entries().map((e: { code: string }) => e.code)).toContain('delete_all_failed');
+  });
+
   it('keeps the free Voice Follow usage counter', async () => {
     jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     await mockRepos.kv.set(USAGE_VF_KEY, 3);
