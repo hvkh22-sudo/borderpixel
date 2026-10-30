@@ -107,6 +107,8 @@ export function useBootstrap(): { ready: boolean; recovered: number } {
         } catch (e) {
           if (__DEV__) console.warn('orphan recovery failed', e);
         }
+        // Deleted scripts are kept 30 days (undo, restore from a backup), then removed for good.
+        void r.scripts.purgeDeleted(Date.now() - 30 * 24 * 60 * 60 * 1000).catch(() => {});
         try {
           cleanExports(24 * 60 * 60 * 1000);
         } catch (e) {

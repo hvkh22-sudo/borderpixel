@@ -10,7 +10,7 @@ import { createRepos, renderScreen } from './testUtils';
 
 let mockRepos: Awaited<ReturnType<typeof createRepos>>;
 const mockParams: Record<string, string> = {};
-const mockFocus: { cb: null | (() => void | (() => void)) } = { cb: null };
+const mockFocus = { cbs: new Set<() => void | (() => void)>() };
 const mockFetchPackages = jest.fn();
 const mockPurchase = jest.fn();
 
@@ -25,9 +25,9 @@ jest.mock('expo-router', () => {
   return {
     router: { push: jest.fn(), replace: jest.fn(), back: jest.fn() },
     useLocalSearchParams: () => mockParams,
-    // Runs on mount like a first focus; tests call mockFocus.cb() to simulate returning to the screen.
+    // Runs on mount like a first focus; tests call refocus() to simulate returning to the screen.
     useFocusEffect: (cb: () => void | (() => void)) => {
-      mockFocus.cb = cb;
+      mockFocus.cbs.add(cb);
       React.useEffect(cb, [cb]);
     },
     Stack: { Screen: () => null },
@@ -35,12 +35,12 @@ jest.mock('expo-router', () => {
 });
 
 const USAGE_VF_KEY = 'usage.voiceFollowSessions';
-const refocus =() => act(async () => void mockFocus.cb?.());
+const refocus = () => act(async () => mockFocus.cbs.forEach((cb) => void cb()));
 
 beforeEach(async () => {
   mockRepos = await createRepos();
   for (const k of Object.keys(mockParams)) delete mockParams[k];
-  mockFocus.cb = null;
+  mockFocus.cbs.clear();
   useSettings.getState().hydrate({ onboardingDone: true });
 });
 

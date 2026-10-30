@@ -13,9 +13,9 @@ import { setAnalyticsEnabled } from '../../services/analytics';
 import { shareScriptsBackup } from '../../services/backupExport';
 import { config } from '../../services/config';
 import { getRepositories } from '../../services/db';
-import { diagnosticsLog } from '../../services/diagnosticsLog';
+import { diagnosticsLog, logDiagnostic } from '../../services/diagnosticsLog';
 import { useDiagnosticsOverrides } from '../../services/diagnosticsOverrides';
-import { deleteRecordingFile } from '../../services/files';
+import { deleteRecordingFile, wipeLocalFiles } from '../../services/files';
 import { INITIAL_FIRST_RUN } from '../../features/onboarding/firstRun';
 import { useFirstRun } from '../../state/firstRun';
 import { useSettings } from '../../state/settings';
@@ -66,28 +66,45 @@ export default function Privacy() {
         text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
-          const repos = await getRepositories();
-          for (const r of await repos.recordings.list()) {
-            deleteRecordingFile(r.fileName);
-            await repos.recordings.remove(r.id);
+          try {
+            await deleteAllData();
+          } catch (e) {
+            logDiagnostic('storage', 'delete_all_failed', e);
+            Alert.alert(t('errors.generic'));
+            return;
           }
-          for (const s of await repos.scripts.list()) await repos.scripts.remove(s.id);
-          await repos.scripts.purgeDeleted(Number.MAX_SAFE_INTEGER);
-          await repos.folders.clearAll();
-          // Free-tier usage counters survive, otherwise deleting data would reset the free Voice Follow trial.
-          await repos.kv.clearAllExcept([USAGE_KEY_PREFIX]);
-          useSettings.getState().reset();
-          useSpeakingRate.getState().reset();
-          // In-memory copies of the KV rows just deleted: otherwise this session keeps using them
-          // and writes them (or only their later changes) back.
-          useFirstRun.getState().hydrate(INITIAL_FIRST_RUN);
-          useDiagnosticsOverrides.getState().hydrate(null);
-          await diagnosticsLog.clear();
           Alert.alert(t('privacy.deleted'));
           router.replace('/');
         },
       },
     ]);
+
+  const deleteAllData = async () => {
+    const repos = await getRepositories();
+    for (const r of await repos.recordings.list()) {
+      try {
+        deleteRecordingFile(r.fileName);
+      } catch {
+        // The row goes anyway; wipeLocalFiles below retries every file.
+      }
+      await repos.recordings.remove(r.id);
+    }
+    for (const s of await repos.scripts.list()) await repos.scripts.remove(s.id);
+    await repos.scripts.purgeDeleted(Number.MAX_SAFE_INTEGER);
+    await repos.folders.clearAll();
+    // Free-tier usage counters survive, otherwise deleting data would reset the free Voice Follow trial.
+    await repos.kv.clearAllExcept([USAGE_KEY_PREFIX]);
+    useSettings.getState().reset();
+    useSpeakingRate.getState().reset();
+    // In-memory copies of the KV rows just deleted: otherwise this session keeps using them
+    // and writes them (or only their later changes) back.
+    useFirstRun.getState().hydrate(INITIAL_FIRST_RUN);
+    useDiagnosticsOverrides.getState().hydrate(null);
+    await diagnosticsLog.clear();
+    // Files without a row (export copies, imported backups, leftovers of an interrupted take)
+    // are personal data too; a leftover take would otherwise come back as "recovered".
+    if (wipeLocalFiles() > 0) throw new Error('some files could not be deleted');
+  };
 
   return (
     <Screen>

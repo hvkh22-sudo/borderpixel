@@ -120,8 +120,14 @@ export function isAudioSidecarOf(takeFileName: string, name: string): boolean {
 export function deleteRecordingFile(fileName: string): void {
   const f = recordingFile(fileName);
   if (f.exists) f.delete();
+  // A muxed take `X_av.mp4` may still have its video-only original `X.mp4` (app killed between the
+  // move and the cleanup) and the kept WAVs `X_audio_N.wav`: they belong to this take too, or the
+  // original would be recovered as a new take on the next launch.
+  const original = /_av\.mp4$/i.test(fileName) ? fileName.replace(/_av\.mp4$/i, '') : null;
   for (const entry of recordingsDir().list()) {
-    if (!(entry instanceof File) || !isAudioSidecarOf(fileName, entry.name)) continue;
+    if (!(entry instanceof File)) continue;
+    const isOriginal = original != null && (entry.name === `${original}.mp4` || entry.name === `${original}.mov`);
+    if (!isOriginal && !isAudioSidecarOf(fileName, entry.name) && !(original && isAudioSidecarOf(`${original}.mp4`, entry.name))) continue;
     try {
       entry.delete();
     } catch {
@@ -140,6 +146,27 @@ export function findOrphanRecordings(known: ReadonlySet<string>): File[] {
     .list()
     .filter((e): e is File => e instanceof File)
     .filter((f) => /\.(mov|mp4)$/i.test(f.name) && !known.has(f.name) && (f.info().size ?? 0) > 0);
+}
+
+/**
+ * "Delete all my data" (user-initiated): every file the app keeps — recordings and their sidecars,
+ * export copies, scratch files and imported-backup copies. Best effort per file; returns how many
+ * could not be deleted.
+ */
+export function wipeLocalFiles(): number {
+  let failed = 0;
+  const dirs = [recordingsDir(), exportsDir(), new Directory(Paths.cache, 'scratch'), new Directory(Paths.cache, 'DocumentPicker')];
+  for (const dir of dirs) {
+    if (!dir.exists) continue;
+    for (const entry of dir.list()) {
+      try {
+        entry.delete();
+      } catch {
+        failed++;
+      }
+    }
+  }
+  return failed;
 }
 
 /** Only disposable export copies are cleaned; recordings are never touched. */

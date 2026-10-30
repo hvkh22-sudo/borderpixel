@@ -134,8 +134,12 @@ export class ScriptRepository {
       params.push(patch.favorite ? 1 : 0);
     }
     if (sets.length === 0) return;
-    sets.push('updated_at = ?');
-    params.push(this.deps.now(), id);
+    // Favoriting is organization, not editing: only text changes move "Last edited".
+    if (patch.title !== undefined || patch.body !== undefined) {
+      sets.push('updated_at = ?');
+      params.push(this.deps.now());
+    }
+    params.push(id);
     await this.deps.db.runAsync(`UPDATE scripts SET ${sets.join(', ')} WHERE id = ?`, params);
   }
 

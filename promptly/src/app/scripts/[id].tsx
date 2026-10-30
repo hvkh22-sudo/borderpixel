@@ -105,6 +105,17 @@ export default function Editor() {
     }
   }, [id]);
 
+  // Leaving the screen (it may stay mounted under the next one): save now, so the library shows
+  // the new title and preview instead of waiting for the debounce or the unmount.
+  useFocusEffect(
+    useCallback(
+      () => () => {
+        void flush();
+      },
+      [flush],
+    ),
+  );
+
   // Save immediately when the app backgrounds or the screen unmounts.
   useEffect(() => {
     const sub = AppState.addEventListener('change', (s) => s !== 'active' && void flush());

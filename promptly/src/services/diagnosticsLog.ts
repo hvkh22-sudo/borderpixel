@@ -7,7 +7,7 @@
  */
 import { getRepositories } from './db';
 
-export type DiagnosticsSource = 'recording' | 'speech' | 'transcription' | 'export' | 'mux';
+export type DiagnosticsSource = 'recording' | 'speech' | 'transcription' | 'export' | 'mux' | 'storage';
 
 export interface DiagnosticsEntry {
   /** Epoch ms. */
@@ -26,7 +26,7 @@ export const DIAGNOSTICS_LOG_KEY = 'diagnostics.log.v1';
 export const DIAGNOSTICS_LOG_MAX = 30;
 const MAX_MESSAGE = 160;
 const MAX_CODE = 60;
-const SOURCES: ReadonlySet<string> = new Set<DiagnosticsSource>(['recording', 'speech', 'transcription', 'export', 'mux']);
+const SOURCES: ReadonlySet<string> = new Set<DiagnosticsSource>(['recording', 'speech', 'transcription', 'export', 'mux', 'storage']);
 
 /** Strip paths/URIs (they can carry file names) and cap the length. */
 export function sanitizeMessage(raw: string): string {

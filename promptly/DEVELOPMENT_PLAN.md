@@ -94,6 +94,17 @@ in the preview and SRT (RLM).
 Open: free Voice Follow counter resets on reinstall (needs Keychain/Keystore or a server-side counter — design call); the
 native burn-in renderers still use the platform's first-strong direction for mixed Hebrew/English cues — verify on a device.
 
+## Code review: Voice Follow engine, scripts & data (2026-10-30)
+Fixed (unit-tested, **not tested on a device**): tap-to-resync / Restart no longer undone by words the recognizer still
+holds; the tapped word counts as unread; Hebrew niqqud / decomposed accents tokenized as one word (vocalized scripts were
+never followed); Android busy/client/too-many-requests retried with backoff; late errors of a stopped session ignored; no
+"lost" flash after a pause. Data: "Delete all my data" also removes export copies, imported-backup copies, scratch files and
+leftover take files, and reports failures; deleting a muxed take removes its leftover original; re-importing a backup never
+duplicates; restoring over a deleted script keeps the newer text as a version; favoriting no longer counts as an edit;
+far-future timestamps rejected on import; deleted scripts purged after 30 days; the editor saves when the screen loses focus.
+Open: search/sort ignore case and accents only for ASCII (needs a normalized search column); number words 13–19 and
+hyphenated numbers don't match digits in Voice Follow (minor).
+
 ## Blockers
 - No macOS/Xcode and no Android SDK in this container → native builds run in GitHub Actions instead; device tests need the founder's phones.
 - Store/developer accounts, RevenueCat project, Anthropic key: founder-owned.

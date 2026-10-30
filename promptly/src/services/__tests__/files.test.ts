@@ -84,3 +84,11 @@ test('orphan recovery never sees sidecar WAVs, before or after a delete', () => 
   expect(findOrphanRecordings(new Set())).toEqual([]);
   expect(names()).toEqual(['take_1_audio_0.wav']);
 });
+
+test('deleting a muxed take also removes its leftover original and WAVs, nothing else', () => {
+  for (const n of ['take_3_av.mp4', 'take_3.mp4', 'take_3_audio_0.wav', 'take_30.mp4', 'take_3_x.mp4']) mockFs.set(dir + n, 100);
+  deleteRecordingFile('take_3_av.mp4');
+  expect(names()).toEqual(['take_30.mp4', 'take_3_x.mp4']);
+  // The original no longer comes back as a "recovered" take.
+  expect(findOrphanRecordings(new Set(['take_30.mp4', 'take_3_x.mp4']))).toEqual([]);
+});

@@ -63,7 +63,8 @@ export function serializeBackup(data: BackupData, exportedAt: number): string {
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v);
 const isId = (v: unknown): v is string => typeof v === 'string' && v.length > 0 && v.length <= 128;
-const isTime = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0;
+// Epoch ms no later than a day from now: a far-future time would sort first forever or show "Invalid Date".
+const isTime = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= Date.now() + 24 * 60 * 60 * 1000;
 
 function fail(detail: string): never {
   throw new BackupError('malformed', detail);
@@ -213,6 +214,10 @@ export function planMerge(existing: ExistingState, incoming: BackupData, newId: 
   const scripts: Script[] = [];
   const restoredScripts: Script[] = [];
   const restored = new Set<string>();
+  // The same content under another id is a copy a previous import already added: skip it, so
+  // importing one backup twice never duplicates scripts.
+  const contentKey = (s: Pick<Script, 'title' | 'body' | 'updatedAt'>) => `${s.updatedAt}\u0000${s.title}\u0000${s.body}`;
+  const present = new Set([...existing.scripts.values()].filter((s) => !s.deleted).map(contentKey));
   for (const s of incoming.scripts) {
     const stored = existing.scripts.get(s.id);
     if (stored?.deleted) {
@@ -227,6 +232,11 @@ export function planMerge(existing: ExistingState, incoming: BackupData, newId: 
       scriptMap.set(s.id, s.id);
       continue;
     }
+    if (present.has(contentKey(s))) {
+      skipped.add(s.id);
+      continue;
+    }
+    present.add(contentKey(s));
     const id = freshId(s.id);
     scriptMap.set(s.id, id);
     scripts.push({ ...s, id, folderId: s.folderId ? (folderMap.get(s.folderId) ?? null) : null });
@@ -270,7 +280,12 @@ export async function importBackup(repos: BackupRepos, text: string, newId: () =
   const plan = planMerge({ folders, scripts: ids.scripts, versionIds: ids.versions }, incoming, newId);
   for (const f of plan.folders) await repos.folders.insert(f);
   for (const s of plan.scripts) await repos.scripts.insertImported(s);
-  for (const s of plan.restoredScripts) await repos.scripts.restoreImported(s);
+  for (const s of plan.restoredScripts) {
+    // The stored (deleted) copy may be newer than the backup: keep it as a version, never overwrite it.
+    const stored = ids.scripts.get(s.id);
+    if (stored && stored.body !== s.body) await repos.scripts.addVersion(s.id, stored.body, 'before_restore');
+    await repos.scripts.restoreImported(s);
+  }
   for (const v of plan.versions) await repos.scripts.insertImportedVersion(v);
   return {
     scriptsAdded: plan.scripts.length + plan.restoredScripts.length,

@@ -170,7 +170,26 @@ describe('import merge', () => {
     const back = await repos.scripts.get(a.id);
     expect(back).toMatchObject({ title: 'Hook one', body: 'Stop scrolling — שלום', favorite: true });
     expect((await repos.scripts.list()).length).toBe(2);
-    expect((await repos.scripts.listVersions(a.id)).map((v) => v.body)).toEqual(['older draft']);
+    // The newer text the user had before deleting is kept as a version, never overwritten.
+    expect((await repos.scripts.listVersions(a.id)).map((v) => v.body)).toEqual(['edited after backup', 'older draft']);
+  });
+
+  it('importing the same backup again after editing never duplicates scripts', async () => {
+    const { repos, a } = await seeded();
+    const file = serializeBackup(await collectBackup(repos), 5);
+    await repos.scripts.update(a.id, { body: 'edited' });
+    for (let i = 0; i < 3; i++) await importBackup(repos, file, fresh());
+    // One original (edited) + one restored copy of the backup's version, not three.
+    expect((await repos.scripts.list()).filter((s) => s.title === 'Hook one')).toHaveLength(2);
+  });
+
+  it('favoriting does not count as an edit (no duplicate on import, no reordering)', async () => {
+    const { repos, a } = await seeded();
+    const before = (await repos.scripts.get(a.id))!.updatedAt;
+    const file = serializeBackup(await collectBackup(repos), 5);
+    await repos.scripts.update(a.id, { favorite: false });
+    expect((await repos.scripts.get(a.id))!.updatedAt).toBe(before);
+    expect((await importBackup(repos, file, fresh())).scriptsAdded).toBe(0);
   });
 
   it('writes nothing when the file is invalid', async () => {
