@@ -24,6 +24,8 @@ export interface OrphanVideoInfo {
   durationMs: number;
   width: number;
   height: number;
+  /** False for a video-only file (a Voice Follow take killed before its audio was merged). */
+  hasAudio?: boolean;
 }
 
 export interface OrphanRecoveryDeps {
@@ -38,6 +40,7 @@ export interface OrphanRecoveryDeps {
     width: number | null;
     height: number | null;
     status: RecordingStatusRow;
+    audioMissing?: boolean;
   }): Promise<unknown>;
 }
 
@@ -106,6 +109,9 @@ async function run(deps: OrphanRecoveryDeps): Promise<number> {
       width: info?.width ?? null,
       height: info?.height ?? null,
       status: 'recovered',
+      // A Voice Follow take killed before its audio was merged is video-only: say so on the take
+      // instead of presenting a silent video as a normal recording.
+      audioMissing: info?.hasAudio === false ? true : undefined,
     });
     known.add(f.name);
     recovered++;

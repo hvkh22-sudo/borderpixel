@@ -31,8 +31,13 @@ const SOURCES: ReadonlySet<string> = new Set<DiagnosticsSource>(['recording', 's
 /** Strip paths/URIs (they can carry file names) and cap the length. */
 export function sanitizeMessage(raw: string): string {
   const clean = raw
-    .replace(/\b[a-z][a-z0-9+.-]*:\/\/\S+/gi, '<path>')
-    .replace(/(^|[\s('"=])\/[^\s'")]+/g, '$1<path>')
+    // Quoted names ("take_1.mp4", “Holiday with Dana.mp4”): file and folder names are personal.
+    .replace(/“[^”]*”|"[^"]*"|‘[^’]*’|'[^'\s][^']*'/g, '<name>')
+    .replace(/\b[a-z][a-z0-9+.-]*:\/\S+/gi, '<path>')
+    // Any token with a slash (absolute, relative, bracketed or after "key=" / ":").
+    .replace(/[^\s]*\/[^\s]*/g, '<path>')
+    // A bare file name left over (path segments with spaces, "take_9f.mp4").
+    .replace(/[^\s<>]+\.(mp4|mov|m4v|wav|caf|m4a|aac|json|srt|txt|db|sqlite)\b/gi, '<file>')
     .replace(/\s+/g, ' ')
     .trim();
   return clean.length > MAX_MESSAGE ? `${clean.slice(0, MAX_MESSAGE - 1)}…` : clean;

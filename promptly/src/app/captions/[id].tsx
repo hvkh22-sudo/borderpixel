@@ -97,18 +97,24 @@ export default function CaptionsEditor() {
     return () => abortRef.current?.abort();
   }, [id]);
 
+  const generatingRef = useRef(false);
   const generate = async () => {
-    if (!uri || !rec) return;
+    // One run at a time: two runs would share the single recognizer and its listeners.
+    if (!uri || !rec || generatingRef.current) return;
+    generatingRef.current = true;
+    // Created before the permission prompt, so Cancel works from the first moment.
+    const controller = new AbortController();
+    abortRef.current = controller;
     setPhase('working');
     setErrorKey(null);
     setPart(null);
     const started = Date.now();
     try {
       if (!(await ensureSpeechPermission())) throw new TranscriptionError('permission_denied');
-      abortRef.current = new AbortController();
+      if (controller.signal.aborted) throw new TranscriptionError('cancelled');
       const durationMs = rec.durationMs || player.duration * 1000;
       const result = await transcribeRecording(uri, speechLocale, {
-        signal: abortRef.current.signal,
+        signal: controller.signal,
         durationMs,
         onProgress: (n, total) => setPart({ n, total }),
       });
@@ -138,10 +144,15 @@ export default function CaptionsEditor() {
       track({ name: 'captions_generated', words: words.length, durationSec: Math.round((Date.now() - started) / 1000) });
     } catch (e) {
       const code = e instanceof TranscriptionError ? e.code : 'failed';
-      logDiagnostic('transcription', code, e);
       setErrorKey(`captions.errors.${code}`);
       setPhase('error');
-      track({ name: 'captions_failed', code });
+      // A cancel (button or leaving the screen) is the user's choice, not a failure to count.
+      if (code !== 'cancelled') {
+        logDiagnostic('transcription', code, e);
+        track({ name: 'captions_failed', code });
+      }
+    } finally {
+      generatingRef.current = false;
     }
   };
 

@@ -2,7 +2,7 @@
  * @jest-environment node
  */
 /* Mic check on the setup screen, with expo-audio and expo-file-system mocked. */
-import { fireEvent, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 
 import { useSettings } from '../../state/settings';
 import { createRepos, renderScreen } from './testUtils';
@@ -117,6 +117,21 @@ describe('Mic check', () => {
     expect(screen.getByText('Good')).toBeTruthy(); // last result on the setup row
     await fireEvent.press(screen.getByLabelText('Open camera'));
     await waitFor(() => expect(mockPush).toHaveBeenCalledWith(`/record/${id}?mode=timed`));
+  });
+
+  it('opens one record screen for a double tap on Open camera', async () => {
+    const s = await mockRepos.scripts.create({ title: 'T', body: 'Hello world' });
+    mockParams.id = s.id;
+    const Prepare = require('../prepare/[id]').default;
+    await renderScreen(<Prepare />);
+    const open = await screen.findByLabelText('Open camera');
+    await act(async () => {
+      fireEvent.press(open);
+      fireEvent.press(open);
+    });
+    await waitFor(() => expect(mockPush).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 50));
+    expect(mockPush).toHaveBeenCalledTimes(1);
   });
 
   it('warns about Bluetooth earbud mics and reports silence', async () => {

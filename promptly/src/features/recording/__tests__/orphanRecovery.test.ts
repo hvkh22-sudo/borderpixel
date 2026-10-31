@@ -5,7 +5,8 @@ function fakeDeps(files: string[], known: string[] = []) {
   const deps: OrphanRecoveryDeps = {
     knownFileNames: async () => new Set(registered),
     findOrphans: (k) => files.filter((f) => !k.has(f)).map((name): OrphanFile => ({ name, uri: `file:///docs/recordings/${name}` })),
-    videoInfo: async (uri) => (uri.includes('broken') ? Promise.reject(new Error('unreadable')) : { durationMs: 1234.4, width: 1080, height: 1920 }),
+    videoInfo: async (uri) =>
+      uri.includes('broken') ? Promise.reject(new Error('unreadable')) : { durationMs: 1234.4, width: 1080, height: 1920, hasAudio: !uri.includes('silent') },
     add: jest.fn(async (r) => {
       registered.push(r.fileName);
     }),
@@ -20,6 +21,13 @@ describe('recoverOrphanRecordings', () => {
     expect(registered).toEqual(['known.mp4', 'a.mp4', 'broken.mov']);
     expect(deps.add).toHaveBeenCalledWith(expect.objectContaining({ fileName: 'a.mp4', durationMs: 1234, status: 'recovered' }));
     expect(deps.add).toHaveBeenCalledWith(expect.objectContaining({ fileName: 'broken.mov', durationMs: 0, width: null }));
+  });
+
+  it('flags a recovered video-only take (Voice Follow killed before the audio merge) as missing audio', async () => {
+    const { deps } = fakeDeps(['silent.mp4', 'a.mp4']);
+    await recoverOrphanRecordings(deps);
+    expect(deps.add).toHaveBeenCalledWith(expect.objectContaining({ fileName: 'silent.mp4', audioMissing: true }));
+    expect(deps.add).toHaveBeenCalledWith(expect.objectContaining({ fileName: 'a.mp4', audioMissing: undefined }));
   });
 
   it('shares one run between concurrent calls (StrictMode double effect)', async () => {

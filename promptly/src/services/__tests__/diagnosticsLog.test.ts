@@ -42,6 +42,21 @@ describe('diagnosticsLog', () => {
     expect(d).toEqual({ at: 1, source: 'recording', code: 'write_failed' });
   });
 
+  it('strips file names and paths in every form the platforms report them', () => {
+    const leaks = [
+      ['The file “take_9f.mp4” couldn’t be opened', 'take_9f'],
+      ['Cannot open “/var/mobile/Containers/Data/take_1.mp4”', 'take_1'],
+      ['bad uri file:/data/user/0/app/files/recordings/take_2.mp4', 'take_2'],
+      ['[/storage/emulated/0/Movies/Holiday with Dana.mp4]', 'Dana'],
+      ['write failed path=/data/My Script.json', 'Script'],
+      ['NSFilePath=/private/var/Provider Storage/Dana resume.json', 'resume'],
+      ["error opening 'Dana notes.wav'", 'Dana'],
+    ] as const;
+    for (const [raw, secret] of leaks) expect(sanitizeMessage(raw)).not.toContain(secret);
+    // Ordinary error text stays readable.
+    expect(sanitizeMessage('Export failed (code -11800): The operation could not be completed')).toBe('Export failed (code -11800): The operation could not be completed');
+  });
+
   it('caps message length', () => {
     expect(sanitizeMessage('x'.repeat(500))).toHaveLength(160);
   });

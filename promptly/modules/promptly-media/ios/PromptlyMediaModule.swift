@@ -1,6 +1,7 @@
 import AVFoundation
 import ExpoModulesCore
 import QuartzCore
+import Speech
 import UIKit
 
 // NOTE: Written against AVFoundation APIs available on iOS 16.4+ (Expo SDK 58 minimum).
@@ -68,6 +69,12 @@ public final class PromptlyMediaModule: Module {
       // JS reload / teardown: stop running exports instead of encoding for a dead runtime.
       let running = self.lock.withLock { Array(self.sessions.values) }
       running.forEach { $0.cancelExport() }
+    }
+
+    // Per locale: SFSpeechRecognizer() alone answers for the device language only.
+    Function("supportsOnDeviceSpeech") { (locale: String) -> Bool in
+      guard let recognizer = SFSpeechRecognizer(locale: Locale(identifier: locale)) else { return false }
+      return recognizer.supportsOnDeviceRecognition
     }
 
     AsyncFunction("getVideoInfo") { (uri: String) async throws -> [String: Any] in

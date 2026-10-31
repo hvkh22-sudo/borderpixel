@@ -71,6 +71,11 @@ const IOS_PREMATURE_CHECK_MIN_MS = 60_000;
 export async function transcribeRecording(videoUri: string, locale: string, opts: TranscriptionOptions = {}): Promise<TranscriptionResult> {
   const { signal, durationMs = 0, onProgress } = opts;
   if (Platform.OS !== 'android') {
+    // Captions promise on-device processing; without an on-device model for this language iOS would
+    // quietly send the take's audio to Apple's servers instead, so refuse rather than fall back.
+    if (PromptlyMedia.supportsOnDeviceSpeech(locale) === false) {
+      throw new TranscriptionError('language_not_supported', 'no on-device recognizer for this language');
+    }
     onProgress?.(1, 1);
     const result = await recognize({ uri: videoUri }, locale, signal);
     // Short takes often end in silence; only long ones risk the engine giving up.

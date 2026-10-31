@@ -2,7 +2,7 @@
  * @jest-environment node
  */
 /* Caption flow: generate (mocked recognizer) → script-aware correction → edit → save. */
-import { fireEvent, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 
 import { FREE_ACCESS } from '../../features/monetization/entitlements';
 import { useAccess } from '../../state/access';
@@ -162,6 +162,27 @@ describe('Captions editor', () => {
     expect(mockTranscribe.mock.calls[0]![2]).toMatchObject({ durationMs: 4000 });
     await fireEvent.press(screen.getByLabelText('Cancel'));
     expect(await screen.findByText('Caption generation was cancelled.')).toBeTruthy();
+  });
+
+  it('starts one transcription for a double tap and does not log a cancel as a failure', async () => {
+    await setupTake();
+    mockTranscribe.mockImplementation((_uri: string, _locale: string, opts: { signal: AbortSignal }) => {
+      const { TranscriptionError } = jest.requireActual('../../services/transcription');
+      return new Promise((_resolve, reject) => opts.signal.addEventListener('abort', () => reject(new TranscriptionError('cancelled'))));
+    });
+    const { diagnosticsLog } = require('../../services/diagnosticsLog');
+    const before = diagnosticsLog.entries().length;
+    const Captions = require('../captions/[id]').default;
+    await renderScreen(<Captions />);
+    const button = await screen.findByLabelText('Generate captions');
+    await act(async () => {
+      fireEvent.press(button);
+      fireEvent.press(button);
+    });
+    await waitFor(() => expect(mockTranscribe).toHaveBeenCalledTimes(1));
+    await fireEvent.press(screen.getByLabelText('Cancel'));
+    expect(await screen.findByText('Caption generation was cancelled.')).toBeTruthy();
+    expect(diagnosticsLog.entries().length).toBe(before);
   });
 
   it('reports parts of the take that have no captions', async () => {

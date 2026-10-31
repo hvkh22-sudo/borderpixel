@@ -79,6 +79,17 @@ export const PromptlyMedia = {
 
   getVideoInfo: (uri: string): Promise<VideoInfo> => mod().getVideoInfo(uri),
 
+  /** iOS: on-device recognition exists for this locale. Null when the build cannot tell (Android, old build). */
+  supportsOnDeviceSpeech(locale: string): boolean | null {
+    const m = native;
+    if (!m || typeof m.supportsOnDeviceSpeech !== 'function') return null;
+    try {
+      return m.supportsOnDeviceSpeech(locale);
+    } catch {
+      return false;
+    }
+  },
+
   burnInCaptions(inputUri: string, cues: NativeCue[], style: NativeCaptionStyle, onProgress?: (p: number) => void): Job<string> {
     const output = `${exportsDir().uri.replace(/\/$/, '')}/captioned_${Date.now()}.mp4`;
     return job((id) => mod().burnInCaptions(id, inputUri, output, cues, style), onProgress);

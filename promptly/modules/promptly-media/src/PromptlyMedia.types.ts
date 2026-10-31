@@ -89,6 +89,12 @@ export interface PromptlyMediaNativeModule {
    * Activity's unhandled-key callbacks). Absent in builds older than this API.
    */
   setRemoteKeysEnabled?(enabled: boolean): Promise<void> | void;
+  /**
+   * iOS: whether Apple's recognizer for `locale` can run on the device. Without it, a request that
+   * asks for on-device recognition silently uses Apple's servers (expo-speech-recognition applies
+   * `requiresOnDeviceRecognition` only when the recognizer supports it). Absent on Android.
+   */
+  supportsOnDeviceSpeech?(locale: string): boolean;
   addListener(event: 'onProgress', cb: (e: ProgressEvent) => void): { remove(): void };
   addListener(event: 'onRemoteKey', cb: (e: RemoteKeyNativeEvent) => void): { remove(): void };
 }

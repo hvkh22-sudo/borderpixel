@@ -127,6 +127,20 @@ line cap; Android audio extract ignores the AAC start offset (~20–50 ms captio
 is fixed: primitive buffer, output checked identical by a simulation of the loop); iOS reports no key repeat; Android may press a focused button on Enter/Space after keyboard use;
 iOS stroke is about half as thick as Android's.
 
+## Code review: captions transcription, prepare, recovery, diagnostics (2026-10-31)
+Fixed with tests (none device-verified): iOS captions refuse a language without an on-device model
+(`PromptlyMedia.supportsOnDeviceSpeech`, new native function) instead of letting Apple's recognizer
+silently use its servers; a recovered video-only take (Voice Follow killed before its audio merge) is
+flagged "saved without sound"; the diagnostics sanitizer strips quoted names, `file:/` URIs, bracketed
+and spaced paths and bare media/JSON file names; one caption run and one record screen per double tap;
+Cancel works during the permission prompt; a cancel is no longer logged as a failure.
+Open: the recognizer's WAVs for Voice Follow live in the OS cache (no `outputDirectory`), so a killed
+take's audio is not recovered, only flagged; Android audio extraction can't be cancelled mid-decode;
+caption timing with per-utterance timestamps needs a long-take device test (Android 14, iOS 18); Voice
+Follow on iOS may still use server recognition for a language without an on-device model (documented in
+the privacy drafts); rare duplicate recovery without a UNIQUE file_name index; repeated "Copy report"
+is not re-announced.
+
 ## Blockers
 - No macOS/Xcode and no Android SDK in this container → native builds run in GitHub Actions instead; device tests need the founder's phones.
 - Store/developer accounts, RevenueCat project, Anthropic key: founder-owned.

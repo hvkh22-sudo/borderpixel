@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { decorative } from '../../components/a11y';
@@ -94,9 +94,20 @@ export default function Prepare() {
   const mode: ScrollMode = prompter.mode === 'voice' && (!voiceSupported || !voiceGate.allowed) ? 'timed' : prompter.mode;
 
   // The camera must own the audio session: wait until a mic check has fully released it.
+  // One record screen per tap: waiting for the mic leaves time for a second tap.
+  const openingRef = useRef(false);
   const openCamera = async () => {
-    await whenMicReleased();
-    router.push(`/record/${id}?mode=${mode}`);
+    if (openingRef.current) return;
+    openingRef.current = true;
+    try {
+      await whenMicReleased();
+      router.push(`/record/${id}?mode=${mode}`);
+    } finally {
+      // Released after the push, so returning to this screen can start again.
+      setTimeout(() => {
+        openingRef.current = false;
+      }, 800);
+    }
   };
 
   const modeHint =
