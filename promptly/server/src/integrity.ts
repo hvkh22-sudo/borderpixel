@@ -36,7 +36,9 @@ export interface IntegrityDeps {
 
 export const INTEGRITY_DEFAULTS = {
   challengeTtlMs: 5 * 60 * 1000,
-  challengesPerDay: 300,
+  // One per signed AI request (and per attestation). Above a heavy creator's daily use, far below the
+  // old 300, so a stolen user ID exhausts it only with a matching number of requests.
+  challengesPerDay: 60,
   unverifiedPaidPerDay: 30,
 } as const;
 

@@ -61,6 +61,8 @@ const USER_ID_RE = /^[A-Za-z0-9$:_\-.]{8,128}$/;
 const ENTITLEMENT_TTL_MS = 10 * 60 * 1000;
 const MICRO = 1_000_000;
 /** Three one- or two-sentence openings fit comfortably. */
+/** Upper bound for the structured-output schema and tool definitions in the request. */
+const SCHEMA_TOKEN_ALLOWANCE = 2_000;
 const HOOK_MAX_TOKENS = 800;
 
 function periodKeys(now: number) {
@@ -270,9 +272,10 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
   const { prompt, wantsAlternatives } = buildUserPrompt(parsed);
   const maxTokens = parsed.tool === 'hook' ? Math.min(HOOK_MAX_TOKENS, deps.config.maxOutputTokens) : deps.config.maxOutputTokens;
   const costMicro = (u: LlmUsage) => Math.ceil(u.inputTokens * deps.config.inputUsdPerMTok + u.outputTokens * deps.config.outputUsdPerMTok);
-  // Worst case is reserved before the call (atomic, so concurrent requests can't overshoot the cap);
-  // input tokens are bounded by characters. Settled to the billed usage afterwards.
-  const reserved = costMicro({ inputTokens: SYSTEM_PROMPT.length + prompt.length, outputTokens: maxTokens });
+  // Worst case is reserved before the call (atomic, so concurrent requests can't overshoot the cap).
+  // Input tokens: up to ~3 per character for emoji and rare scripts, plus the structured-output schema.
+  // Settled to the billed usage afterwards.
+  const reserved = costMicro({ inputTokens: 3 * (SYSTEM_PROMPT.length + prompt.length) + SCHEMA_TOKEN_ALLOWANCE, outputTokens: maxTokens });
   const budgetKeys = [{ key: `spend:${day}`, limit: deps.config.dailyBudgetUsd * MICRO }];
   if (ent.plan === 'free') budgetKeys.unshift({ key: `spend_free:${day}`, limit: deps.config.dailyBudgetUsd * deps.config.freeBudgetShare * MICRO });
   const held: string[] = [];

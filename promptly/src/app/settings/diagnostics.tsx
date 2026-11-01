@@ -6,6 +6,7 @@
  * chat with Claude.
  */
 import * as Clipboard from 'expo-clipboard';
+import { Redirect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -16,6 +17,7 @@ import { Section } from '../../components/Section';
 import { Segmented } from '../../components/Segmented';
 import { Text } from '../../components/Text';
 import { formatDiagnosticsReport, type DiagnosticsData } from '../../features/diagnostics/report';
+import { diagnosticsUnlocked } from '../../features/diagnostics/tapUnlock';
 import type { IosVoiceFollowAudio } from '../../features/platform/audioStrategy';
 import type { Support } from '../../features/platform/support';
 import { useAnnounce } from '../../hooks/useAnnounce';
@@ -40,6 +42,12 @@ const FLAG_LABELS: Record<string, TKey> = {
 };
 
 export default function Diagnostics() {
+  // Hooks below must run in the same order on every render, so the gate is a wrapper.
+  if (!diagnosticsUnlocked()) return <Redirect href="/settings" />;
+  return <DiagnosticsScreen />;
+}
+
+function DiagnosticsScreen() {
   const speechLocale = useSettings((s) => s.speechLocale);
   const iosVfAudio = useDiagnosticsOverrides((s) => s.iosVoiceFollowAudio);
   const burnIn = useDiagnosticsOverrides((s) => s.burnIn);

@@ -15,3 +15,18 @@ export function createTapUnlock(taps = DIAGNOSTICS_TAPS, windowMs = DIAGNOSTICS_
     return true;
   };
 }
+
+let unlocked = false;
+
+/** Set when the hidden gesture completes; lasts until the app restarts. */
+export function markDiagnosticsUnlocked(): void {
+  unlocked = true;
+}
+
+/**
+ * The diagnostics screen holds test switches (burn-in, integrity headers): in release builds it opens
+ * only after the gesture, not from a deep link such as promptly://settings/diagnostics.
+ */
+export function diagnosticsUnlocked(dev: boolean = typeof __DEV__ !== 'undefined' && __DEV__): boolean {
+  return dev || unlocked;
+}

@@ -9,7 +9,7 @@ import { handle, type HandlerConfig } from './handler';
 import { INTEGRITY_DEFAULTS, parseIntegrityMode, type IntegrityDeps } from './integrity';
 import { AnthropicLlm } from './llm';
 import { decodeIntegrityToken, parseServiceAccount } from './playIntegrity';
-import type { QuotaStore } from './quota';
+import { dayCounterPrefix, staleDayKeys, type QuotaStore } from './quota';
 
 export interface Env {
   ANTHROPIC_API_KEY: string;
@@ -45,9 +45,30 @@ export interface Env {
 
 /** One instance per scope (user, IP, global); storage ops are serialized. */
 export class Counters extends DurableObject {
+  /**
+   * Daily counters (`d:2026-11-01`, per IP and per user) are only needed for their day: earlier days
+   * of the same counter are deleted when a new day is written, so per-IP data stays short-lived as
+   * the privacy policy says. Monthly and lifetime counters are kept.
+   */
+  private async pruneOlderDays(key: string): Promise<void> {
+    const prefix = dayCounterPrefix(key);
+    if (!prefix) return;
+    const existing = await this.ctx.storage.list({ prefix });
+    const stale = staleDayKeys([...existing.keys()], key);
+    if (stale.length) await this.ctx.storage.delete(stale);
+  }
+
+  /** Expired cache entries (integrity challenges never redeemed, old key bindings) are removed. */
+  private async pruneExpiredCache(now: number): Promise<void> {
+    const entries = await this.ctx.storage.list<{ expiresAt: number }>({ prefix: 'cache:' });
+    const expired = [...entries].filter(([, e]) => e && e.expiresAt <= now).map(([k]) => k);
+    if (expired.length) await this.ctx.storage.delete(expired);
+  }
+
   async consume(key: string, limit: number): Promise<{ allowed: boolean; used: number }> {
     const used = ((await this.ctx.storage.get<number>(key)) ?? 0) + 1;
     if (used > limit) return { allowed: false, used: used - 1 };
+    if (used === 1) await this.pruneOlderDays(key);
     await this.ctx.storage.put(key, used);
     return { allowed: true, used };
   }
@@ -59,12 +80,16 @@ export class Counters extends DurableObject {
     return (await this.ctx.storage.get<number>(key)) ?? 0;
   }
   async add(key: string, amount: number): Promise<number> {
-    const v = ((await this.ctx.storage.get<number>(key)) ?? 0) + amount;
+    const prev = await this.ctx.storage.get<number>(key);
+    if (prev === undefined) await this.pruneOlderDays(key);
+    const v = (prev ?? 0) + amount;
     await this.ctx.storage.put(key, v);
     return v;
   }
   async reserve(key: string, amount: number, limit: number): Promise<boolean> {
-    const v = ((await this.ctx.storage.get<number>(key)) ?? 0) + amount;
+    const prev = await this.ctx.storage.get<number>(key);
+    if (prev === undefined) await this.pruneOlderDays(key);
+    const v = (prev ?? 0) + amount;
     if (v > limit) return false;
     await this.ctx.storage.put(key, v);
     return true;
@@ -74,6 +99,7 @@ export class Counters extends DurableObject {
     return e && e.expiresAt > now ? e.value : null;
   }
   async cachePut(key: string, value: unknown, expiresAt: number): Promise<void> {
+    await this.pruneExpiredCache(Date.now());
     await this.ctx.storage.put(`cache:${key}`, { value, expiresAt });
   }
   async cacheTake(key: string, now: number): Promise<unknown> {

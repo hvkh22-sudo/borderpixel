@@ -1,5 +1,5 @@
 import { formatDiagnosticsReport, type DiagnosticsData } from '../report';
-import { createTapUnlock } from '../tapUnlock';
+import { createTapUnlock, diagnosticsUnlocked, markDiagnosticsUnlocked } from '../tapUnlock';
 
 const data = (o: Partial<DiagnosticsData> = {}): DiagnosticsData => ({
   generatedAt: Date.UTC(2026, 9, 21, 12, 0, 0),
@@ -91,5 +91,14 @@ describe('createTapUnlock', () => {
     expect(tap(2000)).toBe(false); // too slow: this is tap 1 again
     tap(2100);
     expect(tap(2200)).toBe(true);
+  });
+});
+
+describe('diagnosticsUnlocked', () => {
+  it('in release builds opens only after the hidden gesture (not from a deep link)', () => {
+    expect(diagnosticsUnlocked(false)).toBe(false);
+    expect(diagnosticsUnlocked(true)).toBe(true); // development builds
+    markDiagnosticsUnlocked();
+    expect(diagnosticsUnlocked(false)).toBe(true);
   });
 });

@@ -1,10 +1,13 @@
-# Dependency audit (2026-10-30)
+# Dependency audit (updated 2026-11-01)
 
 `npm audit --omit=dev`:
 
 - **server/** (the AI proxy Worker): 0 vulnerabilities.
-- **app**: 12 advisories (5 low, 3 moderate, 4 high), all in **build tooling**, none in code that ships
-  inside the app bundle:
+- **app**: 17 advisories (1 low, 13 moderate, 3 high; was 12 on 2026-10-30), all in **build tooling**,
+  none in code that ships inside the app bundle (no app source imports any of these packages). New since
+  the last check: `glob`, `minimatch` (via `@expo/fingerprint`, `@expo/config-plugins`) and
+  `expo-sharing`, which is flagged only through its build-time config plugin (`@expo/config-plugins`).
+  The server's `zod` is 4.6.7 (not the affected 3.x line). Earlier list:
   - `@expo/cli`, `@expo/config`, `@expo/metro-config`, `@expo/prebuild-config`, `@expo/config-plugins`,
     `@expo/local-build-cache-provider` → transitive `zod` 3.x (memory exhaustion on oversized input),
     `deepmerge` (prototype poisoning), `node-forge` (signature verification), `uuid` via `xcode`.

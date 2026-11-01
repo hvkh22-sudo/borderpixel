@@ -8,7 +8,7 @@ import { Screen } from '../../components/Screen';
 import { Section } from '../../components/Section';
 import { Segmented } from '../../components/Segmented';
 import { Text } from '../../components/Text';
-import { createTapUnlock } from '../../features/diagnostics/tapUnlock';
+import { createTapUnlock, markDiagnosticsUnlocked } from '../../features/diagnostics/tapUnlock';
 import { canonicalSpeechLocale, speechLocaleOptions } from '../../features/settings/speechLocales';
 import { currentLanguage, t, type TKey } from '../../localization/i18n';
 import { PromptlyMedia } from '../../services/nativeMedia';
@@ -77,7 +77,7 @@ export default function Settings() {
         <ListRow testID="settings-reset-prompter" icon="refresh-outline" title={t('settings.resetPrompter')} onPress={() => useSettings.getState().setPrompter(DEFAULT_PROMPTER)} />
       </Section>
       {/* Hidden entry to the diagnostics screen for device testing: tap 5 times. */}
-      <Text testID="settings-version" variant="caption" muted center onPress={() => tapUnlock(Date.now()) && router.push('/settings/diagnostics')}>
+      <Text testID="settings-version" variant="caption" muted center onPress={() => tapUnlock(Date.now()) && (markDiagnosticsUnlocked(), router.push('/settings/diagnostics'))}>
         {t('settings.version', { v: Constants.expoConfig?.version ?? '—' })}
       </Text>
     </Screen>

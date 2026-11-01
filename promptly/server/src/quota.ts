@@ -73,3 +73,18 @@ export class MemoryQuotaStore implements QuotaStore {
     return true;
   }
 }
+
+/** Per-day counter keys end in the UTC day: `d:2026-11-01`, `spend_free:2026-11-01`. */
+const DAY_KEY = /^(.*:)\d{4}-\d{2}-\d{2}$/;
+
+/** `d:2026-11-01` → `d:`; null for keys that are not per-day counters. */
+export function dayCounterPrefix(key: string): string | null {
+  return DAY_KEY.exec(key)?.[1] ?? null;
+}
+
+/** Keys of the same daily counter for days before `current`'s day. */
+export function staleDayKeys(keys: string[], current: string): string[] {
+  const prefix = dayCounterPrefix(current);
+  if (!prefix) return [];
+  return keys.filter((k) => k !== current && dayCounterPrefix(k) === prefix && k < current);
+}

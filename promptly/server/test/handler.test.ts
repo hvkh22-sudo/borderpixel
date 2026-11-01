@@ -54,12 +54,13 @@ function req(body: unknown, headers: Record<string, string> = {}) {
 
 const IMPROVE = { tool: 'improve', script: 'My secret script about cats.' };
 
-/** The budget reservation for a request: input bounded by characters, output by the token cap. */
+/** The budget reservation for a request: input bounded by 3x characters + schema, output by the token cap. */
 function worstCase(body: unknown, maxTokens = CONFIG.maxOutputTokens): number {
   const parsed = parseStudioRequest(body);
   if ('error' in parsed) throw new Error(parsed.error);
   const { prompt } = buildUserPrompt(parsed);
-  return Math.ceil((SYSTEM_PROMPT.length + prompt.length) * CONFIG.inputUsdPerMTok + maxTokens * CONFIG.outputUsdPerMTok);
+  // ~3 tokens per character at worst (emoji, rare scripts) plus the schema allowance (2,000 tokens).
+  return Math.ceil((3 * (SYSTEM_PROMPT.length + prompt.length) + 2_000) * CONFIG.inputUsdPerMTok + maxTokens * CONFIG.outputUsdPerMTok);
 }
 
 describe('handler', () => {
