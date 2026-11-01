@@ -1,0 +1,26 @@
+# AI Studio in a build without the AI service (CI): the editor's AI button opens a clear
+# "not available" screen instead of a broken form; nothing is sent anywhere.
+appId: app.promptly.placeholder
+tags:
+  - core
+---
+- runFlow: shared/launch.yaml
+- runFlow: shared/skip-onboarding.yaml
+- runFlow: shared/open-create.yaml
+- tapOn:
+    id: create-blank
+- extendedWaitUntil:
+    visible:
+      id: editor-body
+    timeout: 10000
+- tapOn:
+    id: editor-body
+- inputText: "Studio check script."
+- hideKeyboard:
+    optional: true
+- tapOn:
+    id: editor-ai
+- extendedWaitUntil:
+    visible: "AI Studio isn.t available in this build yet\\."
+    timeout: 10000
+- takeScreenshot: screenshots/10-1-studio-unavailable
