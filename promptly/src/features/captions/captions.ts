@@ -326,9 +326,22 @@ function shiftWords(words: CueWord[], deltaMs: number): CueWord[] {
   return words.map((w) => ({ ...w, startMs: Math.max(0, w.startMs + deltaMs), endMs: Math.max(0, w.endMs + deltaMs) }));
 }
 
-export function mergeWithNext(cues: Cue[], id: string): Cue[] {
+/**
+ * Longest caption a cue may hold. About three lines in a vertical video; the burned-in box has no
+ * line limit of its own, so a longer cue would grow past the edge of the frame.
+ */
+export const MAX_CUE_CHARS = 120;
+
+/** Whether merging this cue with the next stays within MAX_CUE_CHARS. */
+export function canMergeWithNext(cues: Cue[], id: string): boolean {
   const i = cues.findIndex((c) => c.id === id);
-  if (i < 0 || i >= cues.length - 1) return cues;
+  if (i < 0 || i >= cues.length - 1) return false;
+  return cues[i]!.text.length + 1 + cues[i + 1]!.text.length <= MAX_CUE_CHARS;
+}
+
+export function mergeWithNext(cues: Cue[], id: string): Cue[] {
+  if (!canMergeWithNext(cues, id)) return cues;
+  const i = cues.findIndex((c) => c.id === id);
   const a = cues[i]!;
   const b = cues[i + 1]!;
   const merged: Cue = { id: a.id, startMs: a.startMs, endMs: b.endMs, text: `${a.text} ${b.text}` };

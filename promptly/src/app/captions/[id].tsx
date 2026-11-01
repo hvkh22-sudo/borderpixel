@@ -21,6 +21,8 @@ import {
   deleteCue,
   estimateWordsFromTranscript,
   hasWordLevelTiming,
+  MAX_CUE_CHARS,
+  canMergeWithNext,
   mergeWithNext,
   normalizeCueTexts,
   segmentWords,
@@ -357,6 +359,7 @@ export default function CaptionsEditor() {
             <TextInput
               maxFontSizeMultiplier={MAX_FONT_SCALE}
               value={item.text}
+              maxLength={MAX_CUE_CHARS}
               onChangeText={(v) => editCues((c) => updateCueText(c, item.id, v))}
               style={[styles.cueInput, { color: colors.text }, contentDirectionStyle(item.text)]}
               multiline
@@ -364,7 +367,7 @@ export default function CaptionsEditor() {
             />
             <View style={styles.cueActions}>
               <IconButton icon="cut-outline" size={18} label={t('captions.split')} onPress={() => editCues((c) => splitCue(c, item.id, Math.ceil(item.text.split(' ').length / 2)))} />
-              <IconButton icon="git-merge-outline" size={18} label={t('captions.merge')} disabled={index === cues.length - 1} onPress={() => editCues((c) => mergeWithNext(c, item.id))} />
+              <IconButton icon="git-merge-outline" size={18} label={t('captions.merge')} disabled={!canMergeWithNext(cues, item.id)} onPress={() => editCues((c) => mergeWithNext(c, item.id))} />
               <IconButton icon="trash-outline" size={18} label={t('captions.deleteCue')} onPress={() => editCues((c) => deleteCue(c, item.id))} />
             </View>
           </View>

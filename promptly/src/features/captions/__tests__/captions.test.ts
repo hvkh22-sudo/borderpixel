@@ -9,6 +9,8 @@ import {
   estimateWordsFromTranscript,
   formatSrtTime,
   hasWordLevelTiming,
+  MAX_CUE_CHARS,
+  canMergeWithNext,
   mergeWithNext,
   parseSrt,
   retimeCue,
@@ -291,5 +293,21 @@ describe('caption style registry', () => {
     expect(isCaptionStyleId('pop')).toBe(true);
     expect(isCaptionStyleId('toString')).toBe(false);
     expect(isCaptionStyleId(null)).toBe(false);
+  });
+});
+
+describe('cue length cap', () => {
+  it('refuses a merge that would exceed MAX_CUE_CHARS (the burned-in box would leave the frame)', () => {
+    const long = 'x'.repeat(MAX_CUE_CHARS - 10);
+    const cues = [
+      { id: 'a', startMs: 0, endMs: 1000, text: long },
+      { id: 'b', startMs: 1000, endMs: 2000, text: 'one two three' },
+      { id: 'c', startMs: 2000, endMs: 3000, text: 'ok' },
+    ];
+    expect(canMergeWithNext(cues, 'a')).toBe(false);
+    expect(mergeWithNext(cues, 'a')).toBe(cues);
+    expect(canMergeWithNext(cues, 'b')).toBe(true);
+    expect(mergeWithNext(cues, 'b')).toHaveLength(2);
+    expect(canMergeWithNext(cues, 'c')).toBe(false); // last cue
   });
 });

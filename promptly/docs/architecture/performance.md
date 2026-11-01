@@ -123,3 +123,10 @@ parsed captions) on each focus. It now asks SQLite for three (`list({ limit: 3 }
 title-sorted list applies the limit after filtering). Probe in Jest with Node's SQLite on the CI-like
 container, 300 takes × 300 cues + 300 scripts × 2,000 words: ~187 ms → ~3 ms per Home load. Not
 measured on a phone; expo-sqlite on a device has different absolute numbers.
+
+## Cold start on the CI emulator (2026-11-01)
+`am start -W` after a force-stop, three times per run (android-e2e job, API 34 x86_64, release APK).
+TotalTime in ms — run 72: 1206 / 1001 / 789; run 73-era: 1024 / 623 / 748; run 74: 1956 / 1126 / 795.
+This is the time to the first native frame, not to Home being usable (JS bundle + settings load come
+after), and the emulator varies a lot between runs. Use it only to spot a large regression; real
+numbers need a phone (Android Studio profiler / Xcode Instruments "App Launch").
