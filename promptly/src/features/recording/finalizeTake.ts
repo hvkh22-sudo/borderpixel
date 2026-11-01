@@ -114,6 +114,8 @@ async function finalizeNamed(input: FinalizeInput, id: string, inPlace: string |
       input.separateAudio.map(async (a, i) => {
         const src = new File(toFileUri(a.uri));
         if (!src.exists) return;
+        // Already kept next to the video (the recognizer wrote it there): nothing to move.
+        if (src.uri.startsWith(recordingFile(`${base}_audio_`).uri)) return;
         const dest = recordingFile(`${base}_audio_${i}.wav`);
         if (dest.exists) return;
         await src.copy(dest);

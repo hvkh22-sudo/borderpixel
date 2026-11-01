@@ -35,6 +35,12 @@ export interface SpeechStartOptions {
    * owns the mic while the camera records video only; audio is muxed later).
    */
   persistAudio?: boolean;
+  /**
+   * Where persisted audio goes, as the take's file URI without extension (`…/recordings/take_X`):
+   * files are named `take_X_audio_N.wav` next to the video. Without it the recognizer writes to the
+   * OS cache, which a force-closed app's take would lose.
+   */
+  audioFilePrefix?: string;
 }
 
 /** A persisted audio file covering part of the session. */

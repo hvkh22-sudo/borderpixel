@@ -55,8 +55,12 @@ export class ExpoSpeechEngine implements SpeechEngine {
   /** Consecutive transient errors since the last result (backoff and give-up count). */
   private transientErrors = 0;
 
+  /** Number of the next persisted audio file in this take (one per native session). */
+  private audioIndex = 0;
+
   async start(options: SpeechStartOptions): Promise<void> {
     this.lastOptions = options;
+    this.audioIndex = 0;
     this.running = true;
     this.transientErrors = 0;
     this.clearRestart();
@@ -76,7 +80,7 @@ export class ExpoSpeechEngine implements SpeechEngine {
       contextualStrings: o.contextualStrings.slice(0, 100),
       requiresOnDeviceRecognition: o.onDevice,
       addsPunctuation: false,
-      recordingOptions: o.persistAudio ? { persist: true } : undefined,
+      recordingOptions: o.persistAudio ? persistOptions(o.audioFilePrefix, this.audioIndex++) : undefined,
       iosTaskHint: 'dictation',
       iosCategory: {
         category: AVAudioSessionCategory.playAndRecord,
@@ -177,6 +181,17 @@ export class ExpoSpeechEngine implements SpeechEngine {
       end.remove();
     };
   }
+}
+
+/**
+ * Recognizer audio files for a take: next to its video as `take_X_audio_N.wav` (a durable location
+ * that recovery, take deletion and Delete all already handle), or the OS cache without a prefix.
+ */
+export function persistOptions(prefix: string | undefined, index: number): { persist: true; outputDirectory?: string; outputFileName?: string } {
+  if (!prefix) return { persist: true };
+  const slash = prefix.lastIndexOf('/');
+  if (slash <= 0 || slash === prefix.length - 1) return { persist: true };
+  return { persist: true, outputDirectory: prefix.slice(0, slash), outputFileName: `${prefix.slice(slash + 1)}_audio_${index}.wav` };
 }
 
 export async function ensureSpeechPermission(): Promise<boolean> {

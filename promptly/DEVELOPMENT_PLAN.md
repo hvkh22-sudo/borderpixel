@@ -134,8 +134,9 @@ silently use its servers; a recovered video-only take (Voice Follow killed befor
 flagged "saved without sound"; the diagnostics sanitizer strips quoted names, `file:/` URIs, bracketed
 and spaced paths and bare media/JSON file names; one caption run and one record screen per double tap;
 Cancel works during the permission prompt; a cancel is no longer logged as a failure.
-Open: the recognizer's WAVs for Voice Follow live in the OS cache (no `outputDirectory`), so a killed
-take's audio is not recovered, only flagged; Android audio extraction: Cancel now returns at once and the
+Voice Follow audio (separate-audio takes) is now written next to the take as `take_X_audio_N.wav`
+(2026-11-01), so a force-closed take keeps its sound on disk; the recovered take is flagged and the
+WAVs stay with it (no automatic re-merge yet — offsets of later segments are not stored). Open: Android audio extraction: Cancel now returns at once and the
 late WAV is deleted (the native decode itself still runs to its end);
 caption timing with per-utterance timestamps needs a long-take device test (Android 14, iOS 18); Voice
 Follow on iOS may still use server recognition for a language without an on-device model (documented in

@@ -219,6 +219,13 @@ describe('RecordingSession', () => {
     expect(h.session.getState()).toMatchObject({ status: 'recoverableFailure', partialFilePath: null });
   });
 
+  it("tells Voice Follow to keep its audio next to the take's video", async () => {
+    const h = setup();
+    const vf = fakeVoiceFollow();
+    await startRecording(h, { scriptId: 's1', voiceFollow: vf, separateAudio: true });
+    expect(vf.start).toHaveBeenCalledWith({ audioFilePrefix: 'file:///docs/recordings/take_1' });
+  });
+
   it('a Voice Follow start failure never stops the recording', async () => {
     const h = setup();
     const vf = fakeVoiceFollow({ start: jest.fn(() => Promise.reject(new Error('no recognizer'))) });

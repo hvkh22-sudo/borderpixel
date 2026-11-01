@@ -174,6 +174,16 @@ describe('finalizeTake', () => {
       expect(mockFs.has('file:///cache/speech/a0.wav')).toBe(false);
     });
 
+    it('leaves audio the recognizer already wrote next to the video where it is when the mux fails', async () => {
+      mockMux.mockRejectedValue(new Error('mux'));
+      const kept = { uri: `${REC}/take_1_audio_0.wav`, startedAt: 1_200 };
+      mockFs.set(kept.uri, 50);
+      const r = await finalizeTake({ ...base, separateAudio: [kept], expectSeparateAudio: true });
+      expect(r.audioMergeFailed).toBe(true);
+      expect(mockFs.get(kept.uri)).toBe(50);
+      expect(mockRecordings[0]?.audioMissing).toBe(true);
+    });
+
     it('on mux failure keeps the video and preserves the audio next to it', async () => {
       mockMux.mockRejectedValue(new Error('mux'));
       const r = await finalizeTake({ ...base, separateAudio: [wav], expectSeparateAudio: true });

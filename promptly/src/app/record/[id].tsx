@@ -216,7 +216,11 @@ export default function RecordScreen() {
     scriptId: id,
     separateAudio,
     voiceFollow: voice
-      ? { start: () => vf.start({ locale: speechLocale, persistAudio: separateAudio }), stop: vf.stop, collectedAudio: vf.collectedAudio }
+      ? {
+          start: (take) => vf.start({ locale: speechLocale, persistAudio: separateAudio, audioFilePrefix: separateAudio ? take?.audioFilePrefix : undefined }),
+          stop: vf.stop,
+          collectedAudio: vf.collectedAudio,
+        }
       : null,
   });
   const beginRecording = () => session.start(takeOptions());

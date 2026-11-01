@@ -39,7 +39,8 @@ export interface RecorderLike {
 }
 
 export interface VoiceFollowLike {
-  start(): Promise<boolean>;
+  /** `audioFilePrefix`: the take's file URI without extension, for audio files kept next to it. */
+  start(take?: { audioFilePrefix: string }): Promise<boolean>;
   stop(): Promise<PersistedAudio[]>;
   /** Audio segments persisted so far (used when stop() does not settle in time). */
   collectedAudio(): PersistedAudio[];
@@ -403,7 +404,7 @@ export class RecordingSession {
   private async startVoiceFollow(take: Take, vf: VoiceFollowLike): Promise<void> {
     let ok = false;
     try {
-      ok = await vf.start();
+      ok = await vf.start({ audioFilePrefix: audioPrefixFor(take.plannedPath) });
     } catch (e) {
       // Voice Follow is best effort: the recording keeps running with manual scrolling.
       this.deps.log?.('voice follow start failed', e);
@@ -452,4 +453,10 @@ export class RecordingSession {
     take.watchdog = null;
     if (this.take === take) this.take = null;
   }
+}
+
+/** `/docs/recordings/take_1.mp4` → `file:///docs/recordings/take_1` (the recognizer wants a file URI). */
+export function audioPrefixFor(videoPath: string): string {
+  const uri = videoPath.startsWith('file://') ? videoPath : `file://${videoPath}`;
+  return uri.replace(/\.(mp4|mov)$/i, '');
 }

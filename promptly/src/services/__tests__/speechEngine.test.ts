@@ -1,7 +1,7 @@
 /* Session bookkeeping of ExpoSpeechEngine over a fake recognizer module. */
 import { ExpoSpeechRecognitionModule } from 'expo-speech-recognition';
 
-import { ExpoSpeechEngine } from '../speechEngine';
+import { ExpoSpeechEngine, persistOptions } from '../speechEngine';
 
 const mockListeners = new Map<string, Set<(e: unknown) => void>>();
 
@@ -41,6 +41,20 @@ describe('ExpoSpeechEngine', () => {
     jest.advanceTimersByTime(200);
     expect(ended).toHaveBeenCalledTimes(1);
     expect(start).toHaveBeenCalledTimes(2);
+  });
+
+  it('gives every native session of a take its own audio file (a restart never overwrites one)', async () => {
+    const engine = new ExpoSpeechEngine();
+    engine.onEnd(() => {});
+    await engine.start({ ...opts, persistAudio: true, audioFilePrefix: 'file:///docs/recordings/take_7' });
+    emit('end');
+    jest.advanceTimersByTime(200);
+    const names = start.mock.calls.map((c) => (c[0] as { recordingOptions?: { outputFileName?: string } }).recordingOptions?.outputFileName);
+    expect(names).toEqual(['take_7_audio_0.wav', 'take_7_audio_1.wav']);
+    // A new take starts numbering again.
+    await engine.stop();
+    await engine.start({ ...opts, persistAudio: true, audioFilePrefix: 'file:///docs/recordings/take_8' });
+    expect((start.mock.calls.at(-1)![0] as { recordingOptions: { outputFileName: string } }).recordingOptions.outputFileName).toBe('take_8_audio_0.wav');
   });
 
   it('a late end from a stopped session neither restarts nor ends the new one', async () => {
@@ -104,5 +118,15 @@ describe('ExpoSpeechEngine', () => {
     emit('end');
     jest.advanceTimersByTime(200);
     expect(start).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe('persistOptions', () => {
+  it("names each session's audio after the take, in the take's folder", () => {
+    expect(persistOptions('file:///docs/recordings/take_1', 0)).toEqual({ persist: true, outputDirectory: 'file:///docs/recordings', outputFileName: 'take_1_audio_0.wav' });
+    expect(persistOptions('file:///docs/recordings/take_1', 2).outputFileName).toBe('take_1_audio_2.wav');
+    // No take: the recognizer's own default (cache) location.
+    expect(persistOptions(undefined, 0)).toEqual({ persist: true });
+    expect(persistOptions('take_1', 0)).toEqual({ persist: true });
   });
 });
