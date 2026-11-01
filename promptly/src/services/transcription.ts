@@ -218,6 +218,7 @@ async function recognize(audioSource: AudioSourceOptions, locale: string, signal
     // Segment timestamps are relative to each final result's session on some
     // engines; we offset by the end of the previous final result when needed.
     let offsetMs = 0;
+    let lastFinal: { text: string; firstStart: number | undefined } | null = null;
 
     const finish = (fn: () => void) => {
       if (settled) return;
@@ -234,8 +235,13 @@ async function recognize(audioSource: AudioSourceOptions, locale: string, signal
         if (!e.isFinal) return;
         const best = e.results[0];
         if (!best) return;
-        transcripts.push(best.transcript);
         const segs = best.segments ?? [];
+        // Some engines (seen reported for iOS 18) deliver the same final result twice; the copy
+        // would repeat the sentence later in the captions. Same text and same first timestamp = repeat.
+        const firstStart = segs[0]?.startTimeMillis;
+        if (lastFinal && lastFinal.text === best.transcript && lastFinal.firstStart === firstStart) return;
+        lastFinal = { text: best.transcript, firstStart };
+        transcripts.push(best.transcript);
         const needsOffset = segs.length > 0 && segments.length > 0 && segs[0]!.startTimeMillis < offsetMs;
         const base = needsOffset ? offsetMs : 0;
         for (const s of segs) {
