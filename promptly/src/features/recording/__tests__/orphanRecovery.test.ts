@@ -30,6 +30,18 @@ describe('recoverOrphanRecordings', () => {
     expect(deps.add).toHaveBeenCalledWith(expect.objectContaining({ fileName: 'a.mp4', audioMissing: undefined }));
   });
 
+  it('does not register a take that its own save registered while recovery was running', async () => {
+    const { deps, registered } = fakeDeps(['late.mp4']);
+    const info = deps.videoInfo;
+    // The take's own finalize registers it while recovery reads the file's metadata.
+    deps.videoInfo = async (uri) => {
+      registered.push('late.mp4');
+      return info(uri);
+    };
+    expect(await recoverOrphanRecordings(deps)).toBe(0);
+    expect(registered.filter((n) => n === 'late.mp4')).toHaveLength(1);
+  });
+
   it('shares one run between concurrent calls (StrictMode double effect)', async () => {
     const { deps, registered } = fakeDeps(['a.mp4']);
     const [x, y] = await Promise.all([recoverOrphanRecordings(deps), recoverOrphanRecordings(deps)]);

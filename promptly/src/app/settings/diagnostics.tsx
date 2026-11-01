@@ -67,6 +67,8 @@ export default function Diagnostics() {
   }, [speechLocale, iosVfAudio, burnIn, integrityHeaders, revision]);
 
   const copy = async () => {
+    // Cleared first so a second copy is announced again (same text would be skipped as a repeat).
+    setNotice(null);
     try {
       const fresh = await collectDiagnostics(speechLocale);
       setData(fresh);

@@ -102,6 +102,9 @@ async function run(deps: OrphanRecoveryDeps): Promise<number> {
     // Register even unreadable files so the user decides what to do with them.
     const info = await deps.videoInfo(f.uri).catch(() => null);
     if (isRecordingActive(f.name)) continue;
+    // A take that finished while this loop ran is registered by its own save: re-read right before
+    // adding, or it would appear twice (file_name has no UNIQUE index).
+    if ((await deps.knownFileNames()).has(f.name)) continue;
     await deps.add({
       scriptId: null,
       fileName: f.name,

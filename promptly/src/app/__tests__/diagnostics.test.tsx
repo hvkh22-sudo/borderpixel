@@ -90,6 +90,23 @@ describe('Diagnostics screen', () => {
     expect(screen.getByTestId('diagnostics-notice')).toBeTruthy();
   });
 
+  it('announces a second copy too (the notice is cleared before each copy)', async () => {
+    const { AccessibilityInfo, Platform } = require('react-native');
+    const spy = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => {});
+    const os = Platform.OS;
+    Platform.OS = 'ios';
+    try {
+      await open();
+      await fireEvent.press(screen.getByTestId('diagnostics-copy'));
+      await waitFor(() => expect(screen.getByTestId('diagnostics-notice')).toBeTruthy());
+      await fireEvent.press(screen.getByTestId('diagnostics-copy'));
+      await waitFor(() => expect(spy.mock.calls.filter(([m]) => m === 'Report copied. Paste it into your message.').length).toBeGreaterThanOrEqual(2));
+    } finally {
+      Platform.OS = os;
+      spy.mockRestore();
+    }
+  });
+
   it('clears the error list', async () => {
     diagnosticsLog.record('export', 'srt');
     await open();
