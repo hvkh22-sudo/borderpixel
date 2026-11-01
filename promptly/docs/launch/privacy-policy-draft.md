@@ -10,7 +10,9 @@ on your device. We do not upload your videos.
 2. **Camera and microphone:** used only while you record. Recordings are saved on your device.
 3. **Speech recognition:** Voice Follow and captions use Apple's or Google's speech recognition. Promptly
    requests on-device processing where available; on some devices or languages the platform provider may
-   process audio on its servers under its own privacy policy.
+   process audio on its servers under its own privacy policy. Captions on iPhone are only made on the
+   device: if your language has no on-device model, Promptly says so instead of sending the audio
+   (code: `transcription.ts`, 2026-10-31). Voice Follow may still use the provider's servers in that case.
 4. **AI Script Studio (optional, asks for consent first):** when you tap an AI action, the text you entered
    is sent to our server (hosted on Cloudflare) and to our AI provider, Anthropic, to generate a draft.
    Our server does not store the text. Anthropic does not train on it and may retain API inputs and
