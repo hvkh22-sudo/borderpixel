@@ -135,11 +135,12 @@ flagged "saved without sound"; the diagnostics sanitizer strips quoted names, `f
 and spaced paths and bare media/JSON file names; one caption run and one record screen per double tap;
 Cancel works during the permission prompt; a cancel is no longer logged as a failure.
 Open: the recognizer's WAVs for Voice Follow live in the OS cache (no `outputDirectory`), so a killed
-take's audio is not recovered, only flagged; Android audio extraction can't be cancelled mid-decode;
+take's audio is not recovered, only flagged; Android audio extraction: Cancel now returns at once and the
+late WAV is deleted (the native decode itself still runs to its end);
 caption timing with per-utterance timestamps needs a long-take device test (Android 14, iOS 18); Voice
 Follow on iOS may still use server recognition for a language without an on-device model (documented in
-the privacy drafts); rare duplicate recovery without a UNIQUE file_name index; repeated "Copy report"
-is not re-announced.
+the privacy drafts); duplicate recovery: recovery now re-reads the DB right before registering (no UNIQUE index yet);
+repeated "Copy report" is announced again (fixed 2026-11-01).
 
 ## Blockers
 - No macOS/Xcode and no Android SDK in this container → native builds run in GitHub Actions instead; device tests need the founder's phones.

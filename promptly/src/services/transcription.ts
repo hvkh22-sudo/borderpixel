@@ -83,7 +83,9 @@ export async function transcribeRecording(videoUri: string, locale: string, opts
     return gap ? { ...result, gaps: [gap] } : result;
   }
   if (!PromptlyMedia.isAvailable()) throw new TranscriptionError('unsupported_device', 'promptly-media module missing');
-  const wav = await PromptlyMedia.extractAudioToWav(videoUri, 16_000);
+  if (signal?.aborted) throw new TranscriptionError('cancelled');
+  // Extraction can't be stopped natively; Cancel returns at once and the late WAV is deleted.
+  const wav = await untilAborted(PromptlyMedia.extractAudioToWav(videoUri, 16_000), signal, (late) => safeDelete(new File(late.uri)));
   const wavFile = new File(wav.uri);
   const handle = wavFile.open(FileMode.ReadOnly);
   try {
@@ -139,6 +141,37 @@ export async function transcribeRecording(videoUri: string, locale: string, opts
     handle.close();
     safeDelete(wavFile);
   }
+}
+
+/** Resolves with `work`, or rejects 'cancelled' as soon as `signal` aborts; a late result goes to `onLate`. */
+function untilAborted<T>(work: Promise<T>, signal: AbortSignal | undefined, onLate: (value: T) => void): Promise<T> {
+  if (!signal) return work;
+  return new Promise<T>((resolve, reject) => {
+    let settled = false;
+    const onAbort = () => {
+      if (settled) return;
+      settled = true;
+      reject(new TranscriptionError('cancelled'));
+    };
+    signal.addEventListener('abort', onAbort);
+    work.then(
+      (v) => {
+        signal.removeEventListener('abort', onAbort);
+        if (settled) onLate(v);
+        else {
+          settled = true;
+          resolve(v);
+        }
+      },
+      (e: unknown) => {
+        signal.removeEventListener('abort', onAbort);
+        if (!settled) {
+          settled = true;
+          reject(e);
+        }
+      },
+    );
+  });
 }
 
 function safeDelete(f: File) {

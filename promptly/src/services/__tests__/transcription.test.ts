@@ -175,3 +175,24 @@ it('does not let the late "end" of a silent part swallow the next part', async (
   expect(r.segments.map((s) => s.text)).toEqual(['p1', 'p3']);
   expect(r.gaps).toBeUndefined();
 });
+
+it('returns at once on Cancel during audio extraction and deletes the late WAV', async () => {
+  const { PromptlyMedia } = jest.requireMock('../nativeMedia');
+  let finish: (v: { uri: string; sampleRate: number; durationMs: number }) => void = () => {};
+  PromptlyMedia.extractAudioToWav.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const ac = new AbortController();
+  const pending = transcribeRecording('file:///docs/take.mp4', 'en-US', { signal: ac.signal }).catch((e: { code: string }) => e.code);
+  await Promise.resolve();
+  ac.abort();
+  expect(await pending).toBe('cancelled');
+  mockFiles.set('file:///cache/late.wav', new Uint8Array(10));
+  finish({ uri: 'file:///cache/late.wav', sampleRate: 16_000, durationMs: 1000 });
+  await Promise.resolve();
+  expect(mockFiles.has('file:///cache/late.wav')).toBe(false);
+  expect(mockStarted).toHaveLength(0);
+});
