@@ -79,7 +79,7 @@ App code: `Paths.availableDiskSpace` (`src/services/files.ts`) blocks recording 
 - React Native's `scripts/cocoapods/privacy_manifest_utils.rb` (`privacy_file_aggregation_enabled: true` by default) merges **only `NSPrivacyAccessedAPITypes`**, and only from pods that ship a `PrivacyInfo.xcprivacy` resource bundle, into the app-level file at `pod install`. It does **not** cover vision-camera, expo-video, expo-sqlite or expo-modules-core, which have no manifest. It never merges `NSPrivacyCollectedDataTypes`.
 - So we should declare everything at app level and not rely on aggregation.
 
-### 3.3 Proposed `ios.privacyManifests` block (paste under `expo.ios` in `app.json`; NOT applied)
+### 3.3 `ios.privacyManifests` block (applied in `app.json`; verified by `expo prebuild -p ios` on 2026-11-21: PrivacyInfo.xcprivacy carries these reasons and data types)
 
 ```json
 "privacyManifests": {
