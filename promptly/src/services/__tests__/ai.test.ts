@@ -73,3 +73,24 @@ describe('runStudio error codes', () => {
     expect(await p).toBe('aborted');
   });
 });
+
+describe('fetchAiBalance', () => {
+  it('signs the balance request only when the server asks for device proof', async () => {
+    const { fetchAiBalance } = require('../ai');
+    fetchMock
+      .mockReset()
+      .mockResolvedValueOnce({ ok: false, status: 403, json: async () => ({ error: 'integrity_required' }) })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ remaining: 7, resetsAt: null }) });
+    expect(await fetchAiBalance()).toEqual({ remaining: 7, resetsAt: null });
+    expect(fetchMock.mock.calls[0][1].headers).not.toHaveProperty('x-integrity-platform');
+    expect(fetchMock.mock.calls[1][1].headers).toMatchObject({ 'x-integrity-platform': 'ios' });
+    expect(mockIntegrity.headersFor).toHaveBeenCalledWith('', expect.anything());
+  });
+
+  it('does not sign when the server does not ask', async () => {
+    const { fetchAiBalance } = require('../ai');
+    fetchMock.mockReset().mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ remaining: 3, resetsAt: null }) });
+    expect(await fetchAiBalance()).toEqual({ remaining: 3, resetsAt: null });
+    expect(mockIntegrity.headersFor).not.toHaveBeenCalled();
+  });
+});

@@ -167,10 +167,18 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
 
   const ip = ipKey(req.headers.get('cf-connecting-ip'));
 
+  const integrity = deps.integrity ?? INTEGRITY_OFF;
+  const ctx = { store: deps.store, now: deps.now, integrity };
+
   if (req.method === 'GET' && url.pathname === '/v1/balance') {
     // Each unknown user id costs a RevenueCat lookup: bounded per address like the studio route.
     const ipBalance = await deps.store.consume(ip, `b:${day}`, deps.config.ipPerDay * 5);
     if (!ipBalance.allowed) return json(429, { error: 'rate_limited' });
+    // With paid quota tied to a verified device, the balance is too (signed over an empty body).
+    if (integrity.config.mode === 'enforce' && integrity.config.paidRequiresIntegrity) {
+      const outcome = await verifyRequestIntegrity(ctx, userId, req.headers, '');
+      if (outcome.status !== 'verified') return json(403, { error: 'integrity_required' });
+    }
     let e: Entitlement;
     try {
       ({ e } = await resolveEntitlement(deps, userId));
@@ -181,9 +189,6 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
     const remaining = await remainingFor(deps.store, `user:${userId}`, q);
     return json(200, { remaining, resetsAt: q.resets ? monthResetsAt : null, plan: e.plan });
   }
-
-  const integrity = deps.integrity ?? INTEGRITY_OFF;
-  const ctx = { store: deps.store, now: deps.now, integrity };
 
   if (req.method === 'POST' && url.pathname.startsWith('/v1/integrity/')) {
     if (integrity.config.mode === 'off') return json(404, { error: 'integrity_disabled' });
@@ -229,7 +234,7 @@ export async function handle(req: Request, deps: Deps): Promise<Response> {
 
   if (integrity.config.mode !== 'off') {
     const outcome = await verifyRequestIntegrity(ctx, userId, req.headers, raw);
-    const decision = decideIntegrity(integrity.config.mode, outcome, ent);
+    const decision = decideIntegrity(integrity.config.mode, outcome, ent, integrity.config.paidRequiresIntegrity);
     deps.log({
       event: 'integrity',
       mode: integrity.config.mode,

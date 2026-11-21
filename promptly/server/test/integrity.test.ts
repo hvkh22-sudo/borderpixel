@@ -305,6 +305,28 @@ describe('enforcement policy', () => {
     expect((await handle(post('/v1/studio', BODY, await ios.headers(BODY, await challenge(ctx.deps))), ctx.deps)).status).toBe(200);
   });
 
+  it('with PAID_REQUIRES_INTEGRITY, a copied paid user id spends nothing and reads no balance', async () => {
+    const ctx = setup({ mode: 'enforce', ent: PRO });
+    ctx.deps.integrity!.config.paidRequiresIntegrity = true;
+    const r = await handle(post('/v1/studio', BODY), ctx.deps);
+    expect(r.status).toBe(403);
+    expect(await ctx.store.get(`user:${USER}`, 'm:2026-10')).toBe(0);
+    const balance = await handle(
+      new Request('https://ai.example/v1/balance', { headers: { 'x-app-user-id': USER, 'cf-connecting-ip': '1.2.3.4' } }),
+      ctx.deps,
+    );
+    expect(balance.status).toBe(403);
+    // The owner's verified device still works, for requests and for the balance.
+    const ios = await iosDevice(ctx);
+    expect((await handle(post('/v1/studio', BODY, await ios.headers(BODY, await challenge(ctx.deps))), ctx.deps)).status).toBe(200);
+    const signed = await ios.headers('', await challenge(ctx.deps));
+    const ok = await handle(
+      new Request('https://ai.example/v1/balance', { headers: { 'x-app-user-id': USER, 'cf-connecting-ip': '1.2.3.4', ...signed } }),
+      ctx.deps,
+    );
+    expect(ok.status).toBe(200);
+  });
+
   it('decision table', () => {
     const failed = { status: 'failed', platform: 'ios', reason: 'x' } as const;
     const ok = { status: 'verified', platform: 'ios' } as const;
@@ -315,6 +337,8 @@ describe('enforcement policy', () => {
     expect(decideIntegrity('enforce', failed, PRO)).toBe('limit');
     expect(decideIntegrity('enforce', failed, { plan: 'lifetime', creditPacks: 0 })).toBe('limit');
     expect(decideIntegrity('enforce', failed, { plan: 'free', creditPacks: 1 })).toBe('limit');
+    expect(decideIntegrity('enforce', failed, PRO, true)).toBe('block');
+    expect(decideIntegrity('report', failed, PRO, true)).toBe('allow');
   });
 });
 

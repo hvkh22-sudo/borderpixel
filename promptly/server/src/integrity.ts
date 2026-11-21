@@ -24,6 +24,13 @@ export interface IntegrityConfig {
   challengesPerDay: number;
   /** Paying users whose integrity fails under `enforce` are limited to this many requests/day. */
   unverifiedPaidPerDay: number;
+  /**
+   * Under `enforce`, paid quota and the balance need a verified device too (no unverified allowance).
+   * Closes spending or reading another user's paid quota with a copied user id; the cost is that a
+   * paying user on a device that cannot pass App Attest / Play Integrity loses AI. Off by default:
+   * a product decision (PAID_REQUIRES_INTEGRITY=true).
+   */
+  paidRequiresIntegrity?: boolean;
 }
 
 export interface IntegrityDeps {
@@ -196,7 +203,7 @@ export type IntegrityDecision = 'allow' | 'block' | 'limit';
  * Policy. off/report never block. enforce: free tier without a verified install is
  * blocked; paying users are never hard-blocked by integrity (they get a daily cap instead).
  */
-export function decideIntegrity(mode: IntegrityMode, outcome: IntegrityOutcome, ent: Entitlement): IntegrityDecision {
+export function decideIntegrity(mode: IntegrityMode, outcome: IntegrityOutcome, ent: Entitlement, paidRequiresIntegrity = false): IntegrityDecision {
   if (mode !== 'enforce' || outcome.status === 'verified') return 'allow';
-  return isPaying(ent) ? 'limit' : 'block';
+  return isPaying(ent) && !paidRequiresIntegrity ? 'limit' : 'block';
 }

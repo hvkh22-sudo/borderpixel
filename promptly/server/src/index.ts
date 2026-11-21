@@ -40,6 +40,7 @@ export interface Env {
   /** Secret: Google service-account JSON with access to the Play Integrity API. */
   PLAY_INTEGRITY_SA_JSON?: string;
   UNVERIFIED_PAID_PER_DAY?: string;
+  PAID_REQUIRES_INTEGRITY?: string;
   COUNTERS: DurableObjectNamespace<Counters>;
 }
 
@@ -164,6 +165,7 @@ function integrityDeps(env: Env): IntegrityDeps {
       androidCertDigests: (env.ANDROID_CERT_SHA256 ?? '').split(',').map((d) => d.trim()).filter(Boolean),
       ...INTEGRITY_DEFAULTS,
       unverifiedPaidPerDay: num(env.UNVERIFIED_PAID_PER_DAY, INTEGRITY_DEFAULTS.unverifiedPaidPerDay),
+      paidRequiresIntegrity: env.PAID_REQUIRES_INTEGRITY === 'true',
     },
     decodePlayToken: sa ? (token, pkg) => decodeIntegrityToken(token, pkg, sa, Date.now()) : undefined,
   };

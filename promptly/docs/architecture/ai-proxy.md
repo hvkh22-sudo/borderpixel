@@ -120,9 +120,11 @@ character plus 2,000 tokens for the schema.
 - **Spoofed user IDs (security review 2026-11-01, confirmed by probe):** `x-app-user-id` is the only
   identity. Anyone who learns a paying user's anonymous RevenueCat ID can read their balance and spend
   their AI requests (all of them under `report`, 30/day under `enforce` via the unverified-paid cap).
-  Proposed fix, not built yet: paid quota spendable only with a verified App Attest / Play Integrity
-  proof for that ID (or a server-signed per-install token issued after the first verified request), and
-  `/v1/balance` behind the same proof under `enforce`. Needs a founder decision before AI goes live.
+  **Built 2026-11-21, off by default:** `PAID_REQUIRES_INTEGRITY=true` (with `INTEGRITY_MODE=enforce`)
+  removes the unverified paid allowance: paid quota and `/v1/balance` need a verified App Attest / Play
+  Integrity proof for that ID (the app signs the balance request only when the server answers
+  `integrity_required`). Trade-off: a paying user on a device that cannot pass verification (rooted,
+  some emulators) loses AI. Founder decision before AI goes live; recommended on.
 - **Free-tier draining:** random IDs each get the free allowance; with rotating IPs the free daily budget
   can be spent by one attacker until `enforce` is on. `enforce` is a deploy gate, not optional.
 - Founder approval of model, allowances, budget; set `AI_ENABLED=true`.

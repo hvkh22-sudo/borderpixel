@@ -124,7 +124,17 @@ export async function fetchAiBalance(): Promise<{ remaining: number; resetsAt: s
   const userId = await appUserId();
   if (!userId) return null;
   try {
-    const res = await fetch(`${config.aiBaseUrl}/v1/balance`, { headers: { 'x-app-user-id': userId } });
+    const url = `${config.aiBaseUrl}/v1/balance`;
+    let res = await fetch(url, { headers: { 'x-app-user-id': userId } });
+    // A server that ties paid quota to a verified device asks for proof here too. Signed only when
+    // asked: each signature uses one of the day's integrity challenges.
+    if (res.status === 403 && integrityHeadersEnabled()) {
+      const err = (await res.json().catch(() => ({}))) as { error?: string };
+      if (err.error === 'integrity_required') {
+        const signed = await integrity.headersFor('', integrityTransport(userId));
+        res = await fetch(url, { headers: { 'x-app-user-id': userId, ...signed } });
+      }
+    }
     return res.ok ? ((await res.json()) as { remaining: number; resetsAt: string | null }) : null;
   } catch {
     return null;
