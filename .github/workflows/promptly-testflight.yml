@@ -1,0 +1,116 @@
+# Manual: builds the iOS app in Expo's cloud (EAS Build) and, when asked, uploads it to TestFlight.
+# Needs repository secrets (Settings → Secrets and variables → Actions), added by the founder:
+#   EXPO_TOKEN      — expo.dev access token
+#   ASC_KEY_ID      — App Store Connect API key id (Team key, App Manager role)
+#   ASC_ISSUER_ID   — App Store Connect API issuer id
+#   ASC_KEY_P8      — the full text of the key's .p8 file
+#   APPLE_TEAM_ID   — Apple Developer team id
+# The bundle id is an input (chosen once by the founder; it cannot change for an App Store Connect app).
+# Nothing here is committed back: app.json / eas.json are patched only inside the runner.
+name: promptly-testflight
+
+on:
+  workflow_dispatch:
+    inputs:
+      bundle_id:
+        description: 'iOS bundle id, e.g. com.example.teleprompter'
+        required: true
+        type: string
+      submit:
+        description: 'Upload the build to TestFlight (needs asc_app_id)'
+        required: false
+        type: boolean
+        default: false
+      asc_app_id:
+        description: 'App Store Connect app id (numeric "Apple ID" of the app) — required to upload'
+        required: false
+        type: string
+      apple_team_type:
+        description: 'Apple team type'
+        required: false
+        type: choice
+        default: INDIVIDUAL
+        options: [INDIVIDUAL, COMPANY_OR_ORGANIZATION]
+
+concurrency:
+  group: promptly-testflight
+  cancel-in-progress: false
+
+jobs:
+  testflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        working-directory: promptly
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: promptly/package-lock.json
+
+      - name: Check secrets are present (names only)
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          SUBMIT: ${{ inputs.submit }}
+          ASC_APP_ID: ${{ inputs.asc_app_id }}
+        run: |
+          missing=0
+          for v in EXPO_TOKEN ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8 APPLE_TEAM_ID; do
+            if [ -z "${!v}" ]; then echo "::error::Repository secret $v is not set"; missing=1; fi
+          done
+          if [ "$SUBMIT" = "true" ] && [ -z "$ASC_APP_ID" ]; then
+            echo "::error::Upload needs asc_app_id (create the app in App Store Connect first)"; missing=1
+          fi
+          exit $missing
+
+      - run: npm ci --no-audit --no-fund
+
+      - name: Apply bundle id (and App Store Connect app id)
+        env:
+          BUNDLE_ID: ${{ inputs.bundle_id }}
+          ASC_APP_ID: ${{ inputs.asc_app_id }}
+        run: node scripts/testflightConfig.js "$BUNDLE_ID" "$ASC_APP_ID"
+
+      - name: Write the App Store Connect key to a temp file
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          umask 077
+          printf '%s\n' "$ASC_KEY_P8" > "$RUNNER_TEMP/asc_key.p8"
+          grep -q 'BEGIN PRIVATE KEY' "$RUNNER_TEMP/asc_key.p8" || { echo "::error::ASC_KEY_P8 does not look like a .p8 key"; exit 1; }
+
+      - name: Link the EAS project (creates it on first run)
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: npx --yes eas-cli@latest init --non-interactive --force
+
+      - name: Build for the App Store (EAS Build, ~30–40 min)
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_ASC_API_KEY_PATH: ${{ runner.temp }}/asc_key.p8
+          EXPO_ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          EXPO_ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          EXPO_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          EXPO_APPLE_TEAM_TYPE: ${{ inputs.apple_team_type }}
+        run: npx --yes eas-cli@latest build --platform ios --profile testflight --non-interactive --wait
+
+      - name: Upload to TestFlight
+        if: ${{ inputs.submit }}
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_ASC_API_KEY_PATH: ${{ runner.temp }}/asc_key.p8
+          EXPO_ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          EXPO_ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          EXPO_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: npx --yes eas-cli@latest submit --platform ios --profile testflight --latest --non-interactive --wait
+
+      - name: Remove the key file
+        if: always()
+        run: rm -f "$RUNNER_TEMP/asc_key.p8"
