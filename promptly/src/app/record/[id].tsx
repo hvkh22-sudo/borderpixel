@@ -217,7 +217,13 @@ export default function RecordScreen() {
     separateAudio,
     voiceFollow: voice
       ? {
-          start: (take) => vf.start({ locale: speechLocale, persistAudio: separateAudio, audioFilePrefix: separateAudio ? take?.audioFilePrefix : undefined }),
+          start: (take) =>
+            vf.start({
+              locale: speechLocale,
+              persistAudio: separateAudio,
+              audioFilePrefix: separateAudio ? take?.audioFilePrefix : undefined,
+              recordingStartedAt: take?.recordingStartedAt,
+            }),
           stop: vf.stop,
           collectedAudio: vf.collectedAudio,
         }

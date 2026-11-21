@@ -17,6 +17,7 @@ import { adoptRecording, recordingFile, recordingNameIfInside, scratchFile, toFi
 import { PromptlyMedia } from '../../services/nativeMedia';
 import type { RecordingStatusRow } from '../../storage/repositories';
 import type { PersistedAudio } from '../voice-follow/voiceFollowController';
+import { type AudioTimingSegment, audioTimingFileName, muxSegments, parseAudioTiming, serializeAudioTiming } from './audioTiming';
 import { markRecordingActive } from './orphanRecovery';
 
 export interface FinalizeInput {
@@ -110,19 +111,33 @@ async function finalizeNamed(input: FinalizeInput, id: string, inPlace: string |
 
   if (audioMergeFailed && input.separateAudio.length > 0) {
     // Never lose the speaker's audio: keep it next to the video for a later retry.
-    await Promise.all(
-      input.separateAudio.map(async (a, i) => {
+    const kept = await Promise.all(
+      input.separateAudio.map(async (a, i): Promise<AudioTimingSegment | null> => {
         const src = new File(toFileUri(a.uri));
-        if (!src.exists) return;
+        if (!src.exists) return null;
         // Already kept next to the video (the recognizer wrote it there): nothing to move.
-        if (src.uri.startsWith(recordingFile(`${base}_audio_`).uri)) return;
+        if (src.uri.startsWith(recordingFile(`${base}_audio_`).uri)) return { file: src.name, startedAt: a.startedAt };
         const dest = recordingFile(`${base}_audio_${i}.wav`);
-        if (dest.exists) return;
+        if (dest.exists) return null;
         await src.copy(dest);
         // The recognizer writes to a cache location; drop it once the documents copy is verified.
-        if (exists(dest)) deleteQuietly(src);
+        if (!exists(dest)) return null;
+        deleteQuietly(src);
+        return { file: dest.name, startedAt: a.startedAt };
       }),
     );
+    // With their offsets, so "Restore sound" on the take can merge them later.
+    const segments = kept.filter((k): k is AudioTimingSegment => k !== null);
+    if (segments.length > 0) {
+      try {
+        const timing = recordingFile(audioTimingFileName(`${base}.mp4`));
+        if (timing.exists) timing.delete();
+        timing.create();
+        timing.write(serializeAudioTiming({ version: 1, recordingStartedAt: input.recordingStartedAt, segments }));
+      } catch (e) {
+        logDiagnostic('mux', 'timing_write_failed', e);
+      }
+    }
   }
 
   const repos = await getRepositories();
@@ -141,6 +156,66 @@ async function finalizeNamed(input: FinalizeInput, id: string, inPlace: string |
     audioMissing: audioMergeFailed,
   });
   return { recordingId: id, audioMergeFailed };
+}
+
+export type RestoreAudioError = 'unavailable' | 'no_audio' | 'failed';
+
+/** Whether a take saved without sound has kept audio with timing that Restore sound can merge. */
+export function canRestoreAudio(fileName: string): boolean {
+  if (!PromptlyMedia.isAvailable() || /_av\.mp4$/i.test(fileName)) return false;
+  try {
+    const timing = recordingFile(audioTimingFileName(fileName));
+    if (!exists(timing)) return false;
+    const t = parseAudioTiming(timing.textSync());
+    return !!t && muxSegments(t, (f) => exists(recordingFile(f))).length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Merges a take's kept audio (WAVs + timing file next to it) into `take_X_av.mp4`, the same way
+ * finalizeTake does, then points the row at it. The video-only original, the WAVs and the timing
+ * file are removed only after the merged file is in place; any failure leaves everything as it was.
+ */
+export async function restoreTakeAudio(rec: { id: string; fileName: string; durationMs: number }): Promise<{ fileName: string } | { error: RestoreAudioError }> {
+  if (!PromptlyMedia.isAvailable()) return { error: 'unavailable' };
+  const stem = rec.fileName.replace(/\.(mov|mp4)$/i, '');
+  const raw = recordingFile(rec.fileName);
+  const timingFile = recordingFile(audioTimingFileName(rec.fileName));
+  let t: ReturnType<typeof parseAudioTiming> = null;
+  try {
+    t = exists(timingFile) ? parseAudioTiming(timingFile.textSync()) : null;
+  } catch {
+    t = null;
+  }
+  const segments = t ? muxSegments(t, (f) => exists(recordingFile(f))) : [];
+  if (!exists(raw) || segments.length === 0) return { error: 'no_audio' };
+  const mergedName = `${stem}_av.mp4`;
+  const tmp = scratchFile(mergedName);
+  try {
+    if (tmp.exists) tmp.delete();
+    const job = PromptlyMedia.muxAudio(
+      raw.uri,
+      segments.map((s) => ({ uri: recordingFile(s.file).uri, offsetMs: s.offsetMs })),
+      tmp.uri,
+    );
+    await withTimeout(job.promise, muxTimeoutMs(rec.durationMs), () => job.cancel());
+    if (!exists(tmp)) throw new Error('mux produced no output');
+    const dest = recordingFile(mergedName);
+    await tmp.move(dest);
+    if (!exists(dest)) throw new Error('merged file missing after move');
+    await (await getRepositories()).recordings.replaceWithMerged(rec.id, mergedName);
+  } catch (e) {
+    logDiagnostic('mux', 'restore_audio_failed', e);
+    deleteQuietly(scratchFile(mergedName));
+    return { error: 'failed' };
+  }
+  // Safe now: the row points at the merged file.
+  deleteQuietly(raw);
+  for (const s of segments) deleteQuietly(recordingFile(s.file));
+  deleteQuietly(timingFile);
+  return { fileName: mergedName };
 }
 
 /** Generous: iOS re-encodes the video when adding audio. */

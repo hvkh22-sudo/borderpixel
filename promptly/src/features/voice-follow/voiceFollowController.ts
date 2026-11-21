@@ -41,6 +41,8 @@ export interface SpeechStartOptions {
    * OS cache, which a force-closed app's take would lose.
    */
   audioFilePrefix?: string;
+  /** Epoch ms the take's video started; with audioFilePrefix, segment timing is kept next to the take. */
+  recordingStartedAt?: number;
 }
 
 /** A persisted audio file covering part of the session. */

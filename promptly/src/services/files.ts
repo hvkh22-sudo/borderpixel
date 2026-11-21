@@ -109,7 +109,10 @@ export async function adoptRecording(sourcePath: string, fileName: string): Prom
  */
 export function isAudioSidecarOf(takeFileName: string, name: string): boolean {
   const stem = takeFileName.replace(/\.(mov|mp4)$/i, '');
-  if (stem === takeFileName || !name.startsWith(`${stem}_audio_`)) return false;
+  if (stem === takeFileName) return false;
+  // The timing file of those WAVs (`X_audio.json`) belongs to the take too.
+  if (name === `${stem}_audio.json`) return true;
+  if (!name.startsWith(`${stem}_audio_`)) return false;
   return /^\d+\.wav$/i.test(name.slice(stem.length + '_audio_'.length));
 }
 

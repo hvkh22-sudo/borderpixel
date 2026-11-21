@@ -465,6 +465,11 @@ export class RecordingRepository {
     ]);
   }
 
+  /** The take now lives in `fileName` with its sound merged (Restore sound). */
+  async replaceWithMerged(id: string, fileName: string): Promise<void> {
+    await this.deps.db.runAsync('UPDATE recordings SET file_name = ?, audio_missing = 0 WHERE id = ?', [fileName, id]);
+  }
+
   async markSavedToLibrary(id: string): Promise<void> {
     await this.deps.db.runAsync('UPDATE recordings SET saved_to_library = 1 WHERE id = ?', [id]);
   }

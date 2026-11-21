@@ -10,6 +10,7 @@
  * must stay behind the `voiceFollow` feature flag until the on-device PoC
  * matrix (docs/testing/device-matrix.md) passes.
  */
+import { File } from 'expo-file-system';
 import {
   AVAudioSessionCategory,
   AVAudioSessionCategoryOptions,
@@ -18,7 +19,18 @@ import {
 } from 'expo-speech-recognition';
 import { Platform } from 'react-native';
 
+import { type AudioTiming, serializeAudioTiming, withSegment } from '../features/recording/audioTiming';
 import type { PersistedAudio, SpeechEngine, SpeechErrorCode, SpeechStartOptions } from '../features/voice-follow/voiceFollowController';
+
+/** Writes text to a file URI (replaced in tests). Best effort: a failure only loses the timing file. */
+export type TimingWriter = (uri: string, text: string) => void;
+
+const writeTimingFile: TimingWriter = (uri, text) => {
+  const f = new File(uri);
+  if (f.exists) f.delete();
+  f.create();
+  f.write(text);
+};
 
 const KNOWN_ERRORS: ReadonlySet<SpeechErrorCode> = new Set([
   'not-allowed',
@@ -42,6 +54,24 @@ export class ExpoSpeechEngine implements SpeechEngine {
   private running = false;
   private lastOptions: SpeechStartOptions | null = null;
   private audioStartedAt = new Map<string, number>();
+  /** Segment timing of the current take, mirrored to `<take>_audio.json` (see audioTiming.ts). */
+  private timing: AudioTiming | null = null;
+
+  constructor(private readonly writeTiming: TimingWriter = writeTimingFile) {}
+
+  /** Records when a persisted audio file of this take started, next to the take. */
+  private noteAudioStart(uri: string, timestamp: number): void {
+    const o = this.lastOptions;
+    if (!this.timing || !o?.audioFilePrefix) return;
+    const file = uri.slice(uri.lastIndexOf('/') + 1);
+    if (!file.startsWith(o.audioFilePrefix.slice(o.audioFilePrefix.lastIndexOf('/') + 1))) return;
+    this.timing = withSegment(this.timing, { file, startedAt: timestamp });
+    try {
+      this.writeTiming(`${o.audioFilePrefix}_audio.json`, serializeAudioTiming(this.timing));
+    } catch {
+      // Best effort: the normal path merges from in-memory timing; this file only helps after a crash.
+    }
+  }
   private restartTimer: ReturnType<typeof setTimeout> | null = null;
   /** A native session was started and has not reported 'end' yet. */
   private nativeActive = false;
@@ -61,6 +91,10 @@ export class ExpoSpeechEngine implements SpeechEngine {
   async start(options: SpeechStartOptions): Promise<void> {
     this.lastOptions = options;
     this.audioIndex = 0;
+    this.timing =
+      options.persistAudio && options.audioFilePrefix && options.recordingStartedAt != null
+        ? { version: 1, recordingStartedAt: options.recordingStartedAt, segments: [] }
+        : null;
     this.running = true;
     this.transientErrors = 0;
     this.clearRestart();
@@ -168,7 +202,10 @@ export class ExpoSpeechEngine implements SpeechEngine {
 
   onAudioPersisted(cb: (a: PersistedAudio) => void): () => void {
     const start = ExpoSpeechRecognitionModule.addListener('audiostart', (e) => {
-      if (e.uri) this.audioStartedAt.set(e.uri, e.timestamp);
+      if (e.uri) {
+        this.audioStartedAt.set(e.uri, e.timestamp);
+        this.noteAudioStart(e.uri, e.timestamp);
+      }
     });
     const end = ExpoSpeechRecognitionModule.addListener('audioend', (e) => {
       if (!e.uri) return;

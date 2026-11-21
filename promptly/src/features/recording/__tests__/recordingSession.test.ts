@@ -223,7 +223,7 @@ describe('RecordingSession', () => {
     const h = setup();
     const vf = fakeVoiceFollow();
     await startRecording(h, { scriptId: 's1', voiceFollow: vf, separateAudio: true });
-    expect(vf.start).toHaveBeenCalledWith({ audioFilePrefix: 'file:///docs/recordings/take_1' });
+    expect(vf.start).toHaveBeenCalledWith({ audioFilePrefix: 'file:///docs/recordings/take_1', recordingStartedAt: expect.any(Number) });
   });
 
   it('a Voice Follow start failure never stops the recording', async () => {

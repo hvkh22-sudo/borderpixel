@@ -11,6 +11,7 @@ import { Text } from '../../components/Text';
 import { CaptionPreview } from '../../features/captions/CaptionPreview';
 import { activeWordIndex, cueAt } from '../../features/captions/captions';
 import { checkFeature } from '../../features/monetization/entitlements';
+import { canRestoreAudio, restoreTakeAudio } from '../../features/recording/finalizeTake';
 import { takeTip } from '../../features/onboarding/firstRun';
 import { useFocusData } from '../../hooks/useAsyncData';
 import { formatClock, t } from '../../localization/i18n';
@@ -24,7 +25,8 @@ import { radius, spacing } from '../../theme/tokens';
 
 export default function Take() {
   const { id, audioIssue, notice } = useLocalSearchParams<{ id: string; audioIssue?: string; notice?: string }>();
-  const { data, error } = useFocusData(async () => {
+  const [restoring, setRestoring] = useState(false);
+  const { data, error, reload } = useFocusData(async () => {
     const repos = await getRepositories();
     const r = await repos.recordings.get(id);
     // Retake needs the script; a deleted one would open an empty prepare screen.
@@ -35,6 +37,8 @@ export default function Take() {
   // Once per loaded take, not per render: playback re-renders this screen ten times a second.
   const file = useMemo(() => (rec ? recordingFile(rec.fileName) : null), [rec]);
   const exists = useMemo(() => file?.exists ?? false, [file]);
+  // Reads the take's timing file: once per loaded take, like the file check above.
+  const restorable = useMemo(() => !!rec?.audioMissing && canRestoreAudio(rec.fileName), [rec]);
   const player = useVideoPlayer(exists && file ? file.uri : null, (p) => {
     p.loop = true;
     p.timeUpdateEventInterval = 0.1;
@@ -73,6 +77,20 @@ export default function Take() {
   }
 
   const activeCue = rec.cues ? cueAt(rec.cues, time.currentTime * 1000) : undefined;
+
+  // The kept audio of a take saved without sound, merged on request (not automatically at launch).
+  const restoreSound = async () => {
+    if (restoring) return;
+    setRestoring(true);
+    player.pause();
+    const r = await restoreTakeAudio(rec);
+    setRestoring(false);
+    if ('error' in r) {
+      Alert.alert(t('preview.restoreSoundFailed'));
+      return;
+    }
+    reload();
+  };
 
   const remove = () =>
     Alert.alert(t('preview.delete'), t('preview.deleteConfirm'), [
@@ -128,6 +146,17 @@ export default function Take() {
         <Text variant="callout" muted center accessibilityLiveRegion="polite">
           {t('record.savedNoAudio')}
         </Text>
+      ) : null}
+      {restorable ? (
+        <Button
+          testID="take-restore-sound"
+          label={restoring ? t('preview.restoringSound') : t('preview.restoreSound')}
+          icon="volume-high-outline"
+          variant="secondary"
+          loading={restoring}
+          disabled={restoring}
+          onPress={() => void restoreSound()}
+        />
       ) : null}
       {notice === 'interrupted' || notice === 'storage_full' ? (
         <Text variant="callout" muted center accessibilityLiveRegion="polite">

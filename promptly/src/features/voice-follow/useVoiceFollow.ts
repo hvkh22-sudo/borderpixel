@@ -12,7 +12,7 @@ import { PersistedAudio, VoiceFollowController, VoiceFollowSnapshot } from './vo
 
 export interface VoiceFollowApi {
   snapshot: VoiceFollowSnapshot;
-  start(opts: { locale: string; persistAudio: boolean; audioFilePrefix?: string }): Promise<boolean>;
+  start(opts: { locale: string; persistAudio: boolean; audioFilePrefix?: string; recordingStartedAt?: number }): Promise<boolean>;
   stop(): Promise<PersistedAudio[]>;
   /** Audio segments persisted so far (fallback when stop() does not settle). */
   collectedAudio(): PersistedAudio[];
@@ -69,7 +69,17 @@ export function useVoiceFollow(script: string): VoiceFollowApi {
   }, [controller, engine]);
 
   const start = useCallback(
-    async ({ locale, persistAudio, audioFilePrefix }: { locale: string; persistAudio: boolean; audioFilePrefix?: string }) => {
+    async ({
+      locale,
+      persistAudio,
+      audioFilePrefix,
+      recordingStartedAt,
+    }: {
+      locale: string;
+      persistAudio: boolean;
+      audioFilePrefix?: string;
+      recordingStartedAt?: number;
+    }) => {
       const gen = ++generation.current;
       let granted = false;
       try {
@@ -91,6 +101,7 @@ export function useVoiceFollow(script: string): VoiceFollowApi {
           onDevice: getSpeechCapabilities().onDevice,
           persistAudio,
           audioFilePrefix,
+          recordingStartedAt,
         });
       } catch {
         controller.handleError('unknown');

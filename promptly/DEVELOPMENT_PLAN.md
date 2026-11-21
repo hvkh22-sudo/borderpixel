@@ -136,7 +136,9 @@ and spaced paths and bare media/JSON file names; one caption run and one record 
 Cancel works during the permission prompt; a cancel is no longer logged as a failure.
 Voice Follow audio (separate-audio takes) is now written next to the take as `take_X_audio_N.wav`
 (2026-11-01), so a force-closed take keeps its sound on disk; the recovered take is flagged and the
-WAVs stay with it (no automatic re-merge yet — offsets of later segments are not stored). Open: Android audio extraction: Cancel now returns at once and the
+WAVs stay with it (2026-11-21: each segment's start is kept in `take_X_audio.json` while recording and by finalize when
+the merge fails; the take screen offers **Restore sound**, which merges on request — not automatically at
+launch — and removes the original, WAVs and timing file only once the merged file is in place). Open: Android audio extraction: Cancel now returns at once and the
 late WAV is deleted (the native decode itself still runs to its end);
 caption timing with per-utterance timestamps needs a long-take device test (Android 14, iOS 18); Voice
 Follow on iOS may still use server recognition for a language without an on-device model (documented in

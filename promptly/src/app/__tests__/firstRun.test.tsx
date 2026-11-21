@@ -23,6 +23,11 @@ jest.mock('../../services/files', () => ({
   exportsDir: () => ({}),
   availableBytes: () => Number.MAX_SAFE_INTEGER,
 }));
+const mockRestore = { can: false, run: jest.fn() };
+jest.mock('../../features/recording/finalizeTake', () => ({
+  canRestoreAudio: () => mockRestore.can,
+  restoreTakeAudio: (...a: unknown[]) => mockRestore.run(...a),
+}));
 jest.mock('expo-video', () => ({
   useVideoPlayer: () => ({ currentTime: 0, duration: 10, play: jest.fn(), pause: jest.fn() }),
   VideoView: () => null,
@@ -262,5 +267,37 @@ describe('Take screen states', () => {
     await buttons.find((b) => b.style === 'destructive')!.onPress!();
     expect(alert).toHaveBeenLastCalledWith('Something went wrong.');
     expect(require('expo-router').router.back).not.toHaveBeenCalled();
+  });
+});
+
+describe('Take screen: Restore sound', () => {
+  afterEach(() => {
+    mockRestore.can = false;
+    mockRestore.run.mockReset();
+  });
+
+  it('offers Restore sound for a take saved without sound when its audio was kept, then reloads', async () => {
+    const take = await mockRepos.recordings.add({ scriptId: null, fileName: 'take.mp4', durationMs: 4000, width: null, height: null, status: 'ready', audioMissing: true });
+    mockParams.id = take.id;
+    mockRestore.can = true;
+    mockRestore.run.mockImplementation(async () => {
+      await mockRepos.recordings.replaceWithMerged(take.id, 'take_av.mp4');
+      return { fileName: 'take_av.mp4' };
+    });
+    const Take = require('../take/[id]').default;
+    await renderScreen(<Take />);
+    await fireEvent.press(await screen.findByTestId('take-restore-sound'));
+    expect(mockRestore.run).toHaveBeenCalledWith(expect.objectContaining({ id: take.id, fileName: 'take.mp4' }));
+    await waitFor(() => expect(screen.queryByTestId('take-restore-sound')).toBeNull());
+    expect((await mockRepos.recordings.get(take.id))?.audioMissing).toBe(false);
+  });
+
+  it('does not offer it when no audio was kept', async () => {
+    const take = await mockRepos.recordings.add({ scriptId: null, fileName: 'take.mp4', durationMs: 4000, width: null, height: null, status: 'ready', audioMissing: true });
+    mockParams.id = take.id;
+    const Take = require('../take/[id]').default;
+    await renderScreen(<Take />);
+    await screen.findByTestId('take-export');
+    expect(screen.queryByTestId('take-restore-sound')).toBeNull();
   });
 });

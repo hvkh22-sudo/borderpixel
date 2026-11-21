@@ -40,7 +40,7 @@ export interface RecorderLike {
 
 export interface VoiceFollowLike {
   /** `audioFilePrefix`: the take's file URI without extension, for audio files kept next to it. */
-  start(take?: { audioFilePrefix: string }): Promise<boolean>;
+  start(take?: { audioFilePrefix: string; recordingStartedAt: number }): Promise<boolean>;
   stop(): Promise<PersistedAudio[]>;
   /** Audio segments persisted so far (used when stop() does not settle in time). */
   collectedAudio(): PersistedAudio[];
@@ -404,7 +404,7 @@ export class RecordingSession {
   private async startVoiceFollow(take: Take, vf: VoiceFollowLike): Promise<void> {
     let ok = false;
     try {
-      ok = await vf.start({ audioFilePrefix: audioPrefixFor(take.plannedPath) });
+      ok = await vf.start({ audioFilePrefix: audioPrefixFor(take.plannedPath), recordingStartedAt: take.startedAt ?? this.deps.now() });
     } catch (e) {
       // Voice Follow is best effort: the recording keeps running with manual scrolling.
       this.deps.log?.('voice follow start failed', e);
