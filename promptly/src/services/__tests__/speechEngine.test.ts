@@ -130,3 +130,33 @@ describe('persistOptions', () => {
     expect(persistOptions('take_1', 0)).toEqual({ persist: true });
   });
 });
+
+describe('segment timing next to the take', () => {
+  it('records each persisted segment start of this take in take_X_audio.json', async () => {
+    const writes: [string, string][] = [];
+    const engine = new ExpoSpeechEngine((uri, text) => writes.push([uri, text]));
+    engine.onAudioPersisted(() => {});
+    await engine.start({ ...opts, persistAudio: true, audioFilePrefix: 'file:///docs/recordings/take_7', recordingStartedAt: 1_000 });
+    emit('audiostart', { uri: 'file:///docs/recordings/take_7_audio_0.wav', timestamp: 1_120 });
+    emit('audiostart', { uri: 'file:///cache/other_take.wav', timestamp: 1_500 }); // not this take's file
+    emit('audiostart', { uri: 'file:///docs/recordings/take_7_audio_1.wav', timestamp: 9_000 });
+    expect(writes.at(-1)![0]).toBe('file:///docs/recordings/take_7_audio.json');
+    expect(JSON.parse(writes.at(-1)![1])).toEqual({
+      version: 1,
+      recordingStartedAt: 1_000,
+      segments: [
+        { file: 'take_7_audio_0.wav', startedAt: 1_120 },
+        { file: 'take_7_audio_1.wav', startedAt: 9_000 },
+      ],
+    });
+  });
+
+  it('writes nothing when audio is not persisted for a take', async () => {
+    const writes: string[] = [];
+    const engine = new ExpoSpeechEngine((uri) => writes.push(uri));
+    engine.onAudioPersisted(() => {});
+    await engine.start(opts);
+    emit('audiostart', { uri: 'file:///cache/a.wav', timestamp: 1 });
+    expect(writes).toEqual([]);
+  });
+});
