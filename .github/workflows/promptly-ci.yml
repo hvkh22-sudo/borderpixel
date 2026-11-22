@@ -141,7 +141,7 @@ jobs:
 
   ios:
     runs-on: macos-26
-    timeout-minutes: 90
+    timeout-minutes: 120  # build ~35–45 min + flows ~30–40 min on a shared macOS runner
     steps:
       - uses: actions/checkout@v4
       # Expo SDK 58 Swift packages need Swift tools 6.2 (Xcode 26+): pick the newest installed Xcode.
